@@ -21,7 +21,7 @@ Plateforme d'hébergement de formations en ligne, pensée comme une alternative 
 ## État d'avancement
 
 - **Fait** : toute la V1 du plan (Phases 0 à 6), testée de bout en bout sur émulateurs.
-- **Production** : projet Firebase `forma-host`, déployé automatiquement par GitHub Actions (`Déploiement Firebase`) dès que le secret `FIREBASE_SERVICE_ACCOUNT` est ajouté. Adresse : https://forma-host--forma-host.europe-west4.hosted.app. Voir [`docs/SETUP.md`](docs/SETUP.md).
+- **Production** : projet Firebase `forma-host`, déployé automatiquement par GitHub Actions (`Déploiement Firebase`), accès sans clé via Workload Identity Federation. Adresse : https://forma-host--forma-host.europe-west4.hosted.app. Voir [`docs/SETUP.md`](docs/SETUP.md).
 - **V2** : Stripe (abonnement formateur) et coupons / codes promo, chat formateur ↔ élève, onboarding self-service des formateurs.
 
 ## Structure

@@ -3,12 +3,14 @@ name: Déploiement Firebase
 # Déploie le projet Firebase « forma-host » à chaque push sur la branche par défaut,
 # ou à la demande (onglet Actions > Déploiement Firebase > Run workflow).
 #
-# Secrets GitHub (Settings > Secrets and variables > Actions) :
-#   FIREBASE_SERVICE_ACCOUNT  (obligatoire) clé JSON d'un compte de service du projet
-#   VIMEO_ACCESS_TOKEN        (optionnel)   token personnel Vimeo, scope « private »
-#   SMTP_CONNECTION_URI       (optionnel)   ex. smtps://login@smtp-relay.brevo.com:465
-#   SMTP_PASSWORD             (optionnel)   clé SMTP Brevo
-#   MAIL_FROM                 (optionnel)   ex. Ecole Motion <contact@ecolemotion.com>
+# Accès au projet sans clé (Workload Identity Federation) : lancer une fois
+# scripts/setup-github-deploy.sh dans Cloud Shell, puis renseigner PROJECT_NUMBER ci-dessous.
+#
+# Secrets GitHub optionnels (Settings > Secrets and variables > Actions) :
+#   VIMEO_ACCESS_TOKEN   token personnel Vimeo, scope « private »
+#   SMTP_CONNECTION_URI  ex. smtps://login@smtp-relay.brevo.com:465
+#   SMTP_PASSWORD        clé SMTP Brevo
+#   MAIL_FROM            ex. Ecole Motion <contact@ecolemotion.com>
 
 on:
   push:
@@ -32,9 +34,12 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   PROJECT_ID: forma-host
+  # Numéro du projet Google Cloud (affiché par scripts/setup-github-deploy.sh).
+  PROJECT_NUMBER: ""
   REGION: europe-west4
   BACKEND_ID: forma-host
 
@@ -43,18 +48,16 @@ jobs:
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     outputs:
-      ready: ${{ steps.secret.outputs.ready }}
+      ready: ${{ steps.config.outputs.ready }}
     steps:
-      - id: secret
-        env:
-          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - id: config
         run: |
-          if [ -n "$SA" ]; then
+          if [ -n "$PROJECT_NUMBER" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "### Déploiement ignoré" >> "$GITHUB_STEP_SUMMARY"
-            echo "Ajoute le secret FIREBASE_SERVICE_ACCOUNT (voir docs/SETUP.md)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Accès au projet pas encore configuré (voir docs/SETUP.md)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   deploy:
@@ -75,7 +78,8 @@ jobs:
 
       - uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/forma-host-repo
+          service_account: github-deploy@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
 
       - name: Dépendances
         run: |

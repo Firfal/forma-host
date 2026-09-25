@@ -4,24 +4,22 @@ Pour le développement local, les émulateurs suffisent (voir le README).
 
 > **Région unique : `europe-west4` (Pays-Bas).** La région de Firestore et celle du bucket Storage ne peuvent **plus être changées** après leur création.
 
-Le déploiement est **automatique** : le workflow GitHub Actions `Déploiement Firebase` (`.github/workflows/deploy.yml`) prépare le projet et déploie tout à chaque push sur la branche par défaut. Il suffit de lui donner un accès au projet (étape 1).
+Le déploiement est **automatique** : le workflow GitHub Actions `Déploiement Firebase` (`.github/workflows/deploy.yml`) prépare le projet et déploie tout à chaque push sur la branche par défaut. Il suffit de lui donner un accès au projet (étape 1), sans aucune clé à manipuler.
 
 Adresse de l'application : **https://forma-host--forma-host.europe-west4.hosted.app**
 
 ## 1. Donner accès au projet (une seule fois)
 
 1. **Offre Blaze** : Console Firebase > ⚙️ Paramètres du projet > *Utilisation et facturation* > *Modifier l'offre* > Blaze. Obligatoire pour App Hosting et Cloud Functions. Pense à définir une alerte budgétaire (par ex. 10 €).
-2. **Compte de service** :
-   1. Ouvre [IAM > Comptes de service](https://console.cloud.google.com/iam-admin/serviceaccounts?project=forma-host) et clique *Créer un compte de service*.
-   2. Nom : `github-deploy`.
-   3. Rôle : **Propriétaire** (le plus simple pour un projet perso ; la liste des rôles minimaux figure plus bas).
-   4. Ouvre le compte créé > *Clés* > *Ajouter une clé* > *Créer une clé* > JSON. Un fichier est téléchargé.
-3. **Secret GitHub** :
-   1. Dans le dépôt, va dans *Settings > Secrets and variables > Actions > New repository secret*.
-   2. Nom : `FIREBASE_SERVICE_ACCOUNT`.
-   3. Valeur : colle **tout le contenu** du fichier JSON.
-   4. Supprime ensuite le fichier de ton ordinateur.
-4. **Authentication** : [Console > Authentication](https://console.firebase.google.com/project/forma-host/authentication) > *Commencer*.
+2. **Accès GitHub → Google Cloud, sans clé** (Workload Identity Federation) :
+   1. Ouvre [Cloud Shell](https://shell.cloud.google.com/?project=forma-host) (terminal dans le navigateur, rien à installer).
+   2. Colle cette commande :
+      ```bash
+      curl -fsSL https://raw.githubusercontent.com/Firfal/forma-host/claude/optimistic-knuth-lnjps2/scripts/setup-github-deploy.sh | bash
+      ```
+   3. Elle crée le compte de service `github-deploy` (rôle Propriétaire). Seul le workflow `deploy.yml` de ce dépôt peut l'utiliser.
+   4. Reporte le **numéro de projet** affiché à la fin dans `PROJECT_NUMBER` de `.github/workflows/deploy.yml`.
+3. **Authentication** : [Console > Authentication](https://console.firebase.google.com/project/forma-host/authentication) > *Commencer*.
    - Il n'y a rien à cocher : le workflow active lui-même Email/Mot de passe, les domaines autorisés et les emails en français.
    - Ce clic reste manuel : via l'API, le projet serait converti en Identity Platform, de façon irréversible.
 
