@@ -54,7 +54,8 @@ export async function resolveVimeo(
   const ref = parseVimeoUrl(url);
   if (!ref) throw new Error("Lien Vimeo non reconnu");
 
-  if (token) {
+  // Sans token valide (secret « unset », token révoqué…), on passe par oEmbed.
+  if (token && token !== "unset") {
     const response = await fetch(
       `https://api.vimeo.com/videos/${ref.id}?fields=name,duration,pictures`,
       {
@@ -65,9 +66,6 @@ export async function resolveVimeo(
       },
     );
     if (response.ok) return fromApi(ref, (await response.json()) as VimeoApiVideo);
-    if (response.status !== 404 && response.status !== 403) {
-      throw new Error(`Vimeo API : erreur ${response.status}`);
-    }
   }
 
   const oembed = new URL("https://vimeo.com/api/oembed.json");

@@ -4,7 +4,8 @@
  *   npm run make-creator -- --emulators --email theo@ecolemotion.com --name "Ecole Motion" --slug ecole-motion
  *   npm run make-creator -- --project mon-projet --email theo@ecolemotion.com --name "Ecole Motion" --slug ecole-motion
  *
- * Options : --color #9d72f9  --support theo@ecolemotion.com  --password <mdp> (crée le compte s'il n'existe pas)
+ * Options : --color #9d72f9  --support theo@ecolemotion.com  --password <mdp>
+ * Le compte est créé s'il n'existe pas (sans --password : mot de passe via « Mot de passe oublié »).
  */
 import { FieldValue } from "firebase-admin/firestore";
 import { isReservedSlug, isValidSlug, slugify } from "../shared/slug";
@@ -26,15 +27,14 @@ async function main() {
   const { auth, db, projectId } = initAdmin(args);
   let user = await auth.getUserByEmail(email).catch(() => null);
   if (!user) {
-    if (typeof args.password !== "string")
-      throw new Error("Compte introuvable : ajouter --password pour le créer");
-    user = await auth.createUser({
-      email,
-      password: args.password,
-      displayName: name,
-      emailVerified: true,
-    });
-    console.log(`Compte créé : ${email}`);
+    // Sans --password : compte sans mot de passe, à définir via « Mot de passe oublié ».
+    const password = typeof args.password === "string" ? args.password : undefined;
+    user = await auth.createUser({ email, password, displayName: name, emailVerified: true });
+    console.log(
+      password
+        ? `Compte créé : ${email}`
+        : `Compte créé : ${email} — définir le mot de passe via « Mot de passe oublié » sur /connexion`,
+    );
   }
 
   await auth.setCustomUserClaims(user.uid, { ...(user.customClaims ?? {}), creator: true });

@@ -24,6 +24,27 @@
       ]
     }
   ],
+  "apphosting": [
+    {
+      "backendId": "forma-host",
+      "rootDir": "/",
+      "ignore": [
+        "node_modules",
+        ".git",
+        ".next",
+        "functions",
+        "tests",
+        "e2e",
+        "test-results",
+        "playwright-report",
+        "docs",
+        "scripts",
+        "firebase-debug.log",
+        "*.log",
+        ".emulator-data"
+      ]
+    }
+  ],
   "emulators": {
     "singleProjectMode": true,
     "auth": {

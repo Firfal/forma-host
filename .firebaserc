@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "demo-forma"
+    "default": "forma-host",
+    "prod": "forma-host",
+    "demo": "demo-forma"
   }
 }

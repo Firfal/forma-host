@@ -12,7 +12,7 @@ runConfig:
 env:
   # URL publique de la plateforme (liens dans les emails, SEO).
   - variable: NEXT_PUBLIC_APP_URL
-    value: https://forma-host--demo-forma.europe-west4.hosted.app
+    value: https://forma-host--forma-host.europe-west4.hosted.app
     availability:
       - BUILD
       - RUNTIME

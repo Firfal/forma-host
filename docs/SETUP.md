@@ -1,93 +1,100 @@
-# Mise en place du projet Firebase
+# Mise en production (projet Firebase `forma-host`)
 
-Ce guide couvre la mise en production. Pour le développement local, les émulateurs suffisent (voir le README).
+Pour le développement local, les émulateurs suffisent (voir le README).
 
 > **Région unique : `europe-west4` (Pays-Bas).** La région de Firestore et celle du bucket Storage ne peuvent **plus être changées** après leur création.
 
-## 1. Projet Firebase
+Le déploiement est **automatique** : le workflow GitHub Actions `Déploiement Firebase` (`.github/workflows/deploy.yml`) prépare le projet et déploie tout à chaque push sur la branche par défaut. Il suffit de lui donner un accès au projet (étape 1).
 
-1. Crée le projet sur [console.firebase.google.com](https://console.firebase.google.com) et passe-le en **offre Blaze** (obligatoire pour App Hosting et Cloud Functions). Pense à définir une alerte budgétaire.
-2. **Authentication** : active le fournisseur *Adresse e-mail/Mot de passe*. Dans *Paramètres > Domaines autorisés*, ajoute le domaine de la plateforme.
-3. **Authentication > Modèles** : passe la langue des emails en français. Pour la réinitialisation du mot de passe, configure l'URL d'action sur ton domaine.
-4. **Firestore** : crée la base `(default)` en mode production, région `europe-west4`.
-5. **Storage** : crée le bucket par défaut en `europe-west4`.
-6. Renseigne l'identifiant du projet dans `.firebaserc` (remplace `demo-forma`).
+Adresse de l'application : **https://forma-host--forma-host.europe-west4.hosted.app**
 
-## 2. Règles, index et Functions
+## 1. Donner accès au projet (une seule fois)
 
-```bash
-npm ci && npm --prefix functions ci
-npx firebase login
-npx firebase deploy --only firestore,storage       # règles + index (+ TTL sur invites/mail)
-```
+1. **Offre Blaze** : Console Firebase > ⚙️ Paramètres du projet > *Utilisation et facturation* > *Modifier l'offre* > Blaze. Obligatoire pour App Hosting et Cloud Functions. Pense à définir une alerte budgétaire (par ex. 10 €).
+2. **Compte de service** :
+   1. Ouvre [IAM > Comptes de service](https://console.cloud.google.com/iam-admin/serviceaccounts?project=forma-host) et clique *Créer un compte de service*.
+   2. Nom : `github-deploy`.
+   3. Rôle : **Propriétaire** (le plus simple pour un projet perso ; la liste des rôles minimaux figure plus bas).
+   4. Ouvre le compte créé > *Clés* > *Ajouter une clé* > *Créer une clé* > JSON. Un fichier est téléchargé.
+3. **Secret GitHub** :
+   1. Dans le dépôt, va dans *Settings > Secrets and variables > Actions > New repository secret*.
+   2. Nom : `FIREBASE_SERVICE_ACCOUNT`.
+   3. Valeur : colle **tout le contenu** du fichier JSON.
+   4. Supprime ensuite le fichier de ton ordinateur.
+4. **Authentication** : [Console > Authentication](https://console.firebase.google.com/project/forma-host/authentication) > *Commencer*.
+   - Il n'y a rien à cocher : le workflow active lui-même Email/Mot de passe, les domaines autorisés et les emails en français.
+   - Ce clic reste manuel : via l'API, le projet serait converti en Identity Platform, de façon irréversible.
 
-Paramètres et secrets des Functions :
+Ensuite, lance le workflow : *Actions > Déploiement Firebase > Run workflow*. Il fait automatiquement :
 
-```bash
-# URL publique de la plateforme (liens dans les emails)
-echo "APP_URL=https://formation.ecolemotion.com" > functions/.env.<project-id>
+| Étape | Détail |
+|---|---|
+| APIs | Activation de Firestore, Functions, App Hosting, Secret Manager… |
+| Firestore | Base `(default)` en `europe-west4`, règles, index, TTL |
+| Authentication | Email/mot de passe, domaines autorisés, emails en français |
+| Storage | Bucket par défaut en `europe-west4`, règles |
+| Functions | Invitations, activation, Vimeo, notifications (APP_URL dans `functions/.env.forma-host`) |
+| App Hosting | Backend `forma-host`, build Next.js depuis les sources du dépôt |
+| IAM | Lecture Firestore pour le serveur Next.js (pages de vente) |
+| Formateur | Si l'email est renseigné dans le formulaire *Run workflow* : compte, rôle et fiche formateur |
 
-# Token personnel Vimeo (developer.vimeo.com > Apps > Generate token, scope « private »)
-npx firebase functions:secrets:set VIMEO_ACCESS_TOKEN
+Pour le **compte formateur**, renseigne l'email dans le formulaire *Run workflow*. Si le compte n'existe pas, il est créé sans mot de passe : utilise « Mot de passe oublié » sur `/connexion` pour en définir un.
 
-npx firebase deploy --only functions
-```
+<details>
+<summary>Rôles minimaux au lieu de « Propriétaire »</summary>
 
-## 3. Emails (extension Trigger Email + Brevo)
+Firebase Admin, Cloud Functions Admin, Cloud Run Admin, Service Account User, Secret Manager Admin, Service Usage Admin, Cloud Build Editor, Artifact Registry Administrator, Firebase App Hosting Admin, Storage Admin, Project IAM Admin, Firebase Extensions Admin.
+</details>
 
-1. Crée un compte [Brevo](https://www.brevo.com), puis authentifie ton domaine d'envoi (SPF, DKIM, DMARC) et génère une **clé SMTP**.
-2. Installe l'extension :
-   ```bash
-   npx firebase ext:install firebase/firestore-send-email
-   ```
-   Paramètres :
-   - Emplacement : `europe-west4`
-   - Collection des emails : `mail`
-   - URI SMTP : `smtps://<login-brevo>@smtp-relay.brevo.com:465`
-   - Mot de passe SMTP : la clé SMTP Brevo (stockée dans Secret Manager)
-   - Expéditeur par défaut : `Ecole Motion <contact@ecolemotion.com>`
-   - TTL des documents : activé (le champ `expireAt` est déjà renseigné)
-3. Les Functions écrivent des documents `mail/{id}` avec le HTML déjà rendu. L'extension les envoie.
+## 2. Vimeo
 
-## 4. App Hosting (Next.js)
-
-1. Console Firebase > **App Hosting** > *Créer un backend* : relie le dépôt GitHub, dossier racine `/`, branche de production `main`, région `europe-west4`.
-2. Mets à jour `NEXT_PUBLIC_APP_URL` dans `apphosting.yaml`.
-3. Si tu utilises une autre marque, ajoute `NEXT_PUBLIC_BRAND_NAME` dans `apphosting.yaml`.
-4. La config web Firebase est injectée automatiquement au build (`FIREBASE_WEBAPP_CONFIG`) ; rien à faire.
-5. Les pages publiques (page de vente) lisent Firestore côté serveur avec l'Admin SDK. Si elles renvoient une erreur de permission, donne le rôle **Cloud Datastore User** (`roles/datastore.user`) au compte de service du backend (`firebase-app-hosting-compute@<project-id>.iam.gserviceaccount.com`) dans IAM.
-6. *(Optionnel)* **Domaine personnalisé** : dans les paramètres du backend, ajoute par exemple `formation.ecolemotion.com`, puis crée les enregistrements DNS indiqués.
-7. Chaque push sur `main` déclenche un déploiement.
-
-## 5. Compte formateur
-
-```bash
-gcloud auth application-default login
-npm run make-creator -- --project <project-id> \
-  --email theo@ecolemotion.com --name "Ecole Motion" --slug ecole-motion --color "#9d72f9"
-```
-
-Le formateur doit se déconnecter puis se reconnecter pour voir l'espace Admin.
-
-## 6. Vimeo
+1. Crée un token sur [developer.vimeo.com](https://developer.vimeo.com/apps) : *Create app*, puis *Generate access token*, scope **Private**.
+2. Ajoute-le en secret GitHub `VIMEO_ACCESS_TOKEN` et relance le workflow.
+3. Sans token, la durée et la miniature sont récupérées via oEmbed quand c'est possible. La lecture des vidéos fonctionne dans tous les cas.
 
 Pour chaque vidéo de leçon :
 
 1. **Confidentialité** : *Masquer de Vimeo* (non répertoriée).
 2. **Où cette vidéo peut-elle être intégrée ?** *Domaines spécifiques*. Ajoute :
-   - le domaine de la plateforme ;
-   - `*.hosted.app` (URL App Hosting) ;
+   - `forma-host--forma-host.europe-west4.hosted.app` ;
+   - ton domaine perso s'il y en a un ;
    - `localhost` pour le développement.
 3. Copie le lien de la vidéo (avec son hash, par ex. `https://vimeo.com/123456789/abcdef1234`) dans l'éditeur de leçon.
 
 ⚠️ **À vérifier sur ton abonnement Vimeo** : la restriction par domaine n'est pas disponible sur toutes les offres. La grille Vimeo change en 2026 ; selon les sources, elle pourrait exiger l'offre *Core* ou supérieure.
 
-## 7. Migration depuis Podia
+## 3. Emails (Brevo)
+
+Sans cette étape, les emails de bienvenue et de notification sont préparés dans la collection `mail`, mais ne partent pas. Les emails de Firebase Auth (mot de passe oublié) fonctionnent, eux, dès le départ.
+
+1. Crée un compte [Brevo](https://www.brevo.com). Authentifie ton domaine d'envoi (SPF, DKIM, DMARC) et génère une **clé SMTP** (*SMTP & API*).
+2. Ajoute trois secrets GitHub :
+   - `SMTP_CONNECTION_URI` = `smtps://<login-brevo>@smtp-relay.brevo.com:465`
+   - `SMTP_PASSWORD` = la clé SMTP
+   - `MAIL_FROM` = `Ecole Motion <contact@ecolemotion.com>`
+3. Relance le workflow : il installe l'extension *Trigger Email from Firestore* (`europe-west4`).
+
+## 4. Domaine personnalisé (optionnel)
+
+1. Console > App Hosting > backend `forma-host` > *Paramètres* > *Domaines*. Ajoute par exemple `formation.ecolemotion.com`, puis crée les enregistrements DNS indiqués.
+2. Mets l'adresse dans `apphosting.yaml` (`NEXT_PUBLIC_APP_URL`) et dans `functions/.env.forma-host` (`APP_URL`).
+3. Ajoute-la dans les domaines Vimeo, puis relance le workflow.
+
+## 5. Migration depuis Podia
 
 1. Ré-uploade les vidéos sur Vimeo (télécharge les originaux depuis Podia si besoin).
 2. Recrée la formation, les chapitres et les leçons dans *Admin > Formations*.
 3. Exporte les clients depuis Podia (*Audience > Export*), puis dans la formation clique sur *Donner l'accès > Importer un CSV*.
    - Colonnes reconnues : `email`, `name`/`nom`, `signed up`/`date`.
-   - Coche « Ne pas envoyer d'email » pour préparer la migration en silence.
+   - Décoche l'email de bienvenue pour préparer la migration en silence.
    - Pour annoncer la nouvelle plateforme, adapte le modèle d'email de bienvenue, puis renvoie les accès.
 4. Teste avec 2-3 élèves pilotes avant de basculer.
+
+## Déployer à la main (alternative)
+
+```bash
+gcloud auth application-default login
+npx tsx scripts/bootstrap-firebase.ts --project forma-host
+npx firebase deploy --only firestore,storage,functions,apphosting --project forma-host
+npm run make-creator -- --project forma-host --email <email> --name "Ecole Motion" --slug ecole-motion
+```

@@ -1,0 +1,159 @@
+name: Déploiement Firebase
+
+# Déploie le projet Firebase « forma-host » à chaque push sur la branche par défaut,
+# ou à la demande (onglet Actions > Déploiement Firebase > Run workflow).
+#
+# Secrets GitHub (Settings > Secrets and variables > Actions) :
+#   FIREBASE_SERVICE_ACCOUNT  (obligatoire) clé JSON d'un compte de service du projet
+#   VIMEO_ACCESS_TOKEN        (optionnel)   token personnel Vimeo, scope « private »
+#   SMTP_CONNECTION_URI       (optionnel)   ex. smtps://login@smtp-relay.brevo.com:465
+#   SMTP_PASSWORD             (optionnel)   clé SMTP Brevo
+#   MAIL_FROM                 (optionnel)   ex. Ecole Motion <contact@ecolemotion.com>
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      creator_email:
+        description: "Email du compte formateur à activer (optionnel)"
+        required: false
+      creator_name:
+        description: "Nom de l'école"
+        required: false
+        default: "Ecole Motion"
+      creator_slug:
+        description: "Adresse publique de l'école (slug)"
+        required: false
+        default: "ecole-motion"
+
+concurrency:
+  group: deploy-forma-host
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: forma-host
+  REGION: europe-west4
+  BACKEND_ID: forma-host
+
+jobs:
+  check:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.secret.outputs.ready }}
+    steps:
+      - id: secret
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -n "$SA" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "### Déploiement ignoré" >> "$GITHUB_STEP_SUMMARY"
+            echo "Ajoute le secret FIREBASE_SERVICE_ACCOUNT (voir docs/SETUP.md)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  deploy:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Dépendances
+        run: |
+          npm ci
+          npm ci --prefix functions
+
+      - name: Initialisation du projet (APIs, Firestore, Auth, Storage, secrets)
+        env:
+          VIMEO_ACCESS_TOKEN: ${{ secrets.VIMEO_ACCESS_TOKEN }}
+        run: npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID"
+
+      - name: Règles et index Firestore
+        run: npx firebase deploy --only firestore --project "$PROJECT_ID" --non-interactive --force
+
+      - name: Règles Storage
+        continue-on-error: true
+        run: npx firebase deploy --only storage --project "$PROJECT_ID" --non-interactive --force
+
+      - name: Cloud Functions
+        run: |
+          # Premier déploiement : les droits Eventarc mettent parfois quelques minutes à se propager.
+          for attempt in 1 2 3; do
+            if npx firebase deploy --only functions --project "$PROJECT_ID" --non-interactive --force; then
+              exit 0
+            fi
+            echo "Nouvelle tentative dans 90 s ($attempt/3)…"
+            sleep 90
+          done
+          exit 1
+
+      - name: App Hosting (backend)
+        run: |
+          if npx firebase apphosting:backends:get "$BACKEND_ID" --project "$PROJECT_ID" > /dev/null 2>&1; then
+            echo "Backend $BACKEND_ID déjà créé."
+          else
+            npx firebase apphosting:backends:create --project "$PROJECT_ID" --backend "$BACKEND_ID" \
+              --primary-region "$REGION" --root-dir / --non-interactive
+          fi
+
+      - name: App Hosting (déploiement Next.js)
+        id: apphosting
+        run: npx firebase deploy --only apphosting --project "$PROJECT_ID" --non-interactive --force
+
+      - name: Logs du build App Hosting (en cas d'échec)
+        if: failure() && steps.apphosting.outcome == 'failure'
+        run: |
+          BUILD_ID=$(gcloud builds list --project "$PROJECT_ID" --region "$REGION" --limit 1 --format="value(id)")
+          [ -n "$BUILD_ID" ] && gcloud builds log "$BUILD_ID" --project "$PROJECT_ID" --region "$REGION" | tail -n 200
+
+      - name: Accès Firestore du serveur App Hosting
+        run: npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID"
+
+      - name: Compte formateur
+        if: github.event_name == 'workflow_dispatch' && inputs.creator_email != ''
+        env:
+          CREATOR_EMAIL: ${{ inputs.creator_email }}
+          CREATOR_NAME: ${{ inputs.creator_name }}
+          CREATOR_SLUG: ${{ inputs.creator_slug }}
+        run: |
+          npx tsx scripts/make-creator.ts --project "$PROJECT_ID" \
+            --email "$CREATOR_EMAIL" --name "$CREATOR_NAME" --slug "$CREATOR_SLUG"
+
+      - name: Extension d'envoi d'emails (si SMTP configuré)
+        env:
+          SMTP_CONNECTION_URI: ${{ secrets.SMTP_CONNECTION_URI }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+        run: |
+          if [ -z "$SMTP_CONNECTION_URI" ] || [ -z "$SMTP_PASSWORD" ] || [ -z "$MAIL_FROM" ]; then
+            echo "SMTP non configuré : extension ignorée (les emails restent dans la collection mail)."
+            exit 0
+          fi
+          bash scripts/deploy-email-extension.sh
+
+      - name: Résumé
+        run: |
+          {
+            echo "### Forma Host déployé"
+            echo "- Application : https://$BACKEND_ID--$PROJECT_ID.$REGION.hosted.app"
+            echo "- Console : https://console.firebase.google.com/project/$PROJECT_ID/overview"
+          } >> "$GITHUB_STEP_SUMMARY"
