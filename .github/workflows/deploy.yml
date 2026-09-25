@@ -138,8 +138,22 @@ jobs:
       - name: Logs du build App Hosting (en cas d'échec)
         if: failure() && steps.apphosting.outcome == 'failure'
         run: |
-          BUILD_ID=$(gcloud builds list --project "$PROJECT_ID" --region "$REGION" --limit 1 --format="value(id)")
-          [ -n "$BUILD_ID" ] && gcloud builds log "$BUILD_ID" --project "$PROJECT_ID" --region "$REGION" | tail -n 200
+          TOKEN=$(gcloud auth print-access-token)
+          API="https://firebaseapphosting.googleapis.com/v1beta/projects/$PROJECT_ID/locations/$REGION/backends/$BACKEND_ID"
+          echo "== Dernier build App Hosting"
+          BUILD=$(curl -sS -H "Authorization: Bearer $TOKEN" "$API/builds" | jq '[.builds[]?] | sort_by(.createTime) | last')
+          echo "$BUILD" | jq '{name, state, error, buildLogsUri, createTime}'
+          echo "== Dernier rollout"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$API/rollouts" | jq '[.rollouts[]?] | sort_by(.createTime) | last | {name, state, error}'
+          LOGS_URI=$(echo "$BUILD" | jq -r '.buildLogsUri // empty')
+          BUILD_ID=$(echo "$LOGS_URI" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | tail -n 1)
+          if [ -n "$BUILD_ID" ]; then
+            echo "== Logs Cloud Build $BUILD_ID"
+            gcloud builds log "$BUILD_ID" --project "$PROJECT_ID" --region "$REGION" 2>/dev/null | grep -vE "^\s*$" | tail -n 150 ||
+              gcloud builds log "$BUILD_ID" --project "$PROJECT_ID" 2>/dev/null | tail -n 150 || true
+          else
+            echo "Pas d'identifiant Cloud Build dans le build App Hosting."
+          fi
 
       - name: Accès Firestore du serveur App Hosting
         if: ${{ !inputs.accounts_only }}
