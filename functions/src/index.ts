@@ -10,16 +10,34 @@ import {
   inviteTokenInput,
   resolveVimeoInput,
 } from "@shared/schemas";
-import { enrollmentId } from "@shared/paths";
-import type { CommentDoc, CoursePrivateSettings } from "@shared/types";
+import { mailSettingsInput } from "@shared/mail-settings";
+import { enrollmentId, paths } from "@shared/paths";
+import { emailLayout, escapeHtml } from "@shared/template";
+import type { CommentDoc, CoursePrivateSettings, CreatorDoc } from "@shared/types";
 import { grantAccessToStudents, resendAccessEmail } from "./access";
 import { auth, db } from "./db";
 import { parseInput, requireCourseOwner, requireCreator } from "./guards";
 import { acceptInvite as acceptInviteImpl, readInvite } from "./invites";
 import { brandFromCreator, buildWelcomeEmail } from "./mail";
-import { APP_URL, VIMEO_ACCESS_TOKEN } from "./params";
+import { deliverMail, resendWaitingMail } from "./mail-delivery";
+import {
+  deleteMailSettings as deleteMailSettingsImpl,
+  loadSmtpConfig,
+  recordSendResult,
+  saveMailSettings as saveMailSettingsImpl,
+} from "./mail-settings";
+import { APP_URL, SETTINGS_ENCRYPTION_KEY, VIMEO_ACCESS_TOKEN, settingsKey } from "./params";
 import { handleNewComment } from "./comments";
+import { smtpClient, smtpErrorMessage } from "./smtp";
 import { resolveVimeo } from "./vimeo";
+
+const mailDeps = { key: settingsKey, client: smtpClient };
+
+async function callerEmail(caller: { uid: string; email: string | null }): Promise<string> {
+  const email = caller.email ?? (await auth().getUser(caller.uid)).email;
+  if (!email) throw new HttpsError("failed-precondition", "Aucun email sur ton compte");
+  return email;
+}
 
 /** Donne l'accès à une formation (invitation unitaire ou import CSV). */
 export const grantAccess = onCall({ timeoutSeconds: 300 }, async (request) => {
@@ -70,16 +88,23 @@ export const sendTestWelcomeEmail = onCall(async (request) => {
   const caller = requireCreator(request);
   const input = parseInput(courseIdInput, request.data);
   const course = await requireCourseOwner(input.courseId, caller.uid);
-  const email = caller.email ?? (await auth().getUser(caller.uid)).email;
-  if (!email) throw new HttpsError("failed-precondition", "Aucun email sur ton compte");
-  const [settingsSnap, creatorSnap] = await Promise.all([
+  const email = await callerEmail(caller);
+  const [settingsSnap, creatorSnap, mailSettingsSnap] = await Promise.all([
     db().doc(`courses/${input.courseId}/private/settings`).get(),
     db().doc(`creators/${caller.uid}`).get(),
+    db().doc(paths.creatorMailSettings(caller.uid)).get(),
   ]);
+  if (!mailSettingsSnap.exists) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Configure d'abord l'envoi des emails dans Paramètres.",
+    );
+  }
   await db()
     .collection("mail")
     .add(
       buildWelcomeEmail({
+        creatorId: caller.uid,
         to: email,
         studentName: "Prénom",
         courseTitle: course.title,
@@ -138,6 +163,74 @@ export const onCommentCreated = onDocumentCreated(
     } catch (error) {
       logger.error("onCommentCreated", error);
       throw error;
+    }
+  },
+);
+
+/** Vérifie la connexion SMTP, enregistre les réglages et envoie les emails en attente. */
+export const saveMailSettings = onCall(
+  { secrets: [SETTINGS_ENCRYPTION_KEY], timeoutSeconds: 300 },
+  async (request) => {
+    const caller = requireCreator(request);
+    const input = parseInput(mailSettingsInput, request.data);
+    try {
+      await saveMailSettingsImpl(caller.uid, input, mailDeps);
+    } catch (error) {
+      logger.warn("saveMailSettings", { uid: caller.uid, code: (error as { code?: string }).code });
+      throw new HttpsError("failed-precondition", smtpErrorMessage(error));
+    }
+    return resendWaitingMail(caller.uid, mailDeps);
+  },
+);
+
+/** Désactive l'envoi des emails (les prochains restent en attente). */
+export const deleteMailSettings = onCall(async (request) => {
+  const caller = requireCreator(request);
+  await deleteMailSettingsImpl(caller.uid);
+  return { ok: true };
+});
+
+/** Envoie tout de suite un email de test au formateur avec ses réglages. */
+export const sendTestMail = onCall({ secrets: [SETTINGS_ENCRYPTION_KEY] }, async (request) => {
+  const caller = requireCreator(request);
+  const email = await callerEmail(caller);
+  const [config, creatorSnap] = await Promise.all([
+    loadSmtpConfig(caller.uid, settingsKey),
+    db().doc(`creators/${caller.uid}`).get(),
+  ]);
+  if (!config) throw new HttpsError("failed-precondition", "Envoi des emails non configuré");
+  const brand = brandFromCreator(creatorSnap.data() as CreatorDoc | undefined);
+  const appUrl = APP_URL.value();
+  try {
+    await smtpClient.send(config, {
+      to: email,
+      subject: "Email de test",
+      html: emailLayout({
+        bodyHtml: `<p style="margin:0 0 16px">Tout fonctionne : tes élèves recevront leurs emails de la part de <strong>${escapeHtml(config.fromName)}</strong> (${escapeHtml(config.fromEmail)}).</p>`,
+        ctaLabel: "Ouvrir l'administration",
+        ctaUrl: `${appUrl}/admin`,
+        brandName: brand.name,
+        brandColor: brand.color,
+      }),
+      text: `Tout fonctionne : tes élèves recevront leurs emails de la part de ${config.fromName} (${config.fromEmail}).`,
+    });
+  } catch (error) {
+    const message = smtpErrorMessage(error);
+    await recordSendResult(caller.uid, message);
+    throw new HttpsError("failed-precondition", message);
+  }
+  await recordSendResult(caller.uid, null);
+  return { email };
+});
+
+/** Envoie chaque email de la file avec les réglages SMTP de son formateur. */
+export const onMailCreated = onDocumentCreated(
+  { document: "mail/{mailId}", secrets: [SETTINGS_ENCRYPTION_KEY] },
+  async (event) => {
+    try {
+      await deliverMail(event.params.mailId, mailDeps);
+    } catch (error) {
+      logger.error("onMailCreated", error);
     }
   },
 );

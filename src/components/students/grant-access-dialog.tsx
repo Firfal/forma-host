@@ -2,17 +2,21 @@
 
 import Papa from "papaparse";
 import { FileSpreadsheet, Loader2, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { GRANT_ACCESS_BATCH_MAX } from "@shared/constants";
 import { parseInviteText, parseStudentRows, type ParsedStudent } from "@shared/import";
+import { routes } from "@shared/paths";
 import type { GrantAccessResult } from "@shared/schemas";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/input";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { callGrantAccess, errorMessage } from "@/lib/firebase/callables";
+import { useMailSettings } from "@/lib/mail-settings";
 
 type Mode = "invite" | "import";
 
@@ -36,6 +40,8 @@ export function GrantAccessDialog({
   courseId: string;
   courseTitle: string;
 }) {
+  const { user } = useAuth();
+  const { data: mailSettings, loading: mailLoading } = useMailSettings(user?.uid);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("invite");
   const [text, setText] = useState("");
@@ -225,6 +231,16 @@ export function GrantAccessDialog({
             </span>
           </span>
         </label>
+        {sendEmail && !mailLoading && !mailSettings ? (
+          <p className="mt-3 rounded-md bg-warning-soft px-3 py-2 text-[13px] text-warning">
+            L&apos;envoi des emails n&apos;est pas encore configuré : ils partiront dès que tu
+            l&apos;auras fait dans{" "}
+            <Link href={routes.adminSettings} className="font-medium underline">
+              Paramètres
+            </Link>
+            .
+          </p>
+        ) : null}
 
         <div className="mt-5 flex items-center justify-end gap-2">
           {progress ? (

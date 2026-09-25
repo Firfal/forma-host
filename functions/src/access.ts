@@ -174,6 +174,7 @@ async function grantOne(
       tx.create(
         db().doc(`mail/${mailId}`),
         buildWelcomeEmail({
+          creatorId: course.creatorId,
           to: student.email,
           studentName: student.name || user.displayName || null,
           courseTitle: course.title,
@@ -261,6 +262,7 @@ export async function resendAccessEmail(params: {
   batch.create(
     db().doc(`mail/resend_${id}_${Date.now()}`),
     buildWelcomeEmail({
+      creatorId: course.creatorId,
       to: enrollment.email,
       studentName: enrollment.displayName,
       courseTitle: course.title,

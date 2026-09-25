@@ -61,16 +61,19 @@ Pour chaque vidéo de leçon :
 
 ⚠️ **À vérifier sur ton abonnement Vimeo** : la restriction par domaine n'est pas disponible sur toutes les offres. La grille Vimeo change en 2026 ; selon les sources, elle pourrait exiger l'offre *Core* ou supérieure.
 
-## 3. Emails (Brevo)
+## 3. Emails
 
-Sans cette étape, les emails de bienvenue et de notification sont préparés dans la collection `mail`, mais ne partent pas. Les emails de Firebase Auth (mot de passe oublié) fonctionnent, eux, dès le départ.
+L'envoi se configure **dans l'application**, par chaque formateur : *Admin > Paramètres > Envoi des emails*. Tant que ce n'est pas fait, les emails (bienvenue, activation, notifications) sont mis en attente. Ils partent dès l'enregistrement des réglages. Les emails de Firebase Auth (mot de passe oublié) fonctionnent, eux, dès le départ.
 
-1. Crée un compte [Brevo](https://www.brevo.com). Authentifie ton domaine d'envoi (SPF, DKIM, DMARC) et génère une **clé SMTP** (*SMTP & API*).
-2. Ajoute trois secrets GitHub :
-   - `SMTP_CONNECTION_URI` = `smtps://<login-brevo>@smtp-relay.brevo.com:465`
-   - `SMTP_PASSWORD` = la clé SMTP
-   - `MAIL_FROM` = `Ecole Motion <contact@ecolemotion.com>`
-3. Relance le workflow : il installe l'extension *Trigger Email from Firestore* (`europe-west4`).
+| Fournisseur | Identifiant | Mot de passe | Remarque |
+|---|---|---|---|
+| **Brevo** (recommandé) | *Login* de la page SMTP & API > SMTP | une clé SMTP | l'expéditeur doit être validé dans Brevo ; authentifie ton domaine (SPF, DKIM, DMARC) pour éviter les spams |
+| **Gmail** | l'adresse Gmail | un [mot de passe d'application](https://myaccount.google.com/apppasswords) | validation en deux étapes requise ; environ 500 emails par jour |
+| **Autre (SMTP)** | fourni par l'hébergeur | fourni par l'hébergeur | OVH, Infomaniak, o2switch… ; ports 465, 587, 2525 ou 25 |
+
+- « Vérifier et enregistrer » teste la connexion avant d'enregistrer ; « M'envoyer un test » envoie un vrai email.
+- Le mot de passe est chiffré (AES-256) avec une clé stockée dans Secret Manager (`SETTINGS_ENCRYPTION_KEY`, créée par le workflow) et n'est jamais renvoyé au navigateur.
+- Un échec d'envoi s'affiche dans Paramètres et sur l'Accueil ; après correction des réglages, les emails en échec sont renvoyés.
 
 ## 4. Domaine personnalisé (optionnel)
 

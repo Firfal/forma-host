@@ -8,6 +8,10 @@ export const paths = {
   user: (uid: string) => `users/${uid}`,
   profile: (uid: string) => `profiles/${uid}`,
   creator: (uid: string) => `creators/${uid}`,
+  /** Réglages d'envoi des emails : lisibles par le formateur, écrits par les Functions. */
+  creatorMailSettings: (uid: string) => `creators/${uid}/private/mail`,
+  /** Mot de passe SMTP chiffré : Functions uniquement. */
+  creatorMailSecret: (uid: string) => `creators/${uid}/secrets/mail`,
   course: (courseId: string) => `courses/${courseId}`,
   courseSettings: (courseId: string) => `courses/${courseId}/private/settings`,
   lesson: (courseId: string, lessonId: string) => `courses/${courseId}/lessons/${lessonId}`,
@@ -48,6 +52,7 @@ export const routes = {
     `/admin/formations/${courseId}/lecons/${lessonId}`,
   adminMembers: "/admin/membres",
   adminComments: "/admin/commentaires",
+  adminSettings: "/admin/parametres",
   salesPage: (creatorSlug: string, courseSlug: string) => `/${creatorSlug}/${courseSlug}`,
   creatorPage: (creatorSlug: string) => `/${creatorSlug}`,
 };

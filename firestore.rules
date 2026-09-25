@@ -108,6 +108,18 @@ service cloud.firestore {
         && isNullableString(request.resource.data.logoUrl, 2000)
         && request.resource.data.brandColor.matches('^#[0-9a-fA-F]{6}$')
         && isNullableString(request.resource.data.supportEmail, 200);
+
+      // Réglages d'envoi des emails : écrits par les Functions (connexion SMTP vérifiée),
+      // lus par le formateur pour afficher l'état de l'envoi.
+      match /private/{docId} {
+        allow read: if isUser(creatorId);
+        allow write: if false;
+      }
+
+      // Mot de passe SMTP chiffré.
+      match /secrets/{docId} {
+        allow read, write: if false;
+      }
     }
 
     // ---------- Formations ----------

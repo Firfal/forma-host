@@ -6,11 +6,9 @@ name: Déploiement Firebase
 # Accès au projet sans clé (Workload Identity Federation) : lancer une fois
 # scripts/setup-github-deploy.sh dans Cloud Shell, puis renseigner PROJECT_NUMBER ci-dessous.
 #
-# Secrets GitHub optionnels (Settings > Secrets and variables > Actions) :
+# Secret GitHub optionnel (Settings > Secrets and variables > Actions) :
 #   VIMEO_ACCESS_TOKEN   token personnel Vimeo, scope « private »
-#   SMTP_CONNECTION_URI  ex. smtps://login@smtp-relay.brevo.com:465
-#   SMTP_PASSWORD        clé SMTP Brevo
-#   MAIL_FROM            ex. Ecole Motion <contact@ecolemotion.com>
+# L'envoi des emails se configure dans l'application (Admin > Paramètres).
 
 on:
   push:
@@ -171,19 +169,6 @@ jobs:
           NAME=$(jq -r '.inputs.creator_name' "$GITHUB_EVENT_PATH")
           SLUG=$(jq -r '.inputs.creator_slug' "$GITHUB_EVENT_PATH")
           npx tsx scripts/make-creator.ts --project "$PROJECT_ID" --email "$EMAIL" --name "$NAME" --slug "$SLUG"
-
-      - name: Extension d'envoi d'emails (si SMTP configuré)
-        if: ${{ !inputs.accounts_only }}
-        env:
-          SMTP_CONNECTION_URI: ${{ secrets.SMTP_CONNECTION_URI }}
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
-        run: |
-          if [ -z "$SMTP_CONNECTION_URI" ] || [ -z "$SMTP_PASSWORD" ] || [ -z "$MAIL_FROM" ]; then
-            echo "SMTP non configuré : extension ignorée (les emails restent dans la collection mail)."
-            exit 0
-          fi
-          bash scripts/deploy-email-extension.sh
 
       - name: Résumé
         if: ${{ !inputs.accounts_only }}

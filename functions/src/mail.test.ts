@@ -6,6 +6,7 @@ const brand = { name: "Ecole Motion", color: "#5a0eb5", supportEmail: "theo@ecol
 describe("buildWelcomeEmail", () => {
   it("utilise le modèle par défaut et le lien d'activation", () => {
     const mail = buildWelcomeEmail({
+      creatorId: "theo",
       to: "anne@test.fr",
       studentName: "Anne Martin",
       courseTitle: "After Effects de A à Z",
@@ -15,6 +16,7 @@ describe("buildWelcomeEmail", () => {
       activation: true,
     });
     expect(mail.to).toBe("anne@test.fr");
+    expect(mail.creatorId).toBe("theo");
     expect(mail.replyTo).toBe("theo@ecolemotion.com");
     expect(mail.message.subject).toBe("Bienvenue dans After Effects de A à Z !");
     expect(mail.message.html).toContain("Bonjour Anne,");
@@ -25,6 +27,7 @@ describe("buildWelcomeEmail", () => {
 
   it("applique le modèle personnalisé en échappant les valeurs", () => {
     const mail = buildWelcomeEmail({
+      creatorId: "theo",
       to: "x@test.fr",
       studentName: "<b>Hack</b>",
       courseTitle: "Cours",

@@ -9,6 +9,7 @@ import type {
   InviteTokenInput,
   ResolveVimeoInput,
 } from "@shared/schemas";
+import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
 import type { VimeoVideo } from "@shared/types";
 import { functions } from "./client";
 
@@ -26,6 +27,11 @@ export const callSendTestWelcomeEmail = callable<CourseIdInput, { email: string 
 export const callGetInvite = callable<InviteTokenInput, InviteInfo>("getInvite");
 export const callAcceptInvite = callable<AcceptInviteInput, { email: string }>("acceptInvite");
 export const callResolveVimeoVideo = callable<ResolveVimeoInput, VimeoVideo>("resolveVimeoVideo");
+export const callSaveMailSettings = callable<MailSettingsInput, SaveMailSettingsResult>(
+  "saveMailSettings",
+);
+export const callDeleteMailSettings = callable<void, { ok: true }>("deleteMailSettings");
+export const callSendTestMail = callable<void, { email: string }>("sendTestMail");
 
 /** Message lisible pour une erreur Firebase (callable, auth, firestore). */
 export function errorMessage(error: unknown): string {

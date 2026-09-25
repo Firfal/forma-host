@@ -29,8 +29,8 @@ Navigateur ── Next.js (App Router) sur Firebase App Hosting (europe-west4)
    ├── Cloud Storage (europe-west4) : miniatures publiques, pièces jointes protégées
    ├── Cloud Functions v2 (europe-west4)
    │     ├─ callables : grantAccess (invitation + import CSV), acceptInvite, revokeAccess, resolveVimeoVideo
-   │     └─ déclencheur : onCommentCreated (notifications + email au formateur)
-   ├── Extension « Trigger Email from Firestore » + SMTP Brevo
+   │     └─ déclencheurs : onCommentCreated (notifications + email au formateur), onMailCreated (envoi SMTP)
+   ├── SMTP du formateur (Brevo, Gmail…), réglé dans Admin > Paramètres
    └── Vimeo (vidéo non répertoriée à domaine restreint, @vimeo/player, API pour les métadonnées)
 ```
 
@@ -61,7 +61,8 @@ Chaque document porte un `creatorId`, pour que plusieurs formateurs puissent coh
 | `enrollments/{courseId_uid}` | courseId, creatorId, uid, email, source (invite/import/stripe), orderId?, status (active/revoked), joinedAt, progress {completedLessonIds[], lastLessonId, lastActivityAt} | lecture par l'élève ou le formateur ; **création uniquement côté serveur** ; l'élève ne modifie que `progress` (`affectedKeys().hasOnly(['progress'])`, `lastActivityAt == request.time`) |
 | `invites/{token}` | uid, email, courseId, expiresAt (+30 j), usedAt | serveur uniquement |
 | `users/{uid}/notifications/{id}` | type, payload, read, createdAt | l'utilisateur |
-| `mail/{id}` | consommé par l'extension (HTML déjà rendu) | serveur uniquement |
+| `mail/{id}` | file d'envoi : creatorId, to, message (HTML déjà rendu), delivery {state, attempts, error} ; envoyé par `onMailCreated` | serveur uniquement |
+| `creators/{uid}/private/mail` + `creators/{uid}/secrets/mail` | réglages SMTP du formateur ; mot de passe chiffré (AES-256-GCM, clé dans Secret Manager) | réglages lus par le formateur ; écriture et secret : serveur uniquement |
 
 Points clés :
 - **Plan en liste plate dans le document de la formation.** Une seule lecture alimente la page de vente et la sidebar du lecteur, et dnd-kit gère une seule liste triable.
@@ -126,7 +127,8 @@ Points clés :
 - `onCommentCreated` utilise des ID déterministes : les déclencheurs peuvent s'exécuter deux fois.
 
 **Emails**
-- Extension Trigger Email + clé SMTP Brevo (secret), avec TTL activé.
+- Envoi par `onMailCreated` avec le SMTP du formateur (Brevo, Gmail ou autre), saisi dans Admin > Paramètres ; TTL activé sur `mail`.
+- Sans réglages, les emails attendent (`NOT_CONFIGURED`) et partent à l'enregistrement.
 - Domaine expéditeur avec SPF, DKIM et DMARC.
 - Emails Firebase Auth (reset) en français, avec l'URL d'action pointant sur notre domaine.
 
@@ -158,7 +160,7 @@ forma-host/
 **Prérequis (côté toi / Théo)**
 - Projet Firebase en offre Blaze, région europe-west4.
 - Vérifier l'offre Vimeo (restriction par domaine + accès API) et créer un token personnel.
-- Compte Brevo et DNS du domaine d'envoi.
+- Compte d'envoi (Brevo ou Gmail) et DNS du domaine d'envoi.
 - Choisir le domaine de la plateforme.
 
 **Phase 0 — Fondations**
@@ -188,7 +190,7 @@ forma-host/
 - Commentaires (fil + réponses, badge « Créateur », suppression).
 
 **Phase 4 — Élèves et mail de bienvenue** (5, 6)
-- Extension Trigger Email + Brevo.
+- Envoi SMTP par formateur (Admin > Paramètres).
 - `grantAccess` (formulaire « Donner l'accès » + import CSV Podia), `acceptInvite` + page `/bienvenue/[token]`, `revokeAccess`.
 - Éditeur du modèle de bienvenue, avec aperçu et envoi de test.
 - Tableau des élèves de la formation : recherche, x/N, dates, renvoyer l'invitation, retirer l'accès.
@@ -238,5 +240,5 @@ forma-host/
 - **Manuel** :
   - déploiement App Hosting de prévisualisation ;
   - vraie vidéo Vimeo à domaine restreint ;
-  - vrai email reçu via Brevo ;
+  - vrai email reçu (Brevo ou Gmail) ;
   - rendu comparé aux frames Figma listées dans le Contexte.

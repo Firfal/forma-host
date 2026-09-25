@@ -1,7 +1,7 @@
 "use client";
 
 import { collection, collectionGroup, limit, orderBy, query, where } from "firebase/firestore";
-import { MessageSquare, PlayCircle, UserPlus } from "lucide-react";
+import { AlertTriangle, Mail, MessageSquare, PlayCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { completedCount, visibleLessons } from "@shared/outline";
@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/client";
 import { toDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
+import { useMailSettings } from "@/lib/mail-settings";
 
 const DAY = 86_400_000;
 
@@ -104,6 +105,7 @@ export default function AdminHomePage() {
   const { data: enrollments, loading } = useQueryData<EnrollmentDoc>(enrollmentsQuery);
   const { data: courses } = useQueryData<CourseDoc>(coursesQuery);
   const { data: comments } = useQueryData<CommentDoc>(commentsQuery);
+  const { data: mailSettings, loading: mailLoading } = useMailSettings(uid);
 
   const courseMap = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
   const kpis = useMemo(() => {
@@ -143,6 +145,26 @@ export default function AdminHomePage() {
   return (
     <PageContainer>
       <PageHeader title="Accueil" />
+      {!mailLoading && (!mailSettings || mailSettings.lastError) ? (
+        <Link
+          href={routes.adminSettings}
+          className={`mb-4 flex items-center gap-2.5 rounded-card px-4 py-3 text-[13px] ${
+            mailSettings ? "bg-danger-soft text-danger" : "bg-warning-soft text-warning"
+          }`}
+        >
+          {mailSettings ? (
+            <AlertTriangle className="size-4 shrink-0" />
+          ) : (
+            <Mail className="size-4 shrink-0" />
+          )}
+          <span className="flex-1">
+            {mailSettings
+              ? "Des emails n'ont pas pu partir. Vérifie tes réglages d'envoi."
+              : "Configure l'envoi des emails pour que tes élèves reçoivent leurs invitations et emails de bienvenue."}
+          </span>
+          <span className="shrink-0 font-medium">{mailSettings ? "Voir" : "Configurer"} →</span>
+        </Link>
+      ) : null}
       {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {Array.from({ length: 5 }, (_, i) => (

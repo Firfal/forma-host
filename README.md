@@ -14,7 +14,7 @@ Plateforme d'hébergement de formations en ligne, pensée comme une alternative 
 | Espace | Fonctionnalités |
 |---|---|
 | Comptes | Inscription, connexion, mot de passe oublié, activation par invitation (`/bienvenue/[token]`) |
-| Formateur (`/admin`) | Formations (titre, description, miniature, slug), plan avec chapitres, sous-chapitres et leçons, leçons (vidéo Vimeo, miniature, description, liens, pièces jointes), élèves (invitation, import CSV, progression), commentaires, notifications, mail de bienvenue |
+| Formateur (`/admin`) | Formations (titre, description, miniature, slug), plan avec chapitres, sous-chapitres et leçons, leçons (vidéo Vimeo, miniature, description, liens, pièces jointes), élèves (invitation, import CSV, progression), commentaires, notifications, mail de bienvenue, envoi des emails par son propre SMTP (Brevo, Gmail…) |
 | Élève (`/formations`) | Mes formations (tous formateurs confondus), lecteur vidéo, progression, reprise, commentaires |
 | Public | Page de vente `/{formateur}/{formation}` |
 
@@ -54,7 +54,7 @@ Comptes de démo :
 - **formateur** : `theo@ecolemotion.com` / `motion123`
 - **élève** : `anne@exemple.fr` / `eleve123`
 
-Les emails ne partent pas en local. Ils sont visibles dans la collection `mail` de l'UI des émulateurs, avec les liens d'activation.
+Les emails ne partent pas en local (aucun SMTP configuré) : ils restent dans la collection `mail` de l'UI des émulateurs, avec les liens d'activation.
 
 ## Tests
 

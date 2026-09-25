@@ -5,10 +5,12 @@
  *   GOOGLE_APPLICATION_CREDENTIALS=cle.json npx tsx scripts/bootstrap-firebase.ts --project forma-host
  *
  * Étapes : facturation (Blaze), APIs, base Firestore, Authentication (email + mot de passe,
- * domaines autorisés, emails en français), bucket Storage par défaut, secret Vimeo.
+ * domaines autorisés, emails en français), bucket Storage par défaut, secrets (Vimeo, clé de
+ * chiffrement des réglages d'envoi des emails).
  * Le déploiement (règles, Functions, App Hosting) est fait ensuite par `firebase deploy`
  * (voir .github/workflows/deploy.yml).
  */
+import { randomBytes } from "node:crypto";
 import { GoogleAuth } from "google-auth-library";
 import { REGION } from "../shared/constants";
 import { parseArgs } from "./admin";
@@ -111,7 +113,6 @@ const REQUIRED_APIS = [
   "pubsub.googleapis.com",
   "secretmanager.googleapis.com",
   "firebaseapphosting.googleapis.com",
-  "firebaseextensions.googleapis.com",
   "cloudresourcemanager.googleapis.com",
   "iam.googleapis.com",
   "cloudbilling.googleapis.com",
@@ -257,6 +258,34 @@ async function ensureVimeoSecret() {
   );
 }
 
+/**
+ * Clé AES-256 qui chiffre les mots de passe SMTP saisis par les formateurs.
+ * Générée une seule fois : la remplacer rendrait illisibles les réglages déjà enregistrés.
+ */
+async function ensureEncryptionKey() {
+  const name = "SETTINGS_ENCRYPTION_KEY";
+  const base = `https://secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets`;
+  const existing = await api("GET", `${base}/${name}`, undefined, { allow404: true });
+  if (existing) {
+    const latest = await api("GET", `${base}/${name}/versions/latest`, undefined, {
+      allow404: true,
+    });
+    if (latest) {
+      ok(`Secret ${name} présent`);
+      return;
+    }
+  } else {
+    await api("POST", `${base}?secretId=${name}`, {
+      replication: { automatic: {} },
+      labels: { "firebase-managed": "true" },
+    });
+  }
+  await api("POST", `${base}/${name}:addVersion`, {
+    payload: { data: Buffer.from(randomBytes(32).toString("base64")).toString("base64") },
+  });
+  ok(`Secret ${name} créé (clé aléatoire)`);
+}
+
 /** Le serveur Next.js (App Hosting) lit les pages de vente dans Firestore avec l'Admin SDK. */
 async function grantAppHostingFirestoreAccess() {
   const member = `serviceAccount:firebase-app-hosting-compute@${PROJECT}.iam.gserviceaccount.com`;
@@ -298,6 +327,7 @@ async function main() {
   await ensureAuth();
   await ensureStorage();
   await ensureVimeoSecret();
+  await ensureEncryptionKey();
   await grantAppHostingFirestoreAccess();
   console.log(
     warnings.length ? `\nTerminé avec ${warnings.length} avertissement(s).` : "\nTerminé.",

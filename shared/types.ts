@@ -192,3 +192,30 @@ export interface UserDoc<T = TimestampLike> {
   notifyOnComment: boolean;
   createdAt: T;
 }
+
+/** Réglages d'envoi des emails du formateur (creators/{uid}/private/mail), écrits par les Functions. */
+export interface MailSettingsDoc<T = TimestampLike> {
+  provider: "brevo" | "gmail" | "smtp";
+  host: string;
+  port: number;
+  username: string;
+  fromName: string;
+  fromEmail: string;
+  updatedAt: T;
+  lastSentAt: T | null;
+  /** Dernier échec d'envoi, effacé au premier envoi réussi. */
+  lastError: string | null;
+  lastErrorAt: T | null;
+}
+
+/** NOT_CONFIGURED : en attente des réglages d'envoi du formateur. */
+export type MailDeliveryState = "PROCESSING" | "SUCCESS" | "ERROR" | "NOT_CONFIGURED";
+
+export interface MailDelivery<T = TimestampLike> {
+  state: MailDeliveryState;
+  attempts: number;
+  error: string | null;
+  messageId?: string | null;
+  leaseExpireAt?: T | null;
+  updatedAt: T;
+}

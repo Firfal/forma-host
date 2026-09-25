@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Settings,
   UserRound,
   Users,
   X,
@@ -42,6 +43,7 @@ const adminNav: NavItem[] = [
   { href: routes.adminCourses, label: "Formations", icon: BookOpen },
   { href: routes.adminMembers, label: "Membres", icon: Users },
   { href: routes.adminComments, label: "Commentaires", icon: MessageSquare },
+  { href: routes.adminSettings, label: "Paramètres", icon: Settings },
 ];
 
 const memberNav: NavItem[] = [

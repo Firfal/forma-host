@@ -1,15 +1,19 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { DEFAULT_WELCOME_EMAIL } from "@shared/constants";
 import { emailLayout, fillTemplate, textToHtml } from "@shared/template";
-import type { CoursePrivateSettings, CreatorDoc } from "@shared/types";
+import type { CoursePrivateSettings, CreatorDoc, MailDelivery } from "@shared/types";
 
 const MAIL_TTL_DAYS = 30;
 
+/** File d'envoi : chaque document de `mail` est envoyé par onMailCreated (mail-delivery.ts). */
 export interface MailDoc {
+  /** Formateur dont les réglages d'envoi sont utilisés. */
+  creatorId: string;
   to: string;
   replyTo?: string;
   message: { subject: string; html: string; text: string };
   expireAt: Timestamp;
+  delivery?: MailDelivery<Timestamp>;
 }
 
 export interface Brand {
@@ -31,6 +35,7 @@ export function firstName(name: string | null | undefined): string {
 }
 
 export interface WelcomeEmailInput {
+  creatorId: string;
   to: string;
   studentName: string | null;
   courseTitle: string;
@@ -62,20 +67,29 @@ export function buildWelcomeEmail(input: WelcomeEmailInput): MailDoc {
       : `Email envoyé par ${input.brand.name}.`,
   });
   const text = `${fillTemplate(template.body, vars)}\n\n${ctaLabel} : ${input.ctaUrl}`;
-  return mailDoc(input.to, subject, html, text, input.brand.supportEmail);
+  return mailDoc({
+    creatorId: input.creatorId,
+    to: input.to,
+    subject,
+    html,
+    text,
+    replyTo: input.brand.supportEmail,
+  });
 }
 
-export function mailDoc(
-  to: string,
-  subject: string,
-  html: string,
-  text: string,
-  replyTo?: string | null,
-): MailDoc {
+export function mailDoc(input: {
+  creatorId: string;
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string | null;
+}): MailDoc {
   return {
-    to,
-    ...(replyTo ? { replyTo } : {}),
-    message: { subject, html, text },
+    creatorId: input.creatorId,
+    to: input.to,
+    ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+    message: { subject: input.subject, html: input.html, text: input.text },
     expireAt: Timestamp.fromMillis(Date.now() + MAIL_TTL_DAYS * 24 * 3600 * 1000),
   };
 }

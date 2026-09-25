@@ -49,16 +49,17 @@ export async function handleNewComment(
         ctaUrl: `${appUrl}${link}`,
         brandName: brand.name,
         brandColor: brand.color,
-        footer: "Désactive ces emails dans Paramètres > Notifications.",
+        footer: "Désactive ces emails dans Mon compte.",
       });
       batch.set(
         db().doc(`mail/comment_${commentId}`),
-        mailDoc(
-          creatorUser.email,
+        mailDoc({
+          creatorId: course.creatorId,
+          to: creatorUser.email,
           subject,
           html,
-          `${comment.authorName} : ${excerpt}\n${appUrl}${link}`,
-        ),
+          text: `${comment.authorName} : ${excerpt}\n${appUrl}${link}`,
+        }),
       );
     }
   }

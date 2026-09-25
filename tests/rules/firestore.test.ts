@@ -368,6 +368,25 @@ describe("utilisateurs et zones serveur", () => {
 
   it("invitations et emails inaccessibles au client", async () => {
     await assertFails(getDoc(doc(creatorDb(), "invites/abc")));
-    await assertFails(setDoc(doc(creatorDb(), "mail/x"), { to: "a@b.c" }));
+    await assertFails(setDoc(doc(creatorDb(), "mail/x"), { to: "a@b.c", creatorId: THEO }));
+    await assertFails(getDoc(doc(creatorDb(), "mail/x")));
+  });
+
+  it("réglages d'envoi : lus par le formateur seul, écrits par le serveur ; secret inaccessible", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      await setDoc(doc(admin, "creators/theo/private/mail"), { host: "smtp-relay.brevo.com" });
+      await setDoc(doc(admin, "creators/theo/secrets/mail"), { password: "v1:chiffré" });
+    });
+    await assertSucceeds(getDoc(doc(creatorDb(), "creators/theo/private/mail")));
+    await assertFails(
+      getDoc(doc(db(OTHER_CREATOR, { creator: true }), "creators/theo/private/mail")),
+    );
+    await assertFails(getDoc(doc(db(null), "creators/theo/private/mail")));
+    await assertFails(
+      setDoc(doc(creatorDb(), "creators/theo/private/mail"), { host: "smtp.evil.com" }),
+    );
+    await assertFails(getDoc(doc(creatorDb(), "creators/theo/secrets/mail")));
+    await assertFails(setDoc(doc(creatorDb(), "creators/theo/secrets/mail"), { password: "x" }));
   });
 });

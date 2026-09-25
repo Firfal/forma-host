@@ -34,6 +34,7 @@ test("invitation : le formateur donne l'accès, l'élève active son compte", as
   await login(page, THEO);
   await page.goto("/admin/formations/after-effects");
   await page.getByRole("button", { name: "Donner l'accès" }).first().click();
+  await expect(page.getByText("L'envoi des emails n'est pas encore configuré")).toBeVisible();
   await page.fill("#invite-emails", `Julie Martin <${email}>`);
   await page.getByRole("button", { name: "Donner l'accès", exact: true }).last().click();
   await expect(page.getByText("1 élève ajouté")).toBeVisible();

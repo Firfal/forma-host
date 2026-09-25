@@ -56,3 +56,21 @@ test("la page de vente publique se personnalise", async ({ page }) => {
   );
   expect((await page.goto("/ecole-motion/nexiste-pas"))?.status()).toBe(404);
 });
+
+test("l'envoi des emails se configure dans Paramètres", async ({ page }) => {
+  await login(page, THEO);
+  await page.getByRole("link", { name: /Configure l'envoi des emails/ }).click();
+  await expect(page).toHaveURL(/\/admin\/parametres$/);
+  await expect(page.getByText("Non configuré")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Autre (SMTP)" }).click();
+  await page.fill("#mail-host", "metadata.google.internal");
+  await page.fill("#mail-username", "theo");
+  await page.fill("#mail-password", "secret");
+  await page.getByRole("button", { name: "Vérifier et enregistrer" }).click();
+  await expect(page.getByText("Adresse du serveur non autorisée")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Gmail" }).click();
+  await expect(page.getByText("Mot de passe d'application").first()).toBeVisible();
+  await expect(page.locator("#mail-host")).toHaveCount(0);
+});
