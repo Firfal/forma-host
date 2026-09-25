@@ -18,6 +18,17 @@ Plateforme d'hébergement de formations en ligne, pensée comme une alternative 
 | Élève (`/formations`) | Mes formations (tous formateurs confondus), lecteur vidéo, progression, reprise, commentaires |
 | Public | Page de vente `/{formateur}/{formation}` |
 
+## État d'avancement
+
+- **Fait** : toute la V1 du plan (Phases 0 à 6), testée de bout en bout sur émulateurs.
+- **À faire de ton côté avant la mise en ligne** (voir [`docs/SETUP.md`](docs/SETUP.md)) :
+  - créer le projet Firebase (Blaze, `europe-west4`) ;
+  - vérifier l'offre Vimeo de Théo (restriction par domaine) et créer un token API ;
+  - configurer Brevo + l'extension Trigger Email ;
+  - relier App Hosting au dépôt ;
+  - lancer `make-creator` pour Théo.
+- **V2** : Stripe (abonnement formateur) et coupons / codes promo, chat formateur ↔ élève, onboarding self-service des formateurs, domaine personnalisé par formateur.
+
 ## Structure
 
 ```
@@ -57,4 +68,5 @@ npm test                          # tests unitaires (shared, lib)
 npm run test:rules                # règles Firestore + Storage (émulateurs)
 npm --prefix functions test       # Functions : tests unitaires
 npm --prefix functions run test:emu   # Functions : intégration (émulateurs Auth + Firestore)
+npm run test:e2e                  # Playwright : parcours formateur / élève / invitation / page de vente
 ```

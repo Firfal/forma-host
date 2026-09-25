@@ -24,7 +24,11 @@ function assertUsable(
   invite: InviteDoc<Timestamp> | undefined,
 ): asserts invite is InviteDoc<Timestamp> {
   if (!invite) throw new HttpsError("not-found", "Invitation introuvable");
-  if (invite.usedAt) throw new HttpsError("already-exists", "Compte déjà activé : connecte-toi.");
+  if (invite.usedAt)
+    throw new HttpsError(
+      "already-exists",
+      "Ce lien a déjà servi : connecte-toi avec ton email et ton mot de passe.",
+    );
   if (invite.expiresAt.toMillis() < Date.now()) {
     throw new HttpsError(
       "deadline-exceeded",

@@ -54,3 +54,8 @@ jobs:
         env:
           NEXT_PUBLIC_USE_EMULATORS: "true"
           NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: E2E (Playwright + émulateurs + données de démo)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e

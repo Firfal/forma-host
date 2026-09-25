@@ -18,7 +18,8 @@
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-forma \"vitest run --config vitest.rules.config.mts\"",
     "emulators": "npm --prefix functions run build && firebase emulators:start --project demo-forma",
     "seed": "tsx scripts/seed-emulator.ts",
-    "make-creator": "tsx scripts/make-creator.ts"
+    "make-creator": "tsx scripts/make-creator.ts",
+    "test:e2e": "npm --prefix functions run build && firebase emulators:exec --project demo-forma \"tsx scripts/seed-emulator.ts && playwright test\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

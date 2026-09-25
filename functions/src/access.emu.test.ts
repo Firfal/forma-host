@@ -177,7 +177,7 @@ describe("invitations", () => {
     expect(user.providerData.map((p) => p.providerId)).toContain("password");
     await expect(
       acceptInvite({ token, password: "autre12345", displayName: "Anne" }),
-    ).rejects.toThrow(/déjà activé/);
+    ).rejects.toThrow(/déjà servi/);
   });
 
   it("refuse un jeton expiré", async () => {

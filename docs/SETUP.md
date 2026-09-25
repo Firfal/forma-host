@@ -55,8 +55,9 @@ npx firebase deploy --only functions
 2. Mets à jour `NEXT_PUBLIC_APP_URL` dans `apphosting.yaml`.
 3. Si tu utilises une autre marque, ajoute `NEXT_PUBLIC_BRAND_NAME` dans `apphosting.yaml`.
 4. La config web Firebase est injectée automatiquement au build (`FIREBASE_WEBAPP_CONFIG`) ; rien à faire.
-5. *(Optionnel)* **Domaine personnalisé** : dans les paramètres du backend, ajoute par exemple `formation.ecolemotion.com`, puis crée les enregistrements DNS indiqués.
-6. Chaque push sur `main` déclenche un déploiement.
+5. Les pages publiques (page de vente) lisent Firestore côté serveur avec l'Admin SDK. Si elles renvoient une erreur de permission, donne le rôle **Cloud Datastore User** (`roles/datastore.user`) au compte de service du backend (`firebase-app-hosting-compute@<project-id>.iam.gserviceaccount.com`) dans IAM.
+6. *(Optionnel)* **Domaine personnalisé** : dans les paramètres du backend, ajoute par exemple `formation.ecolemotion.com`, puis crée les enregistrements DNS indiqués.
+7. Chaque push sur `main` déclenche un déploiement.
 
 ## 5. Compte formateur
 

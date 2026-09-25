@@ -44,13 +44,16 @@ export function Composer({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!body.trim()) return;
+    const text = body.trim();
+    if (!text) return;
+    // Vidé tout de suite (le commentaire s'affiche en temps réel), restauré en cas d'erreur.
+    setBody("");
     setSending(true);
     try {
-      await onSubmit(body.trim());
-      setBody("");
+      await onSubmit(text);
       onCancel?.();
     } catch (error) {
+      setBody(text);
       toast.error(errorMessage(error));
     } finally {
       setSending(false);
