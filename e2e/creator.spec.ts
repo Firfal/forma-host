@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, THEO } from "./helpers";
+import { login, mailsTo, THEO } from "./helpers";
 
 test("le formateur crée une formation, un chapitre, une leçon, puis publie", async ({ page }) => {
   await login(page, THEO);
@@ -58,7 +58,18 @@ test("la page de vente publique se personnalise", async ({ page }) => {
 });
 
 test("l'envoi des emails se configure dans Paramètres", async ({ page }) => {
+  const student = `paul-${Date.now()}@exemple.fr`;
   await login(page, THEO);
+
+  // Invitation avant la configuration : l'email attend.
+  await page.goto("/admin/formations/after-effects");
+  await page.getByRole("button", { name: "Donner l'accès" }).first().click();
+  await page.fill("#invite-emails", student);
+  await page.getByRole("button", { name: "Donner l'accès", exact: true }).last().click();
+  await expect(page.getByText("1 élève ajouté")).toBeVisible();
+  await expect.poll(async () => (await mailsTo(student))[0]?.state).toBe("NOT_CONFIGURED");
+
+  await page.goto("/admin");
   await page.getByRole("link", { name: /Configure l'envoi des emails/ }).click();
   await expect(page).toHaveURL(/\/admin\/parametres$/);
   await expect(page.getByText("Non configuré")).toBeVisible();
@@ -70,7 +81,30 @@ test("l'envoi des emails se configure dans Paramètres", async ({ page }) => {
   await page.getByRole("button", { name: "Vérifier et enregistrer" }).click();
   await expect(page.getByText("Adresse du serveur non autorisée")).toBeVisible();
 
+  // Gmail : serveur imposé, identifiants vérifiés par le serveur (SMTP simulé en émulateur).
   await page.getByRole("tab", { name: "Gmail" }).click();
-  await expect(page.getByText("Mot de passe d'application").first()).toBeVisible();
   await expect(page.locator("#mail-host")).toHaveCount(0);
+  await page.fill("#mail-username", "ecolemotion@gmail.com");
+  await page.fill("#mail-from-email", "ecolemotion@gmail.com");
+  await page.fill("#mail-password", "refuse");
+  await page.getByRole("button", { name: "Vérifier et enregistrer" }).click();
+  await expect(page.getByText(/Identifiant ou mot de passe refusé/)).toBeVisible();
+
+  await page.fill("#mail-password", "abcdefghijklmnop");
+  await page.getByRole("button", { name: "Vérifier et enregistrer" }).click();
+  // L'invitation et les notifications des données de démo étaient en attente.
+  await expect(
+    page.getByText(/Connexion vérifiée, réglages enregistrés · \d+ emails en attente envoyés/),
+  ).toBeVisible();
+  await expect(page.getByText("Actif", { exact: true })).toBeVisible();
+  await expect.poll(async () => (await mailsTo(student))[0]?.state).toBe("SUCCESS");
+
+  await page.getByRole("button", { name: "M'envoyer un test" }).click();
+  await expect(page.getByText(`Email de test envoyé à ${THEO.email}`)).toBeVisible();
+
+  // Désactivation : les tests suivants repartent sans configuration.
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Désactiver" }).click();
+  await expect(page.getByText("Envoi des emails désactivé")).toBeVisible();
+  await expect(page.getByText("Non configuré")).toBeVisible();
 });

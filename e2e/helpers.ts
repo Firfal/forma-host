@@ -19,8 +19,10 @@ export async function login(page: Page, user: { email: string; password: string 
   await expect(page).toHaveURL(/\/(admin|formations)$/);
 }
 
-/** Emails écrits dans la collection `mail` de l'émulateur (non envoyés en local). */
-export async function mailsTo(email: string): Promise<{ text: string; subject: string }[]> {
+/** Emails écrits dans la collection `mail` de l'émulateur (SMTP simulé en local). */
+export async function mailsTo(
+  email: string,
+): Promise<{ text: string; subject: string; state: string | null }[]> {
   const response = await fetch(
     "http://127.0.0.1:8080/v1/projects/demo-forma/databases/(default)/documents/mail?pageSize=300",
     { headers: { Authorization: "Bearer owner" } },
@@ -30,6 +32,7 @@ export async function mailsTo(email: string): Promise<{ text: string; subject: s
       fields: {
         to: { stringValue: string };
         message: { mapValue: { fields: Record<string, { stringValue: string }> } };
+        delivery?: { mapValue: { fields: { state?: { stringValue: string } } } };
       };
     }[];
   };
@@ -38,5 +41,6 @@ export async function mailsTo(email: string): Promise<{ text: string; subject: s
     .map((doc) => ({
       text: doc.fields.message.mapValue.fields.text.stringValue,
       subject: doc.fields.message.mapValue.fields.subject.stringValue,
+      state: doc.fields.delivery?.mapValue.fields.state?.stringValue ?? null,
     }));
 }

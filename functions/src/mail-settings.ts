@@ -31,7 +31,11 @@ export async function saveMailSettings(
   const secretRef = db().doc(paths.creatorMailSecret(uid));
   const { host, port } = smtpServer(input);
 
-  let password = input.password ?? "";
+  // Google affiche le mot de passe d'application par groupes de 4 lettres séparés d'espaces.
+  let password =
+    input.provider === "gmail"
+      ? (input.password ?? "").replace(/\s+/g, "")
+      : (input.password ?? "");
   if (!password) {
     const secret = (await secretRef.get()).data() as MailSecretDoc | undefined;
     if (!secret) throw new SmtpSetupError("Mot de passe requis.");

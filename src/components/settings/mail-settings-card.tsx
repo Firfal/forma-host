@@ -157,11 +157,12 @@ export function MailSettingsCard() {
   async function save(event: FormEvent) {
     event.preventDefault();
     if (!form) return;
+    // Champs inutiles omis (pas `undefined` : le SDK Firebase les enverrait sous la forme `null`).
+    const { host, port, password, ...rest } = form;
     const parsed = mailSettingsInput.safeParse({
-      ...form,
-      host: form.provider === "smtp" ? form.host : undefined,
-      port: form.provider === "smtp" ? form.port : undefined,
-      password: form.password || undefined,
+      ...rest,
+      ...(form.provider === "smtp" ? { host, port } : {}),
+      ...(password ? { password } : {}),
     });
     if (!parsed.success) {
       const next: Errors = {};

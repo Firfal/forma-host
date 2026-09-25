@@ -127,6 +127,19 @@ describe("envoi des emails", () => {
     );
   });
 
+  it("Gmail : le mot de passe d'application est collé avec ses espaces", async () => {
+    await saveMailSettings(
+      "theo",
+      { ...brevo, provider: "gmail", password: "abcd efgh ijkl mnop" },
+      deps,
+    );
+    expect(await loadSmtpConfig("theo", deps.key)).toMatchObject({
+      host: "smtp.gmail.com",
+      port: 465,
+      password: "abcdefghijklmnop",
+    });
+  });
+
   it("un échec d'envoi est visible dans les réglages, puis renvoyé", async () => {
     await saveMailSettings("theo", brevo, deps);
     await queueMail("m1");

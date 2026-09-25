@@ -115,6 +115,24 @@ export const smtpClient: SmtpClient = {
   },
 };
 
+/**
+ * SMTP simulé pour les émulateurs (tests E2E, développement local) : aucune connexion réelle.
+ * Le mot de passe « refuse » simule des identifiants refusés.
+ */
+export const fakeSmtpClient: SmtpClient = {
+  async verify(config) {
+    if (config.password === "refuse") {
+      throw Object.assign(new Error("Authentication failed"), {
+        code: "EAUTH",
+        response: "535 Authentication failed",
+      });
+    }
+  },
+  async send() {
+    return { messageId: `<simule-${Date.now()}@forma-host.test>` };
+  },
+};
+
 /** Message lisible pour une erreur SMTP (sans jamais inclure le mot de passe). */
 export function smtpErrorMessage(error: unknown): string {
   if (error instanceof SmtpSetupError) return error.message;

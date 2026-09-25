@@ -60,6 +60,20 @@ describe("mailSettingsInput", () => {
     ).toBe(false);
   });
 
+  it("accepte les champs vides transmis à null par le SDK Firebase", () => {
+    const parsed = mailSettingsInput.parse({
+      ...base,
+      provider: "gmail",
+      host: null,
+      port: null,
+      password: null,
+    });
+    expect(smtpServer(parsed)).toEqual({ host: "smtp.gmail.com", port: 465 });
+    expect(
+      mailSettingsInput.safeParse({ ...base, provider: "smtp", host: null, port: null }).success,
+    ).toBe(false);
+  });
+
   it("le mot de passe est optionnel (conservé côté serveur)", () => {
     const withoutPassword: Partial<typeof base> = { ...base };
     delete withoutPassword.password;

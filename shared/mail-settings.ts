@@ -78,8 +78,9 @@ const singleLine = (value: string) => !/[\u0000-\u001f\u007f]/.test(value);
 export const mailSettingsInput = z
   .object({
     provider: z.enum(["brevo", "gmail", "smtp"]),
-    host: z.string().optional(),
-    port: z.number().int().optional(),
+    // nullish : le SDK Firebase transmet les champs `undefined` sous la forme `null`.
+    host: z.string().nullish(),
+    port: z.number().int().nullish(),
     username: z
       .string()
       .trim()
@@ -87,7 +88,7 @@ export const mailSettingsInput = z
       .max(200)
       .refine(singleLine, "Identifiant invalide"),
     /** Vide ou absent : le mot de passe déjà enregistré est conservé. */
-    password: z.string().max(500).refine(singleLine, "Mot de passe invalide").optional(),
+    password: z.string().max(500).refine(singleLine, "Mot de passe invalide").nullish(),
     fromName: z
       .string()
       .trim()

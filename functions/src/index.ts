@@ -28,10 +28,12 @@ import {
 } from "./mail-settings";
 import { APP_URL, SETTINGS_ENCRYPTION_KEY, VIMEO_ACCESS_TOKEN, settingsKey } from "./params";
 import { handleNewComment } from "./comments";
-import { smtpClient, smtpErrorMessage } from "./smtp";
+import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
 import { resolveVimeo } from "./vimeo";
 
-const mailDeps = { key: settingsKey, client: smtpClient };
+// SMTP simulé uniquement dans les émulateurs (SMTP_FAKE=true dans functions/.env.demo-forma).
+const fakeSmtp = process.env.FUNCTIONS_EMULATOR === "true" && process.env.SMTP_FAKE === "true";
+const mailDeps = { key: settingsKey, client: fakeSmtp ? fakeSmtpClient : smtpClient };
 
 async function callerEmail(caller: { uid: string; email: string | null }): Promise<string> {
   const email = caller.email ?? (await auth().getUser(caller.uid)).email;
@@ -202,7 +204,7 @@ export const sendTestMail = onCall({ secrets: [SETTINGS_ENCRYPTION_KEY] }, async
   const brand = brandFromCreator(creatorSnap.data() as CreatorDoc | undefined);
   const appUrl = APP_URL.value();
   try {
-    await smtpClient.send(config, {
+    await mailDeps.client.send(config, {
       to: email,
       subject: "Email de test",
       html: emailLayout({
