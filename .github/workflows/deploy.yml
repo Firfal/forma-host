@@ -27,6 +27,11 @@ on:
         description: "Adresse publique de l'école (slug)"
         required: false
         default: "ecole-motion"
+      accounts_only:
+        description: "Uniquement le compte formateur (sans redéployer)"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: deploy-forma-host
@@ -39,7 +44,7 @@ permissions:
 env:
   PROJECT_ID: forma-host
   # Numéro du projet Google Cloud (affiché par scripts/setup-github-deploy.sh).
-  PROJECT_NUMBER: ""
+  PROJECT_NUMBER: "1038452933800"
   REGION: europe-west4
   BACKEND_ID: forma-host
 
@@ -87,18 +92,22 @@ jobs:
           npm ci --prefix functions
 
       - name: Initialisation du projet (APIs, Firestore, Auth, Storage, secrets)
+        if: ${{ !inputs.accounts_only }}
         env:
           VIMEO_ACCESS_TOKEN: ${{ secrets.VIMEO_ACCESS_TOKEN }}
         run: npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID"
 
       - name: Règles et index Firestore
+        if: ${{ !inputs.accounts_only }}
         run: npx firebase deploy --only firestore --project "$PROJECT_ID" --non-interactive --force
 
       - name: Règles Storage
+        if: ${{ !inputs.accounts_only }}
         continue-on-error: true
         run: npx firebase deploy --only storage --project "$PROJECT_ID" --non-interactive --force
 
       - name: Cloud Functions
+        if: ${{ !inputs.accounts_only }}
         run: |
           # Premier déploiement : les droits Eventarc mettent parfois quelques minutes à se propager.
           for attempt in 1 2 3; do
@@ -111,6 +120,7 @@ jobs:
           exit 1
 
       - name: App Hosting (backend)
+        if: ${{ !inputs.accounts_only }}
         run: |
           if npx firebase apphosting:backends:get "$BACKEND_ID" --project "$PROJECT_ID" > /dev/null 2>&1; then
             echo "Backend $BACKEND_ID déjà créé."
@@ -120,6 +130,7 @@ jobs:
           fi
 
       - name: App Hosting (déploiement Next.js)
+        if: ${{ !inputs.accounts_only }}
         id: apphosting
         run: npx firebase deploy --only apphosting --project "$PROJECT_ID" --non-interactive --force
 
@@ -130,19 +141,21 @@ jobs:
           [ -n "$BUILD_ID" ] && gcloud builds log "$BUILD_ID" --project "$PROJECT_ID" --region "$REGION" | tail -n 200
 
       - name: Accès Firestore du serveur App Hosting
+        if: ${{ !inputs.accounts_only }}
         run: npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID"
 
       - name: Compte formateur
         if: github.event_name == 'workflow_dispatch' && inputs.creator_email != ''
-        env:
-          CREATOR_EMAIL: ${{ inputs.creator_email }}
-          CREATOR_NAME: ${{ inputs.creator_name }}
-          CREATOR_SLUG: ${{ inputs.creator_slug }}
         run: |
-          npx tsx scripts/make-creator.ts --project "$PROJECT_ID" \
-            --email "$CREATOR_EMAIL" --name "$CREATOR_NAME" --slug "$CREATOR_SLUG"
+          # Dépôt public : l'email est lu depuis l'événement et masqué avant tout affichage.
+          EMAIL=$(jq -r '.inputs.creator_email' "$GITHUB_EVENT_PATH")
+          echo "::add-mask::$EMAIL"
+          NAME=$(jq -r '.inputs.creator_name' "$GITHUB_EVENT_PATH")
+          SLUG=$(jq -r '.inputs.creator_slug' "$GITHUB_EVENT_PATH")
+          npx tsx scripts/make-creator.ts --project "$PROJECT_ID" --email "$EMAIL" --name "$NAME" --slug "$SLUG"
 
       - name: Extension d'envoi d'emails (si SMTP configuré)
+        if: ${{ !inputs.accounts_only }}
         env:
           SMTP_CONNECTION_URI: ${{ secrets.SMTP_CONNECTION_URI }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
@@ -155,6 +168,7 @@ jobs:
           bash scripts/deploy-email-extension.sh
 
       - name: Résumé
+        if: ${{ !inputs.accounts_only }}
         run: |
           {
             echo "### Forma Host déployé"
