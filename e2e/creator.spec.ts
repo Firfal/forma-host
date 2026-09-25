@@ -21,15 +21,16 @@ test("le formateur crée une formation, un chapitre, une leçon, puis publie", a
   await page.locator("button", { hasText: "Nouvelle leçon" }).last().click();
   await expect(page).toHaveURL(/\/lecons\//);
   await page.fill("#lesson-title", "Les 12 principes de l'animation");
-  await page.fill("#vimeo-url", "https://vimeo.com/76979871/abcdef1234");
-  await page.getByRole("button", { name: "Ajouter", exact: true }).click();
-  await expect(page.getByText("Vimeo #76979871")).toBeVisible();
+  // Lien collé sans cliquer sur « Ajouter » : la vidéo doit quand même être enregistrée.
+  await page.fill("#vimeo-url", "https://vimeo.com/76979871/abcdef1234?fl=pl&fe=sh");
   await page.getByRole("button", { name: "Ajouter un lien" }).click();
   await page.getByPlaceholder("Libellé (ex. Discord)").fill("Discord");
   await page.getByPlaceholder("https://…").fill("https://discord.gg/test");
   await page.getByRole("switch").first().click();
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Leçon enregistrée")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Vimeo #76979871")).toBeVisible();
 
   await page.getByRole("link", { name: "Fermer" }).click();
   await expect(page.getByText("Les 12 principes de l'animation")).toBeVisible();

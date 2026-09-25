@@ -139,20 +139,26 @@ export default function LessonEditorPage() {
     setDirty(true);
   };
 
-  async function attachVideo() {
-    const ref = parseVimeoUrl(videoUrl);
+  /** Ajoute la vidéo du lien (titre, durée, miniature si Vimeo les fournit). Null si lien invalide. */
+  async function attachVideo(url = videoUrl): Promise<VimeoVideo | null> {
+    const ref = parseVimeoUrl(url);
     if (!ref) {
-      setVideoWarning("Lien Vimeo non reconnu. Exemple : https://vimeo.com/123456789/abcdef1234");
-      return;
+      setVideoWarning("Lien Vimeo non reconnu. Exemple : https://vimeo.com/123456789");
+      return null;
     }
     setVideoWarning(null);
-    update({
-      video: { provider: "vimeo", ...ref, title: null, durationSec: null, thumbnailUrl: null },
-    });
+    let video: VimeoVideo = {
+      provider: "vimeo",
+      ...ref,
+      title: null,
+      durationSec: null,
+      thumbnailUrl: null,
+    };
+    update({ video });
     setVideoUrl("");
     setResolving(true);
     try {
-      const video = await callResolveVimeoVideo({ url: vimeoPageUrl(ref) });
+      video = await callResolveVimeoVideo({ url: vimeoPageUrl(ref) });
       update({ video });
       if (draft?.title === "Nouvelle leçon" && video.title) update({ title: video.title });
     } catch (error) {
@@ -162,6 +168,7 @@ export default function LessonEditorPage() {
     } finally {
       setResolving(false);
     }
+    return video;
   }
 
   async function onAttachment(event: ChangeEvent<HTMLInputElement>) {
@@ -197,6 +204,15 @@ export default function LessonEditorPage() {
 
   async function save() {
     if (!draft) return;
+    // Lien collé sans cliquer sur « Ajouter » : la vidéo est ajoutée avant l'enregistrement.
+    let video = draft.video;
+    let title = draft.title;
+    if (videoUrl.trim()) {
+      const attached = await attachVideo(videoUrl);
+      if (!attached) return;
+      video = attached;
+      if (title === "Nouvelle leçon" && attached.title) title = attached.title;
+    }
     const links = draft.links.filter((link) => link.label.trim() || link.url.trim());
     for (const link of links) {
       const result = lessonLinkSchema.safeParse(link);
@@ -211,17 +227,17 @@ export default function LessonEditorPage() {
         course.id,
         lessonId,
         {
-          video: draft.video,
+          video,
           thumbnailUrl: draft.thumbnailUrl,
           body: draft.body,
           links,
           attachments: draft.attachments,
         },
         {
-          title: draft.title.trim() || "Sans titre",
+          title: title.trim() || "Sans titre",
           isPreview: draft.isPreview,
           hidden: draft.hidden,
-          durationSec: draft.video?.durationSec ?? null,
+          durationSec: video?.durationSec ?? null,
         },
       );
       await Promise.allSettled(removedPaths.current.map(deleteFile));
@@ -269,7 +285,7 @@ export default function LessonEditorPage() {
           <Button asChild variant="ghost">
             <Link href={routes.adminCourseContent(course.id)}>Fermer</Link>
           </Button>
-          <Button onClick={save} disabled={!draft || saving || !dirty}>
+          <Button onClick={save} disabled={!draft || saving || (!dirty && !videoUrl.trim())}>
             {saving ? "Enregistrement…" : "Enregistrer"}
           </Button>
         </div>
@@ -327,13 +343,20 @@ export default function LessonEditorPage() {
                 <Field
                   label="Lien de la vidéo Vimeo"
                   htmlFor="vimeo-url"
-                  hint="Vidéo « masquée de Vimeo », intégration autorisée sur ton domaine. Colle le lien de partage (avec son code) ou le code d'intégration."
+                  hint="Colle le lien de la vidéo (vimeo.com/…) ou son code d'intégration : elle est ajoutée automatiquement. Vidéo non répertoriée : lien complet avec son code (vimeo.com/123456789/abcdef1234)."
                 >
                   <div className="flex gap-2">
                     <Input
                       id="vimeo-url"
                       value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)}
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData.getData("text");
+                        if (parseVimeoUrl(pasted)) {
+                          e.preventDefault();
+                          void attachVideo(pasted);
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -342,7 +365,11 @@ export default function LessonEditorPage() {
                       }}
                       placeholder="https://vimeo.com/123456789/abcdef1234"
                     />
-                    <Button variant="secondary" onClick={attachVideo} disabled={!videoUrl.trim()}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => void attachVideo()}
+                      disabled={!videoUrl.trim()}
+                    >
                       Ajouter
                     </Button>
                   </div>
