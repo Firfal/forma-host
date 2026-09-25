@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/* Design tokens issus de la maquette Figma « app forma ». */
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-ink: #06040e;
+  --color-muted: #717073;
+  --color-line: #d6d6d7;
+  --color-line-soft: #eeeeee;
+  --color-surface: #f5f5f5;
+  --color-canvas: #ffffff;
+
+  --color-brand: #5a0eb5;
+  --color-brand-soft: #f2ebfa;
+  --color-brand-logo: #9d72f9;
+
+  --color-info: #186b91;
+  --color-info-soft: #eaf3f7;
+  --color-success: #1f7a4d;
+  --color-success-soft: #e7f5ee;
+  --color-warning: #a8591a;
+  --color-warning-soft: #fdf1e7;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+
+  --radius-card: 8px;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans text-sm;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-logo;
+  }
+}
+
+/* Contenu riche (descriptions de formation et de leçon). */
+@layer components {
+  .prose-forma {
+    @apply text-sm leading-6 text-ink;
+  }
+  .prose-forma p {
+    @apply mb-3;
+  }
+  .prose-forma h2 {
+    @apply mt-5 mb-2 text-base font-semibold;
+  }
+  .prose-forma h3 {
+    @apply mt-4 mb-2 text-sm font-semibold;
+  }
+  .prose-forma ul {
+    @apply mb-3 list-disc pl-5;
+  }
+  .prose-forma ol {
+    @apply mb-3 list-decimal pl-5;
+  }
+  .prose-forma a {
+    @apply text-ink underline decoration-line underline-offset-2 hover:decoration-ink;
+  }
+  .prose-forma blockquote {
+    @apply mb-3 border-l-2 border-line pl-3 text-muted;
+  }
+  .prose-forma > :last-child {
+    @apply mb-0;
+  }
+}

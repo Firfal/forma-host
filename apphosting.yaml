@@ -1,0 +1,20 @@
+# Configuration Firebase App Hosting (backend Next.js).
+# Région du backend : europe-west4 (choisie à la création du backend dans la console).
+# Doc : https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # URL publique de la plateforme (liens dans les emails, SEO).
+  - variable: NEXT_PUBLIC_APP_URL
+    value: https://forma-host--demo-forma.europe-west4.hosted.app
+    availability:
+      - BUILD
+      - RUNTIME
+  # La config web Firebase (FIREBASE_WEBAPP_CONFIG) est injectée automatiquement au build
+  # par App Hosting ; next.config.ts la recopie dans NEXT_PUBLIC_FIREBASE_CONFIG.

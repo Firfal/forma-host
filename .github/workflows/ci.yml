@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      # Les émulateurs Firebase ont besoin de Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm ci
+        working-directory: functions
+
+      - name: Lint, types, tests unitaires (app + shared)
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
+      - name: Functions — types, tests unitaires, build
+        working-directory: functions
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Règles de sécurité (émulateurs Firestore + Storage)
+        run: npm run test:rules
+
+      - name: Functions — intégration (émulateurs Auth + Firestore)
+        working-directory: functions
+        run: npm run test:emu
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NEXT_PUBLIC_USE_EMULATORS: "true"
+          NEXT_TELEMETRY_DISABLED: "1"

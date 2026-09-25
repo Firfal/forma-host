@@ -1,0 +1,271 @@
+rules_version = '2';
+
+// Contrôle d'accès de Forma Host.
+// Principe : les écritures sensibles (inscriptions, invitations, emails, notifications)
+// passent par les Cloud Functions (Admin SDK, hors règles). Le client ne peut que lire
+// ce qui le concerne, gérer ses propres formations (formateur) et sa progression (élève).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    // Claim posé par scripts/make-creator.ts (V1) puis par l'onboarding (V2).
+    function isCreator() {
+      return signedIn() && request.auth.token.creator == true;
+    }
+
+    function coursePath(courseId) {
+      return /databases/$(database)/documents/courses/$(courseId);
+    }
+
+    function course(courseId) {
+      return get(coursePath(courseId)).data;
+    }
+
+    function isCourseOwner(courseId) {
+      return signedIn() && course(courseId).creatorId == request.auth.uid;
+    }
+
+    function enrollmentPath(courseId) {
+      return /databases/$(database)/documents/enrollments/$(courseId + '_' + request.auth.uid);
+    }
+
+    function isEnrolled(courseId) {
+      return signedIn()
+        && exists(enrollmentPath(courseId))
+        && get(enrollmentPath(courseId)).data.status == 'active';
+    }
+
+    function onlyKeys(keys) {
+      return request.resource.data.keys().hasOnly(keys);
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function isShortString(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+
+    function isNullableString(value, max) {
+      return value == null || (value is string && value.size() <= max);
+    }
+
+    // ---------- Utilisateurs ----------
+
+    // Données privées (email, préférences).
+    match /users/{userId} {
+      allow read: if isUser(userId);
+      allow create: if isUser(userId)
+        && onlyKeys(['email', 'notifyOnComment', 'createdAt'])
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.notifyOnComment is bool
+        && request.resource.data.createdAt == request.time;
+      allow update: if isUser(userId)
+        && changedOnly(['notifyOnComment'])
+        && request.resource.data.notifyOnComment is bool;
+
+      // Notifications : créées par les Functions ; l'utilisateur les lit et les marque lues.
+      match /notifications/{notificationId} {
+        allow read, delete: if isUser(userId);
+        allow update: if isUser(userId) && changedOnly(['read']) && request.resource.data.read is bool;
+      }
+    }
+
+    // Profil public (nom, avatar), affiché dans les commentaires et la liste des membres.
+    match /profiles/{userId} {
+      allow read: if signedIn();
+      allow create: if isUser(userId)
+        && onlyKeys(['displayName', 'avatarUrl', 'createdAt'])
+        && isShortString(request.resource.data.displayName, 1, 80)
+        && isNullableString(request.resource.data.avatarUrl, 2000)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isUser(userId)
+        && changedOnly(['displayName', 'avatarUrl'])
+        && isShortString(request.resource.data.displayName, 1, 80)
+        && isNullableString(request.resource.data.avatarUrl, 2000);
+    }
+
+    // ---------- Formateurs ----------
+
+    match /creators/{creatorId} {
+      allow read: if true;
+      allow create, update: if isUser(creatorId) && isCreator()
+        && onlyKeys(['name', 'slug', 'logoUrl', 'brandColor', 'supportEmail', 'createdAt'])
+        && isShortString(request.resource.data.name, 1, 80)
+        && request.resource.data.slug is string
+        && request.resource.data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
+        && isNullableString(request.resource.data.logoUrl, 2000)
+        && request.resource.data.brandColor.matches('^#[0-9a-fA-F]{6}$')
+        && isNullableString(request.resource.data.supportEmail, 200);
+    }
+
+    // ---------- Formations ----------
+
+    function isValidCourse(data) {
+      return data.keys().hasOnly([
+          'creatorId', 'title', 'slug', 'description', 'summary', 'thumbnailUrl', 'status',
+          'visibility', 'commentsMode', 'items', 'outlineVersion', 'salesPage',
+          'createdAt', 'updatedAt'])
+        && isShortString(data.title, 1, 200)
+        && data.slug is string && data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
+        && data.summary is string && data.summary.size() <= 500
+        && isNullableString(data.thumbnailUrl, 2000)
+        && data.status in ['draft', 'published']
+        && data.visibility in ['visible', 'hidden']
+        && data.commentsMode in ['active', 'restricted', 'hidden']
+        && data.items is list && data.items.size() <= 500
+        && data.outlineVersion is int
+        && data.updatedAt == request.time;
+    }
+
+    match /courses/{courseId} {
+      // Publiée : visible par tous (page de vente). Dépublier ne coupe pas l'accès des inscrits.
+      allow read: if resource.data.status == 'published'
+        || (signedIn() && resource.data.creatorId == request.auth.uid)
+        || isEnrolled(courseId);
+      allow create: if isCreator()
+        && request.resource.data.creatorId == request.auth.uid
+        && isValidCourse(request.resource.data)
+        && request.resource.data.outlineVersion == 0
+        && request.resource.data.createdAt == request.time;
+      // Le plan (items) est versionné : chaque écriture incrémente outlineVersion de 1,
+      // ce qui empêche deux onglets de s'écraser mutuellement.
+      allow update: if signedIn()
+        && resource.data.creatorId == request.auth.uid
+        && request.resource.data.creatorId == resource.data.creatorId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && isValidCourse(request.resource.data)
+        && (request.resource.data.outlineVersion == resource.data.outlineVersion
+            ? request.resource.data.items == resource.data.items
+            : request.resource.data.outlineVersion == resource.data.outlineVersion + 1);
+      allow delete: if signedIn()
+        && resource.data.creatorId == request.auth.uid
+        && resource.data.status == 'draft';
+
+      // Réglages privés du formateur (modèle d'email, lien de paiement externe).
+      match /private/{docId} {
+        allow read, write: if isCourseOwner(courseId);
+      }
+
+      // Contenu protégé des leçons (vidéo, description, liens, pièces jointes).
+      match /lessons/{lessonId} {
+        allow read: if (signedIn() && resource.data.creatorId == request.auth.uid)
+          || isEnrolled(courseId)
+          || (resource.data.isPreview == true && resource.data.courseStatus == 'published');
+        allow create: if signedIn()
+          && request.resource.data.creatorId == request.auth.uid
+          && request.resource.data.courseId == courseId
+          && isCourseOwner(courseId)
+          && isValidLesson(request.resource.data);
+        allow update: if signedIn()
+          && resource.data.creatorId == request.auth.uid
+          && request.resource.data.creatorId == request.auth.uid
+          && request.resource.data.courseId == courseId
+          && isValidLesson(request.resource.data);
+        allow delete: if signedIn() && resource.data.creatorId == request.auth.uid;
+      }
+
+      // Commentaires (1 niveau de réponse).
+      match /comments/{commentId} {
+        allow read: if (signedIn() && resource.data.creatorId == request.auth.uid)
+          || (isEnrolled(courseId) && course(courseId).commentsMode != 'hidden');
+        allow create: if signedIn()
+          && isValidNewComment(courseId, request.resource.data)
+          && (isCourseOwner(courseId)
+              || (isEnrolled(courseId) && course(courseId).commentsMode == 'active'));
+        allow update: if signedIn()
+          && resource.data.authorUid == request.auth.uid
+          && changedOnly(['body', 'editedAt'])
+          && isShortString(request.resource.data.body, 1, 5000)
+          && request.resource.data.editedAt == request.time;
+        allow delete: if signedIn()
+          && (resource.data.authorUid == request.auth.uid
+              || resource.data.creatorId == request.auth.uid);
+      }
+    }
+
+    function isValidLesson(data) {
+      return data.keys().hasOnly([
+          'creatorId', 'courseId', 'courseStatus', 'isPreview', 'title', 'video', 'thumbnailUrl',
+          'body', 'links', 'attachments', 'updatedAt'])
+        && data.courseStatus in ['draft', 'published']
+        && data.isPreview is bool
+        && isShortString(data.title, 1, 200)
+        && isNullableString(data.thumbnailUrl, 2000)
+        && data.links is list && data.links.size() <= 50
+        && data.attachments is list && data.attachments.size() <= 50
+        && data.updatedAt == request.time;
+    }
+
+    function isValidNewComment(courseId, data) {
+      return data.keys().hasOnly([
+          'courseId', 'creatorId', 'lessonId', 'authorUid', 'authorName', 'authorAvatarUrl',
+          'body', 'parentId', 'createdAt'])
+        && data.courseId == courseId
+        && data.creatorId == course(courseId).creatorId
+        && data.authorUid == request.auth.uid
+        && isShortString(data.lessonId, 1, 64)
+        && isShortString(data.authorName, 1, 80)
+        && isNullableString(data.authorAvatarUrl, 2000)
+        && isShortString(data.body, 1, 5000)
+        && data.createdAt == request.time
+        && (data.parentId == null || isValidParent(courseId, data));
+    }
+
+    // Une réponse vise un commentaire racine de la même leçon.
+    function isValidParent(courseId, data) {
+      let parent = get(/databases/$(database)/documents/courses/$(courseId)/comments/$(data.parentId)).data;
+      return parent.parentId == null && parent.lessonId == data.lessonId;
+    }
+
+    // Page « Commentaires » du formateur : requête collection group filtrée sur creatorId.
+    match /{path=**}/comments/{commentId} {
+      allow read: if signedIn() && resource.data.creatorId == request.auth.uid;
+    }
+
+    // ---------- Inscriptions ----------
+
+    // Créées / révoquées uniquement par les Functions (grantAccess, revokeAccess).
+    // L'élève met à jour sa progression, rien d'autre.
+    match /enrollments/{enrollmentId} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || resource.data.creatorId == request.auth.uid);
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && resource.data.status == 'active'
+        && changedOnly(['progress'])
+        && isValidProgress(request.resource.data.progress);
+      allow create, delete: if false;
+    }
+
+    function isValidProgress(progress) {
+      return progress is map
+        && progress.keys().hasOnly(['completedLessonIds', 'lastLessonId', 'lastActivityAt'])
+        && progress.completedLessonIds is list
+        && progress.completedLessonIds.size() <= 1000
+        && isNullableString(progress.lastLessonId, 64)
+        && progress.lastActivityAt == request.time;
+    }
+
+    // ---------- Réservé au serveur ----------
+
+    match /invites/{token} {
+      allow read, write: if false;
+    }
+
+    match /mail/{mailId} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// Fichiers : miniatures et logos publics, pièces jointes des leçons réservées aux inscrits.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isCourseOwner(courseId) {
+      return signedIn()
+        && firestore.get(/databases/(default)/documents/courses/$(courseId)).data.creatorId == request.auth.uid;
+    }
+
+    function isEnrolled(courseId) {
+      let path = /databases/(default)/documents/enrollments/$(courseId + '_' + request.auth.uid);
+      return signedIn() && firestore.exists(path) && firestore.get(path).data.status == 'active';
+    }
+
+    function isImage(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024
+        && request.resource.contentType.matches('image/(png|jpeg|gif|webp)');
+    }
+
+    match /courses/{courseId}/thumbnail/{fileName} {
+      allow read: if true;
+      allow write: if isCourseOwner(courseId) && (request.resource == null || isImage(5));
+    }
+
+    match /courses/{courseId}/lessons/{lessonId}/thumbnail/{fileName} {
+      allow read: if true;
+      allow write: if isCourseOwner(courseId) && (request.resource == null || isImage(5));
+    }
+
+    match /courses/{courseId}/lessons/{lessonId}/attachments/{fileName} {
+      allow read: if isCourseOwner(courseId) || isEnrolled(courseId);
+      allow write: if isCourseOwner(courseId)
+        && (request.resource == null || request.resource.size < 100 * 1024 * 1024);
+    }
+
+    match /users/{userId}/avatar/{fileName} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == userId
+        && (request.resource == null || isImage(2));
+    }
+
+    match /creators/{creatorId}/logo/{fileName} {
+      allow read: if true;
+      allow write: if signedIn() && request.auth.uid == creatorId
+        && request.auth.token.creator == true
+        && (request.resource == null || isImage(2));
+    }
+  }
+}

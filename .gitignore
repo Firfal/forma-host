@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+functions/node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# functions build
+functions/lib/
+
+# firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+database-debug.log*
+pubsub-debug.log*
+.emulator-data/
+functions/.secret.local
+functions/.runtime.env
+
+# env
+.env*.local
+.env
+!.env.example
+
+# tests
+test-results/
+playwright-report/
+
+# misc
+.DS_Store
+*.log
