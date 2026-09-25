@@ -36,7 +36,7 @@ export function SignupForm() {
       await updateProfile(credential.user, { displayName: name.trim() });
       // Recharge le token pour que le profil soit créé avec le bon nom.
       await credential.user.getIdToken(true);
-      router.replace(next);
+      router.replace(next ?? routes.myCourses);
     } catch (err) {
       // Compte pré-créé par une invitation : il faut définir un mot de passe.
       if ((err as { code?: string }).code === "auth/email-already-in-use") setEmailTaken(true);

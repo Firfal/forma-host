@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { routes } from "@shared/paths";
-import { useNextPath } from "@/components/auth/use-next-path";
+import { homeFor, useNextPath } from "@/components/auth/use-next-path";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -17,15 +17,15 @@ import { auth } from "@/lib/firebase/client";
 export function LoginForm() {
   const router = useRouter();
   const next = useNextPath();
-  const { user, loading } = useAuth();
+  const { user, loading, isCreator } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) router.replace(next);
-  }, [loading, user, next, router]);
+    if (!loading && user) router.replace(next ?? homeFor(isCreator));
+  }, [loading, user, isCreator, next, router]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();

@@ -28,7 +28,7 @@ import { useDocData, useQueryData } from "@/lib/hooks";
 
 type CommentWithId = CommentDoc & { id: string };
 
-function Composer({
+export function Composer({
   placeholder,
   onSubmit,
   autoFocus,
@@ -87,7 +87,7 @@ function Composer({
   );
 }
 
-function CommentItem({
+export function CommentItem({
   comment,
   creatorId,
   canDelete,

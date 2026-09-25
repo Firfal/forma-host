@@ -146,14 +146,17 @@ async function grantOne(
         progress: { completedLessonIds: [], lastLessonId: null, lastActivityAt: null },
       });
       outcome = "created";
-      tx.set(db().doc(`users/${course.creatorId}/notifications/student_${id}`), {
-        type: "new_student",
-        title: "Nouvel élève",
-        body: `${student.name || student.email} a rejoint « ${course.title} »`,
-        link: routes.adminCourse(courseId),
-        read: false,
-        createdAt: FieldValue.serverTimestamp(),
-      });
+      // Pas de notification pour un import en masse (migration Podia).
+      if (params.source !== "import") {
+        tx.set(db().doc(`users/${course.creatorId}/notifications/student_${id}`), {
+          type: "new_student",
+          title: "Nouvel élève",
+          body: `${student.name || student.email} a rejoint « ${course.title} »`,
+          link: routes.adminCourse(courseId),
+          read: false,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
     }
 
     if (params.sendEmail) {

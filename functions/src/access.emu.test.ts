@@ -53,15 +53,13 @@ afterAll(async () => {
 beforeEach(async () => {
   await clearEmulators();
   await db().doc("courses/c1").set(course);
-  await db()
-    .doc("creators/theo")
-    .set({
-      name: "Ecole Motion",
-      slug: "ecole-motion",
-      brandColor: "#5a0eb5",
-      supportEmail: null,
-      logoUrl: null,
-    });
+  await db().doc("creators/theo").set({
+    name: "Ecole Motion",
+    slug: "ecole-motion",
+    brandColor: "#5a0eb5",
+    supportEmail: null,
+    logoUrl: null,
+  });
   await db().doc("users/theo").set({ email: "theo@test.fr", notifyOnComment: true });
 });
 
@@ -261,5 +259,20 @@ describe("handleNewComment", () => {
       APP_URL,
     );
     expect((await db().doc("users/theo/notifications/comment_own").get()).exists).toBe(false);
+  });
+});
+
+describe("notifications d'inscription", () => {
+  it("pas de notification pour un import", async () => {
+    await grantAccessToStudents({
+      courseId: "c1",
+      course,
+      students: [{ email: "import@test.fr" }],
+      source: "import",
+      sendEmail: false,
+      appUrl: APP_URL,
+    });
+    const notifications = await db().collection("users/theo/notifications").get();
+    expect(notifications.size).toBe(0);
   });
 });
