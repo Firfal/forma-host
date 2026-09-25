@@ -122,7 +122,8 @@ jobs:
       - name: App Hosting (backend)
         if: ${{ !inputs.accounts_only }}
         run: |
-          if npx firebase apphosting:backends:get "$BACKEND_ID" --project "$PROJECT_ID" > /dev/null 2>&1; then
+          # backends:get répond 0 même sans backend : on cherche l'identifiant dans la liste JSON.
+          if npx firebase apphosting:backends:list --project "$PROJECT_ID" --json | grep -q "/backends/$BACKEND_ID\""; then
             echo "Backend $BACKEND_ID déjà créé."
           else
             npx firebase apphosting:backends:create --project "$PROJECT_ID" --backend "$BACKEND_ID" \
