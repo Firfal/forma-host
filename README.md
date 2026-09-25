@@ -21,7 +21,8 @@ Plateforme d'hébergement de formations en ligne, pensée comme une alternative 
 ## État d'avancement
 
 - **Fait** : toute la V1 du plan (Phases 0 à 6), testée de bout en bout sur émulateurs.
-- **Production** : projet Firebase `forma-host`, déployé automatiquement par GitHub Actions (`Déploiement Firebase`), accès sans clé via Workload Identity Federation. Adresse : https://forma-host--forma-host.europe-west4.hosted.app. Voir [`docs/SETUP.md`](docs/SETUP.md).
+- **Production** : en ligne sur https://forma-host--forma-host.europe-west4.hosted.app (projet Firebase `forma-host`), déployé automatiquement par GitHub Actions à chaque push (accès sans clé, Workload Identity Federation). Voir [`docs/SETUP.md`](docs/SETUP.md).
+- **Comptes formateur** : Ecole Motion (`/ecole-motion`) et un compte d'administration du site. Mot de passe à définir via « Mot de passe oublié ».
 - **V2** : Stripe (abonnement formateur) et coupons / codes promo, chat formateur ↔ élève, onboarding self-service des formateurs.
 
 ## Structure
