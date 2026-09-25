@@ -39,5 +39,13 @@ describe("vimeo", () => {
         thumbnail_url: "https://i.vimeocdn.com/video/1-d_295x166",
       }).thumbnailUrl,
     ).toBe("https://i.vimeocdn.com/video/1-d_1280x720");
+    expect(
+      fromOEmbed(ref, { thumbnail_url: "https://i.vimeocdn.com/video/1-d_295x166?region=us" })
+        .thumbnailUrl,
+    ).toBe("https://i.vimeocdn.com/video/1-d_1280x720?region=us");
+    expect(
+      fromOEmbed(ref, { thumbnail_url: "https://i.vimeocdn.com/video/1-d_640x360.jpg" })
+        .thumbnailUrl,
+    ).toBe("https://i.vimeocdn.com/video/1-d_1280x720.jpg");
   });
 });

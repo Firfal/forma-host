@@ -38,7 +38,8 @@ export function fromOEmbed(ref: VimeoRef, body: VimeoOEmbed): VimeoVideo {
     title: body.title ?? null,
     durationSec: typeof body.duration === "number" ? body.duration : null,
     // Miniature oEmbed redimensionnée par Vimeo (suffixe _WxH) : on demande une taille HD.
-    thumbnailUrl: body.thumbnail_url?.replace(/_\d+x\d+(\.\w+)?$/, "_1280x720$1") ?? null,
+    // (l'URL peut se terminer par une extension et/ou des paramètres, ex. « ?region=us »).
+    thumbnailUrl: body.thumbnail_url?.replace(/_\d+x\d+(?=(\.\w+)?(\?|$))/, "_1280x720") ?? null,
   };
 }
 
