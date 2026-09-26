@@ -1,6 +1,9 @@
 /** Région unique du projet (App Hosting, Firestore, Storage, Functions). */
 export const REGION = "europe-west4";
 
+/** Backend App Hosting qui sert l'application (et les domaines personnalisés des écoles). */
+export const APP_HOSTING_BACKEND = "forma-host";
+
 /** Durée de validité d'une invitation (lien « Activer mon compte »). */
 export const INVITE_TTL_DAYS = 30;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { PageContainer } from "@/components/layout/page";
+import { DomainSettingsCard } from "@/components/settings/domain-settings-card";
 import { MailSettingsCard } from "@/components/settings/mail-settings-card";
 import { SchoolSettingsCard } from "@/components/settings/school-settings-card";
 import { TeamSettingsCard } from "@/components/settings/team-settings-card";
@@ -19,6 +20,7 @@ export default function SettingsPage() {
         {isOwner ? (
           <>
             <TeamSettingsCard />
+            <DomainSettingsCard />
             <MailSettingsCard />
             <VimeoSettingsCard />
           </>

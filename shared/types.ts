@@ -3,6 +3,8 @@
  * Le type de timestamp est générique : le SDK web et l'Admin SDK ont chacun leur classe.
  */
 
+import type { SchoolDomain } from "./domains";
+
 export interface TimestampLike {
   toMillis(): number;
   toDate(): Date;
@@ -181,6 +183,8 @@ export interface CreatorDoc<T = TimestampLike> {
   previousSlugs?: string[];
   /** Administrateurs de l'école (propriétaire inclus), tenus à jour par les Functions. */
   adminUids?: string[];
+  /** Domaine personnalisé (Paramètres > Domaine), géré par les Functions. */
+  customDomain?: SchoolDomain<T> | null;
   logoUrl: string | null;
   brandColor: string;
   supportEmail: string | null;

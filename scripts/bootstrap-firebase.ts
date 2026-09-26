@@ -286,14 +286,29 @@ async function ensureEncryptionKey() {
   ok(`Secret ${name} créé (clé aléatoire)`);
 }
 
+type IamPolicy = { bindings?: { role: string; members: string[] }[]; etag?: string };
+
+/** Ajoute un rôle IAM au niveau du projet (idempotent). */
+async function grantProjectRole(member: string, role: string, label: string) {
+  const url = `https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT}`;
+  const policy = (await api<IamPolicy>("POST", `${url}:getIamPolicy`, {}))!;
+  const binding = policy.bindings?.find((b) => b.role === role);
+  if (binding?.members.includes(member)) {
+    ok(`${label} : déjà accordé`);
+    return;
+  }
+  if (binding) binding.members.push(member);
+  else (policy.bindings ??= []).push({ role, members: [member] });
+  await api("POST", `${url}:setIamPolicy`, { policy });
+  ok(`${label} : accordé (${role})`);
+}
+
 /** Le serveur Next.js (App Hosting) lit les pages de vente dans Firestore avec l'Admin SDK. */
 async function grantAppHostingFirestoreAccess() {
-  const member = `serviceAccount:firebase-app-hosting-compute@${PROJECT}.iam.gserviceaccount.com`;
-  const role = "roles/datastore.user";
-  const url = `https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT}`;
+  const email = `firebase-app-hosting-compute@${PROJECT}.iam.gserviceaccount.com`;
   const serviceAccount = await api(
     "GET",
-    `https://iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/firebase-app-hosting-compute@${PROJECT}.iam.gserviceaccount.com`,
+    `https://iam.googleapis.com/v1/projects/${PROJECT}/serviceAccounts/${email}`,
     undefined,
     { allow404: true },
   );
@@ -303,20 +318,81 @@ async function grantAppHostingFirestoreAccess() {
     );
     return;
   }
-  const policy = (await api<{ bindings?: { role: string; members: string[] }[]; etag?: string }>(
-    "POST",
-    `${url}:getIamPolicy`,
-    {},
-  ))!;
-  const binding = policy.bindings?.find((b) => b.role === role);
-  if (binding?.members.includes(member)) {
-    ok("App Hosting : accès Firestore déjà accordé");
+  await grantProjectRole(
+    `serviceAccount:${email}`,
+    "roles/datastore.user",
+    "App Hosting : accès Firestore",
+  );
+}
+
+/**
+ * Domaines d'école (Paramètres > Domaine) : les Functions ajoutent le domaine au backend
+ * App Hosting et aux domaines autorisés d'Authentication.
+ */
+async function grantFunctionsDomainAccess() {
+  const project = await api<{ projectNumber?: string }>(
+    "GET",
+    `https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT}`,
+  );
+  const member = `serviceAccount:${project?.projectNumber}-compute@developer.gserviceaccount.com`;
+  await grantProjectRole(
+    member,
+    "roles/firebaseapphosting.admin",
+    "Functions : domaines App Hosting",
+  );
+  await grantProjectRole(member, "roles/firebaseauth.admin", "Functions : domaines autorisés Auth");
+}
+
+interface DnsRecord {
+  type?: string;
+  domainName?: string;
+  rdata?: string;
+  requiredAction?: string;
+}
+
+/**
+ * Domaine de la plateforme (--domain) : ajouté au backend App Hosting. Les enregistrements DNS
+ * à créer chez l'hébergeur du domaine sont affichés (et écrits dans le résumé du workflow).
+ */
+async function ensurePlatformDomain() {
+  if (typeof args.domain !== "string") return;
+  const host = args.domain.toLowerCase();
+  const base = `https://firebaseapphosting.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/backends/${BACKEND_ID}/domains`;
+  let domain = await api<{
+    customDomainStatus?: {
+      hostState?: string;
+      certState?: string;
+      requiredDnsUpdates?: {
+        desired?: { records?: DnsRecord[] }[];
+        discovered?: { records?: DnsRecord[] }[];
+      }[];
+    };
+  }>("GET", `${base}/${host}`, undefined, { allow404: true });
+  if (!domain) {
+    // L'opération reste en cours tant que le DNS n'est pas configuré : on relit le domaine.
+    await api("POST", `${base}?domainId=${encodeURIComponent(host)}`, {});
+    for (let attempt = 0; attempt < 10 && !domain; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      domain = await api("GET", `${base}/${host}`, undefined, { allow404: true });
+    }
+  }
+  const status = domain?.customDomainStatus;
+  if (status?.hostState === "HOST_ACTIVE" && status.certState === "CERT_ACTIVE") {
+    ok(`Domaine ${host} actif`);
     return;
   }
-  if (binding) binding.members.push(member);
-  else (policy.bindings ??= []).push({ role, members: [member] });
-  await api("POST", `${url}:setIamPolicy`, { policy });
-  ok("App Hosting : accès Firestore accordé (roles/datastore.user)");
+  const records = (status?.requiredDnsUpdates ?? [])
+    .flatMap((update) => [...(update.desired ?? []), ...(update.discovered ?? [])])
+    .flatMap((set) => set.records ?? [])
+    .filter((record) => record.requiredAction === "ADD" || record.requiredAction === "REMOVE");
+  const lines = records.map(
+    (r) =>
+      `${r.requiredAction === "REMOVE" ? "Supprimer" : "Ajouter"} ${r.type} ${r.domainName} → ${r.rdata}`,
+  );
+  warn(
+    `Domaine ${host} en attente (${status?.hostState ?? "?"}, ${status?.certState ?? "?"}). ` +
+      `Enregistrements DNS : ${lines.join(" ; ") || "vérification en cours"}`,
+  );
 }
 
 async function main() {
@@ -329,6 +405,8 @@ async function main() {
   await ensureVimeoSecret();
   await ensureEncryptionKey();
   await grantAppHostingFirestoreAccess();
+  await grantFunctionsDomainAccess();
+  await ensurePlatformDomain();
   console.log(
     warnings.length ? `\nTerminé avec ${warnings.length} avertissement(s).` : "\nTerminé.",
   );

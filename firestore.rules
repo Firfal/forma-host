@@ -282,5 +282,10 @@ service cloud.firestore {
     match /mail/{mailId} {
       allow read, write: if false;
     }
+
+    // Domaines personnalisés des écoles (routage par src/middleware.ts, Admin SDK).
+    match /domains/{host} {
+      allow read, write: if false;
+    }
   }
 }

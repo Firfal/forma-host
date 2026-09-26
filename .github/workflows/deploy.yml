@@ -30,6 +30,9 @@ on:
         description: "Adresse publique de l'école (slug)"
         required: false
         default: "ecole-motion"
+      platform_domain:
+        description: "Domaine de la plateforme à ajouter (ex. formahost.fr), optionnel"
+        required: false
       accounts_only:
         description: "Uniquement le compte formateur (sans redéployer)"
         type: boolean
@@ -98,7 +101,10 @@ jobs:
         if: ${{ !inputs.accounts_only }}
         env:
           VIMEO_ACCESS_TOKEN: ${{ secrets.VIMEO_ACCESS_TOKEN }}
-        run: npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID"
+          PLATFORM_DOMAIN: ${{ inputs.platform_domain }}
+        run: |
+          npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID" \
+            ${PLATFORM_DOMAIN:+--domain "$PLATFORM_DOMAIN"}
 
       - name: Règles et index Firestore
         if: ${{ !inputs.accounts_only }}

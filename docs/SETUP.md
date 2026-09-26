@@ -75,11 +75,23 @@ L'envoi se configure **dans l'application**, par chaque formateur : *Admin > Par
 - Le mot de passe est chiffré (AES-256) avec une clé stockée dans Secret Manager (`SETTINGS_ENCRYPTION_KEY`, créée par le workflow) et n'est jamais renvoyé au navigateur.
 - Un échec d'envoi s'affiche dans Paramètres et sur l'Accueil ; après correction des réglages, les emails en échec sont renvoyés.
 
-## 4. Domaine personnalisé (optionnel)
+## 4. Domaines
 
-1. Console > App Hosting > backend `forma-host` > *Paramètres* > *Domaines*. Ajoute par exemple `formation.ecolemotion.com`, puis crée les enregistrements DNS indiqués.
-2. Mets l'adresse dans `apphosting.yaml` (`NEXT_PUBLIC_APP_URL`) et dans `functions/.env.forma-host` (`APP_URL`).
-3. Ajoute-la dans les domaines Vimeo, puis relance le workflow.
+**Domaine d'une école** (dans l'application, propriétaire de l'école) : *Admin > Paramètres > Domaine*.
+
+1. Saisir le domaine, de préférence un sous-domaine (ex. `formation.ecolemotion.com`).
+2. Créer chez l'hébergeur du domaine les enregistrements DNS affichés (A et TXT en général), puis « Vérifier les DNS ». La propagation et le certificat HTTPS peuvent prendre jusqu'à 24 h.
+3. Une fois actif :
+   - la page de l'école s'affiche à la racine du domaine, et ses pages de vente sous `/{formation}` ;
+   - l'espace élève et la connexion fonctionnent sur ce domaine ;
+   - les emails envoient des liens vers ce domaine.
+4. Ajouter le domaine dans les réglages d'intégration des vidéos Vimeo.
+
+**Domaine de la plateforme** (adresse commune à toutes les écoles) :
+
+1. Acheter le domaine.
+2. *Actions > Déploiement Firebase > Run workflow* avec `platform_domain` (ex. `formahost.fr`). Le résumé du workflow liste les enregistrements DNS à créer.
+3. Une fois le domaine actif, mettre l'adresse dans `apphosting.yaml` (`NEXT_PUBLIC_APP_URL`) et `functions/.env.forma-host` (`APP_URL`), puis relancer le déploiement.
 
 ## 5. Migration depuis Podia
 

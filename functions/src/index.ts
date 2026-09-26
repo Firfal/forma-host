@@ -10,6 +10,7 @@ import {
   inviteTokenInput,
   resolveVimeoInput,
 } from "@shared/schemas";
+import { schoolDomainInput } from "@shared/domains";
 import { mailSettingsInput } from "@shared/mail-settings";
 import { inviteSchoolAdminInput, removeSchoolAdminInput } from "@shared/school";
 import { schoolProfileInput } from "@shared/school";
@@ -38,6 +39,15 @@ import {
 import { APP_URL, SETTINGS_ENCRYPTION_KEY, VIMEO_ACCESS_TOKEN, settingsKey } from "./params";
 import { handleNewComment } from "./comments";
 import {
+  addSchoolDomain as addSchoolDomainImpl,
+  appHostingDomains,
+  DomainError,
+  fakeDomains,
+  refreshSchoolDomain as refreshSchoolDomainImpl,
+  removeSchoolDomain as removeSchoolDomainImpl,
+  schoolBaseUrl,
+} from "./domains";
+import {
   inviteSchoolAdmin as inviteSchoolAdminImpl,
   removeSchoolAdmin as removeSchoolAdminImpl,
   SchoolError,
@@ -56,6 +66,12 @@ import {
 // SMTP simulé uniquement dans les émulateurs (SMTP_FAKE=true dans functions/.env.demo-forma).
 const fakeSmtp = process.env.FUNCTIONS_EMULATOR === "true" && process.env.SMTP_FAKE === "true";
 const mailDeps = { key: settingsKey, client: fakeSmtp ? fakeSmtpClient : smtpClient };
+
+// App Hosting simulé dans les émulateurs (DOMAINS_FAKE=true) : aucun appel réel.
+const domainsClient =
+  process.env.FUNCTIONS_EMULATOR === "true" && process.env.DOMAINS_FAKE === "true"
+    ? fakeDomains
+    : appHostingDomains;
 
 // Vimeo simulé dans les émulateurs (VIMEO_FAKE=true) : le token « refuse » est rejeté.
 const fakeVimeo = process.env.FUNCTIONS_EMULATOR === "true" && process.env.VIMEO_FAKE === "true";
@@ -80,7 +96,7 @@ export const grantAccess = onCall({ timeoutSeconds: 300 }, async (request) => {
     students: input.students,
     source: input.source,
     sendEmail: input.sendEmail,
-    appUrl: APP_URL.value(),
+    appUrl: await schoolBaseUrl(course.creatorId, APP_URL.value()),
   });
 });
 
@@ -103,7 +119,7 @@ export const resendInvite = onCall(async (request) => {
       courseId: input.courseId,
       course,
       uid: input.uid,
-      appUrl: APP_URL.value(),
+      appUrl: await schoolBaseUrl(course.creatorId, APP_URL.value()),
     });
   } catch (error) {
     throw new HttpsError("failed-precondition", (error as Error).message);
@@ -137,7 +153,7 @@ export const sendTestWelcomeEmail = onCall(async (request) => {
         courseTitle: course.title,
         settings: settingsSnap.data() as CoursePrivateSettings | undefined,
         brand: brandFromCreator(creatorSnap.data() as never),
-        ctaUrl: `${APP_URL.value()}/formations/${input.courseId}`,
+        ctaUrl: `${await schoolBaseUrl(course.creatorId, APP_URL.value())}/formations/${input.courseId}`,
         activation: false,
       }),
     );
@@ -222,7 +238,7 @@ export const onCommentCreated = onDocumentCreated(
         event.params.courseId,
         event.params.commentId,
         comment,
-        APP_URL.value(),
+        await schoolBaseUrl(comment.creatorId, APP_URL.value()),
       );
     } catch (error) {
       logger.error("onCommentCreated", error);
@@ -323,7 +339,7 @@ export const inviteSchoolAdmin = onCall(async (request) => {
       schoolId: caller.uid,
       email: input.email,
       inviterName: inviter.displayName || inviter.email || "Le propriétaire",
-      appUrl: APP_URL.value(),
+      appUrl: await schoolBaseUrl(caller.uid, APP_URL.value()),
     });
   } catch (error) {
     if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
@@ -340,6 +356,43 @@ export const removeSchoolAdmin = onCall(async (request) => {
   } catch (error) {
     if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
     throw error;
+  }
+  return { ok: true };
+});
+
+function domainError(error: unknown): never {
+  if (error instanceof DomainError) throw new HttpsError("failed-precondition", error.message);
+  logger.error("domaine", error);
+  throw new HttpsError("internal", "Opération sur le domaine impossible pour le moment.");
+}
+
+/** Relie un domaine personnalisé à l'école (propriétaire) et retourne les DNS à configurer. */
+export const addSchoolDomain = onCall({ timeoutSeconds: 60 }, async (request) => {
+  const caller = await requireSchoolOwner(request);
+  const input = parseInput(schoolDomainInput, request.data);
+  try {
+    return await addSchoolDomainImpl(caller.uid, input.host, domainsClient);
+  } catch (error) {
+    domainError(error);
+  }
+});
+
+/** Vérifie l'état du domaine (DNS, certificat HTTPS). */
+export const refreshSchoolDomain = onCall(async (request) => {
+  const caller = await requireSchoolOwner(request);
+  try {
+    return await refreshSchoolDomainImpl(caller.uid, domainsClient);
+  } catch (error) {
+    domainError(error);
+  }
+});
+
+export const removeSchoolDomain = onCall(async (request) => {
+  const caller = await requireSchoolOwner(request);
+  try {
+    await removeSchoolDomainImpl(caller.uid, domainsClient);
+  } catch (error) {
+    domainError(error);
   }
   return { ok: true };
 });

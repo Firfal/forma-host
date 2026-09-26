@@ -9,6 +9,7 @@ import type {
   InviteTokenInput,
   ResolveVimeoInput,
 } from "@shared/schemas";
+import type { SchoolDomain, SchoolDomainInput } from "@shared/domains";
 import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
 import type {
   InviteSchoolAdminInput,
@@ -50,6 +51,9 @@ export const callInviteSchoolAdmin = callable<
 export const callRemoveSchoolAdmin = callable<RemoveSchoolAdminInput, { ok: true }>(
   "removeSchoolAdmin",
 );
+export const callAddSchoolDomain = callable<SchoolDomainInput, SchoolDomain>("addSchoolDomain");
+export const callRefreshSchoolDomain = callable<void, SchoolDomain>("refreshSchoolDomain");
+export const callRemoveSchoolDomain = callable<void, { ok: true }>("removeSchoolDomain");
 export const callUpdateSchoolProfile = callable<SchoolProfileInput, { ok: true }>(
   "updateSchoolProfile",
 );
