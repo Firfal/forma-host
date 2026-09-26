@@ -153,7 +153,13 @@ export interface CommentDoc<T = TimestampLike> {
   editedAt?: T | null;
 }
 
-export type NotificationType = "new_student" | "new_comment" | "comment_reply";
+export type NotificationType =
+  | "new_student"
+  | "new_comment"
+  | "comment_reply"
+  | "team_member"
+  | "creator_request"
+  | "creator_request_decision";
 
 export interface NotificationDoc<T = TimestampLike> {
   type: NotificationType;

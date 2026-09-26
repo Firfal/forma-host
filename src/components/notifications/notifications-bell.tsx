@@ -1,7 +1,15 @@
 "use client";
 
 import { collection, doc, limit, orderBy, query, updateDoc, writeBatch } from "firebase/firestore";
-import { Bell, BookOpen, MessageSquare, UserPlus } from "lucide-react";
+import {
+  BadgeCheck,
+  Bell,
+  BookOpen,
+  GraduationCap,
+  MessageSquare,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import type { NotificationDoc, NotificationType } from "@shared/types";
@@ -21,6 +29,9 @@ const icons: Record<NotificationType, typeof Bell> = {
   new_student: UserPlus,
   new_comment: MessageSquare,
   comment_reply: MessageSquare,
+  team_member: Users,
+  creator_request: GraduationCap,
+  creator_request_decision: BadgeCheck,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

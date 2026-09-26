@@ -38,6 +38,11 @@ service cloud.firestore {
         && (request.auth.uid == schoolId || schoolId in request.auth.token.get('schools', []));
     }
 
+    // Administrateur de la plateforme (custom claim `platformAdmin`) : valide les formateurs.
+    function isPlatformAdmin() {
+      return signedIn() && request.auth.token.get('platformAdmin', false) == true;
+    }
+
     function isCourseAdmin(courseId) {
       return isSchoolAdmin(course(courseId).creatorId);
     }
@@ -280,6 +285,35 @@ service cloud.firestore {
     }
 
     match /mail/{mailId} {
+      allow read, write: if false;
+    }
+
+    // ---------- Demandes d'espace formateur ----------
+
+    // Une demande par compte (id = uid), traitée par les Functions (acceptée ou refusée).
+    // Après un refus, le demandeur peut la supprimer pour en refaire une.
+    match /creatorRequests/{uid} {
+      allow read: if isUser(uid) || isPlatformAdmin();
+      allow create: if isUser(uid)
+        && request.auth.token.get('creator', false) != true
+        && request.auth.token.email is string
+        && onlyKeys(['uid', 'email', 'displayName', 'schoolName', 'slug', 'message', 'status', 'createdAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'pending'
+        && isShortString(request.resource.data.displayName, 1, 80)
+        && isShortString(request.resource.data.schoolName, 1, 80)
+        && request.resource.data.slug is string
+        && request.resource.data.slug.size() <= 80
+        && request.resource.data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 2000
+        && request.resource.data.createdAt == request.time;
+      allow delete: if isUser(uid) && resource.data.status == 'rejected';
+      allow update: if false;
+    }
+
+    match /platformAdmins/{uid} {
       allow read, write: if false;
     }
 

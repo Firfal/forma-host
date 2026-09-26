@@ -1,4 +1,4 @@
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type Transaction } from "firebase-admin/firestore";
 import { paths, routes } from "@shared/paths";
 import { nextPreviousSlugs, schoolsFromClaims, type SchoolProfileInput } from "@shared/school";
 import type { CreatorDoc, SchoolMemberDoc } from "@shared/types";
@@ -8,6 +8,19 @@ import { brandFromCreator, buildMemberInviteEmail } from "./mail";
 
 /** Erreur au message déjà lisible par le formateur. */
 export class SchoolError extends Error {}
+
+/** Adresse déjà utilisée par une autre école (actuelle ou ancienne, encore redirigée). */
+export async function isSlugTaken(
+  tx: Transaction,
+  slug: string,
+  exceptSchoolId: string | null,
+): Promise<boolean> {
+  const [bySlug, byPrevious] = await Promise.all([
+    tx.get(db().collection("creators").where("slug", "==", slug).limit(2)),
+    tx.get(db().collection("creators").where("previousSlugs", "array-contains", slug).limit(2)),
+  ]);
+  return [...bySlug.docs, ...byPrevious.docs].some((doc) => doc.id !== exceptSchoolId);
+}
 
 /**
  * Met à jour le profil public de l'école. Une adresse (slug) ne peut appartenir qu'à une
@@ -22,15 +35,8 @@ export async function updateSchoolProfile(
     const current = (await tx.get(ref)).data() as CreatorDoc | undefined;
     if (!current) throw new SchoolError("École introuvable");
 
-    if (input.slug !== current.slug) {
-      const [bySlug, byPrevious] = await Promise.all([
-        tx.get(db().collection("creators").where("slug", "==", input.slug).limit(2)),
-        tx.get(
-          db().collection("creators").where("previousSlugs", "array-contains", input.slug).limit(2),
-        ),
-      ]);
-      const taken = [...bySlug.docs, ...byPrevious.docs].some((doc) => doc.id !== schoolId);
-      if (taken) throw new SchoolError("Cette adresse est déjà prise, choisis-en une autre.");
+    if (input.slug !== current.slug && (await isSlugTaken(tx, input.slug, schoolId))) {
+      throw new SchoolError("Cette adresse est déjà prise, choisis-en une autre.");
     }
 
     tx.update(ref, {
@@ -141,7 +147,7 @@ export async function inviteSchoolAdmin(params: {
     ctaUrl = `${params.appUrl}${routes.welcome(token)}`;
   } else {
     batch.set(db().doc(`users/${user.uid}/notifications/member_${schoolId}`), {
-      type: "new_student",
+      type: "team_member",
       title: `Tu fais partie de l'équipe de « ${creator.name} »`,
       body: `${params.inviterName} t'a ajouté comme administrateur.`,
       link: routes.admin,

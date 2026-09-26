@@ -5,12 +5,14 @@ import {
   Check,
   ChevronDown,
   ChevronsUpDown,
+  GraduationCap,
   House,
   LayoutGrid,
   LogOut,
   Menu,
   MessageSquare,
   Settings,
+  ShieldCheck,
   UserRound,
   Users,
   X,
@@ -52,6 +54,16 @@ const adminNav: NavItem[] = [
 
 const memberNav: NavItem[] = [
   { href: routes.myCourses, label: "Mes formations", icon: LayoutGrid },
+];
+
+const becomeCreatorNav: NavItem = {
+  href: routes.becomeCreator,
+  label: "Devenir formateur",
+  icon: GraduationCap,
+};
+
+const platformNav: NavItem[] = [
+  { href: routes.platformRequests, label: "Demandes formateurs", icon: ShieldCheck },
 ];
 
 function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
@@ -138,7 +150,7 @@ function SchoolSwitcher({ onNavigate }: { onNavigate: () => void }) {
 }
 
 function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
-  const { user, isCreator, signOut } = useAuth();
+  const { user, isCreator, isPlatformAdmin, signOut } = useAuth();
   const { schools } = useSchool();
   const displayName = user?.displayName || user?.email || "";
 
@@ -169,8 +181,19 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
             {memberNav.map((item) => (
               <NavLink key={item.href} item={item} onNavigate={onNavigate} />
             ))}
+            {isCreator ? null : <NavLink item={becomeCreatorNav} onNavigate={onNavigate} />}
           </div>
         </div>
+        {isPlatformAdmin ? (
+          <div>
+            <p className="px-2 pb-1 text-[12px] font-medium text-muted">Plateforme</p>
+            <div className="space-y-0.5">
+              {platformNav.map((item) => (
+                <NavLink key={item.href} item={item} onNavigate={onNavigate} />
+              ))}
+            </div>
+          </div>
+        ) : null}
       </nav>
 
       <div className="flex items-center gap-1 border-t border-line/60 p-2">

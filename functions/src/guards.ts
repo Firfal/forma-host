@@ -70,3 +70,12 @@ export async function requireCourseAdmin(
     throw new HttpsError("permission-denied", "Formation d'un autre formateur");
   return { caller, course };
 }
+
+/** Administrateur de la plateforme (custom claim `platformAdmin`) : validation des formateurs. */
+export function requirePlatformAdmin(request: CallableRequest): Caller {
+  const caller = requireAuth(request);
+  if (request.auth?.token.platformAdmin !== true) {
+    throw new HttpsError("permission-denied", "Réservé aux administrateurs de la plateforme");
+  }
+  return caller;
+}

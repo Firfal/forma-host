@@ -285,6 +285,56 @@ describe("co-gestion d'une école", () => {
   });
 });
 
+describe("demandes d'espace formateur", () => {
+  const requestData = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    uid,
+    email: `${uid}@test.fr`,
+    displayName: "Léa",
+    schoolName: "Studio Léa",
+    slug: "studio-lea",
+    message: "",
+    status: "pending",
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  it("un utilisateur crée sa propre demande, en attente", async () => {
+    await assertSucceeds(
+      setDoc(doc(db(STRANGER), "creatorRequests/inconnu"), requestData(STRANGER)),
+    );
+    await assertFails(setDoc(doc(db(STRANGER), "creatorRequests/anne"), requestData(ANNE)));
+    await assertFails(
+      setDoc(doc(db(ANNE), "creatorRequests/anne"), requestData(ANNE, { status: "approved" })),
+    );
+    await assertFails(
+      setDoc(doc(db(ANNE), "creatorRequests/anne"), requestData(ANNE, { email: "autre@test.fr" })),
+    );
+    // Un formateur a déjà une école.
+    await assertFails(setDoc(doc(creatorDb(), "creatorRequests/theo"), requestData(THEO)));
+  });
+
+  it("lisible par son auteur et les administrateurs de la plateforme uniquement", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "creatorRequests/anne"), {
+        ...requestData(ANNE),
+        createdAt: Timestamp.now(),
+      });
+    });
+    await assertSucceeds(getDoc(doc(db(ANNE), "creatorRequests/anne")));
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(db("admin", { platformAdmin: true }), "creatorRequests"),
+          where("status", "==", "pending"),
+        ),
+      ),
+    );
+    await assertFails(getDoc(doc(creatorDb(), "creatorRequests/anne")));
+    await assertFails(updateDoc(doc(db(ANNE), "creatorRequests/anne"), { status: "approved" }));
+    await assertFails(deleteDoc(doc(db(ANNE), "creatorRequests/anne")));
+  });
+});
+
 describe("leçons", () => {
   it("contenu protégé : inscrit actif ou formateur", async () => {
     await assertSucceeds(getDoc(doc(db(ANNE), "courses/c1/lessons/l2")));

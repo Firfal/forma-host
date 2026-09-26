@@ -10,6 +10,11 @@ import {
   inviteTokenInput,
   resolveVimeoInput,
 } from "@shared/schemas";
+import {
+  approveCreatorRequestInput,
+  rejectCreatorRequestInput,
+  type CreatorRequestDoc,
+} from "@shared/creator-requests";
 import { schoolDomainInput } from "@shared/domains";
 import { mailSettingsInput } from "@shared/mail-settings";
 import { inviteSchoolAdminInput, removeSchoolAdminInput } from "@shared/school";
@@ -24,6 +29,7 @@ import {
   parseInput,
   requireCourseAdmin,
   requireCreator,
+  requirePlatformAdmin,
   requireSchoolAdmin,
   requireSchoolOwner,
 } from "./guards";
@@ -38,6 +44,11 @@ import {
 } from "./mail-settings";
 import { APP_URL, SETTINGS_ENCRYPTION_KEY, VIMEO_ACCESS_TOKEN, settingsKey } from "./params";
 import { handleNewComment } from "./comments";
+import {
+  approveCreatorRequest as approveCreatorRequestImpl,
+  handleCreatorRequestCreated,
+  rejectCreatorRequest as rejectCreatorRequestImpl,
+} from "./creator-requests";
 import {
   addSchoolDomain as addSchoolDomainImpl,
   appHostingDomains,
@@ -393,6 +404,52 @@ export const removeSchoolDomain = onCall(async (request) => {
     await removeSchoolDomainImpl(caller.uid, domainsClient);
   } catch (error) {
     domainError(error);
+  }
+  return { ok: true };
+});
+
+/** Nouvelle demande d'espace formateur : les administrateurs de la plateforme sont prévenus. */
+export const onCreatorRequestCreated = onDocumentCreated("creatorRequests/{uid}", async (event) => {
+  const request = event.data?.data() as CreatorRequestDoc | undefined;
+  if (!request) return;
+  try {
+    await handleCreatorRequestCreated(request, APP_URL.value());
+  } catch (error) {
+    logger.error("onCreatorRequestCreated", error);
+  }
+});
+
+/** Accepte une demande : l'école est créée avec l'adresse retenue. */
+export const approveCreatorRequest = onCall(async (request) => {
+  const caller = requirePlatformAdmin(request);
+  const input = parseInput(approveCreatorRequestInput, request.data);
+  try {
+    await approveCreatorRequestImpl({
+      uid: input.uid,
+      slug: input.slug,
+      deciderUid: caller.uid,
+      appUrl: APP_URL.value(),
+    });
+  } catch (error) {
+    if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
+    throw error;
+  }
+  return { ok: true };
+});
+
+export const rejectCreatorRequest = onCall(async (request) => {
+  const caller = requirePlatformAdmin(request);
+  const input = parseInput(rejectCreatorRequestInput, request.data);
+  try {
+    await rejectCreatorRequestImpl({
+      uid: input.uid,
+      reason: input.reason ?? null,
+      deciderUid: caller.uid,
+      appUrl: APP_URL.value(),
+    });
+  } catch (error) {
+    if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
+    throw error;
   }
   return { ok: true };
 });

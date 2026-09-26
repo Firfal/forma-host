@@ -33,6 +33,9 @@ on:
       platform_domain:
         description: "Domaine de la plateforme à ajouter (ex. formahost.fr), optionnel"
         required: false
+      platform_admin_email:
+        description: "Email du compte administrateur de la plateforme (optionnel)"
+        required: false
       accounts_only:
         description: "Uniquement le compte formateur (sans redéployer)"
         type: boolean
@@ -171,6 +174,14 @@ jobs:
       - name: Accès Firestore du serveur App Hosting
         if: ${{ !inputs.accounts_only }}
         run: npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID"
+
+      - name: Administrateur de la plateforme
+        if: github.event_name == 'workflow_dispatch' && inputs.platform_admin_email != ''
+        run: |
+          # Dépôt public : l'email est lu depuis l'événement et masqué avant tout affichage.
+          EMAIL=$(jq -r '.inputs.platform_admin_email' "$GITHUB_EVENT_PATH")
+          echo "::add-mask::$EMAIL"
+          npx tsx scripts/make-platform-admin.ts --project "$PROJECT_ID" --email "$EMAIL"
 
       - name: Compte formateur
         if: github.event_name == 'workflow_dispatch' && inputs.creator_email != ''

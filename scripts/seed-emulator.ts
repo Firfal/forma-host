@@ -88,6 +88,10 @@ async function main() {
     createdAt: FieldValue.serverTimestamp(),
   });
   await ensureSchoolOwner(auth, db, theo);
+  // Théo administre aussi la plateforme (validation des demandes d'espace formateur).
+  const theoUser = await auth.getUser(theo);
+  await auth.setCustomUserClaims(theo, { ...(theoUser.customClaims ?? {}), platformAdmin: true });
+  await db.doc(`platformAdmins/${theo}`).set({ email: "theo@ecolemotion.com" });
 
   const courseId = "after-effects";
   const items: OutlineItem[] = [];

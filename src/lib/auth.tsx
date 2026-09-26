@@ -22,6 +22,8 @@ interface AuthState {
   isCreator: boolean;
   /** Écoles administrées (propriétaire ou co-administrateur), d'après les custom claims. */
   schools: string[];
+  /** Administrateur de la plateforme : validation des demandes d'espace formateur. */
+  isPlatformAdmin: boolean;
   signOut: () => Promise<void>;
   /** Recharge les claims (ex. après activation du rôle formateur). */
   refreshClaims: () => Promise<void>;
@@ -56,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isCreator, setIsCreator] = useState(false);
   const [schools, setSchools] = useState<string[]>([]);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const tokenIssuedAt = useRef(0);
 
@@ -67,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const token = await nextUser.getIdTokenResult();
           tokenIssuedAt.current = Date.parse(token.issuedAtTime);
           setIsCreator(token.claims.creator === true);
+          setIsPlatformAdmin(token.claims.platformAdmin === true);
           setSchools((current) => {
             const next = schoolsFromClaims(nextUser.uid, token.claims);
             return current.join("|") === next.join("|") ? current : next;
@@ -74,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ensureUserDocs(nextUser).catch((error) => console.error("ensureUserDocs", error));
         } else {
           setIsCreator(false);
+          setIsPlatformAdmin(false);
           setSchools([]);
         }
         setLoading(false);
@@ -105,8 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, isCreator, schools, signOut, refreshClaims }),
-    [user, loading, isCreator, schools, signOut, refreshClaims],
+    () => ({ user, loading, isCreator, schools, isPlatformAdmin, signOut, refreshClaims }),
+    [user, loading, isCreator, schools, isPlatformAdmin, signOut, refreshClaims],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

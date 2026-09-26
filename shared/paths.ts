@@ -24,6 +24,7 @@ export const paths = {
   notifications: (uid: string) => `users/${uid}/notifications`,
   invite: (token: string) => `invites/${token}`,
   mail: (id: string) => `mail/${id}`,
+  creatorRequest: (uid: string) => `creatorRequests/${uid}`,
 };
 
 export const storagePaths = {
@@ -57,6 +58,8 @@ export const routes = {
   adminMembers: "/admin/membres",
   adminComments: "/admin/commentaires",
   adminSettings: "/admin/parametres",
+  becomeCreator: "/devenir-formateur",
+  platformRequests: "/plateforme/demandes",
   salesPage: (creatorSlug: string, courseSlug: string) => `/${creatorSlug}/${courseSlug}`,
   creatorPage: (creatorSlug: string) => `/${creatorSlug}`,
 };
