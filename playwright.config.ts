@@ -13,6 +13,9 @@ export default defineConfig({
     trace: "retain-on-failure",
     locale: "fr-FR",
     ...devices["Desktop Chrome"],
+    // Chromium complet (nouveau mode headless) : le « headless shell » refuse toujours les
+    // notifications, même autorisées, ce qui empêche de tester le push.
+    channel: "chromium",
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_PATH
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH }
       : undefined,
