@@ -99,6 +99,7 @@ describe("paiements Stripe", () => {
       currency: "eur",
       paymentIntentId: "pi_123",
       promoCode: null,
+      livemode: false,
     };
     await completeCheckout(checkout, appUrlFor);
     await completeCheckout(checkout, appUrlFor);
@@ -111,6 +112,7 @@ describe("paiements Stripe", () => {
       email: "lea@test.fr",
       amount: 15760,
       status: "paid",
+      livemode: false,
     });
     const mails = await db().collection("mail").where("to", "==", "lea@test.fr").get();
     expect(mails.size).toBe(1);
@@ -134,6 +136,7 @@ describe("paiements Stripe", () => {
           currency: "eur",
           paymentIntentId: null,
           promoCode: null,
+          livemode: false,
         },
         appUrlFor,
       ),
@@ -159,5 +162,37 @@ describe("paiements Stripe", () => {
     ).rejects.toThrow("existe déjà");
     await deactivatePromoCode("c1", id, client);
     expect((await db().doc(`courses/c1/promoCodes/${id}`).get()).data()?.active).toBe(false);
+  });
+
+  it("passage du mode test au réel : compte, produit et codes promo de test mis de côté", async () => {
+    const testAccount = await connectedAccount();
+    await createCheckout({ courseId: "c1", email: null, appUrl: APP_URL, client });
+    const promoId = await createPromoCode(
+      { courseId: "c1", code: "TEST20", kind: "percent", value: 20 },
+      client,
+    );
+    expect((await db().doc("creators/theo/private/stripe").get()).data()?.livemode).toBe(false);
+
+    // Clé réelle : le compte de test est ignoré, l'école doit reconnecter Stripe.
+    const live = fakePaymentsClient(true);
+    await expect(
+      createCheckout({ courseId: "c1", email: null, appUrl: APP_URL, client: live }),
+    ).rejects.toThrow("pas encore activé");
+    expect(await refreshStripeAccount("theo", live)).toBeNull();
+
+    await connectStripe({ schoolId: "theo", email: "theo@test.fr", appUrl: APP_URL, client: live });
+    await refreshStripeAccount("theo", live);
+    const stripe = (await db().doc("creators/theo/private/stripe").get()).data();
+    expect(stripe).toMatchObject({ livemode: true, chargesEnabled: true });
+    expect(stripe?.accountId).not.toBe(testAccount);
+    // Le code promo de test n'existe pas sur le compte réel : désactivé, il peut être recréé.
+    expect((await db().doc(`courses/c1/promoCodes/${promoId}`).get()).data()?.active).toBe(false);
+    await createPromoCode({ courseId: "c1", code: "TEST20", kind: "percent", value: 20 }, live);
+
+    // Nouveau produit Stripe, sur le compte réel.
+    await createCheckout({ courseId: "c1", email: null, appUrl: APP_URL, client: live });
+    expect((await db().doc("courses/c1/private/stripe").get()).data()?.accountId).toBe(
+      stripe?.accountId,
+    );
   });
 });

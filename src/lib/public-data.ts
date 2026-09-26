@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { sameStripeMode, type PlatformSettingsDoc, type SchoolStripeDoc } from "@shared/payments";
 import type { CourseDoc, CoursePrivateSettings, CreatorDoc, LessonDoc } from "@shared/types";
 import { adminDb } from "./firebase/admin";
 
@@ -73,5 +74,11 @@ export async function isCheckoutAvailable(creatorId: string): Promise<boolean> {
     adminDb.doc("platform/settings").get(),
     adminDb.doc(`creators/${creatorId}/private/stripe`).get(),
   ]);
-  return Boolean(platform.data()?.paymentsEnabled && stripe.data()?.chargesEnabled);
+  const settings = platform.data() as PlatformSettingsDoc | undefined;
+  const account = stripe.data() as SchoolStripeDoc | undefined;
+  return Boolean(
+    settings?.paymentsEnabled &&
+    account?.chargesEnabled &&
+    sameStripeMode(account.livemode, settings.stripeLivemode),
+  );
 }

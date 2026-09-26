@@ -1,6 +1,14 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import Stripe from "stripe";
-import type { CoursePrice, OrderDoc, PromoCodeInput, SchoolStripeDoc } from "@shared/payments";
+import {
+  isLiveKey,
+  sameStripeMode,
+  type CoursePrice,
+  type OrderDoc,
+  type PromoCodeDoc,
+  type PromoCodeInput,
+  type SchoolStripeDoc,
+} from "@shared/payments";
 import { routes } from "@shared/paths";
 import type { CourseDoc, CreatorDoc } from "@shared/types";
 import { grantAccessToStudents } from "./access";
@@ -10,6 +18,9 @@ import { db } from "./db";
  * Paiements Stripe Connect : chaque école relie son propre compte Stripe (compte « Standard »,
  * frais Stripe à sa charge, 0 % de commission pour la plateforme). Les sessions Checkout et
  * les codes promo sont créés sur le compte de l'école ; le webhook Connect donne l'accès.
+ *
+ * Mode test ou réel : suit la clé de la plateforme. Un compte relié dans l'autre mode est ignoré
+ * (l'école reconnecte Stripe) et ses codes promo sont désactivés.
  */
 
 /** Erreur au message déjà lisible par le formateur ou l'acheteur. */
@@ -27,6 +38,8 @@ export interface CheckoutRequest {
 }
 
 export interface PaymentsClient {
+  /** Clé réelle (true) ou de test (false). */
+  readonly livemode: boolean;
   createAccount(input: { email: string; schoolName: string; schoolId: string }): Promise<string>;
   accountLink(accountId: string, returnUrl: string, refreshUrl: string): Promise<string>;
   getAccount(accountId: string): Promise<{ chargesEnabled: boolean; detailsSubmitted: boolean }>;
@@ -44,6 +57,7 @@ export interface PaymentsClient {
 export function stripeClient(secretKey: string): PaymentsClient {
   const stripe = new Stripe(secretKey);
   return {
+    livemode: isLiveKey(secretKey),
     async createAccount({ email, schoolName, schoolId }) {
       const account = await stripe.accounts.create({
         controller: {
@@ -157,9 +171,26 @@ export function paymentErrorMessage(error: unknown): string {
   return "Paiement indisponible pour le moment.";
 }
 
-async function schoolStripe(schoolId: string): Promise<SchoolStripeDoc | null> {
+/** Compte Stripe de l'école dans le mode de la clé actuelle (null : aucun, ou autre mode). */
+async function schoolStripe(schoolId: string, livemode: boolean): Promise<SchoolStripeDoc | null> {
   const snap = await db().doc(`creators/${schoolId}/private/stripe`).get();
-  return (snap.data() as SchoolStripeDoc | undefined) ?? null;
+  const stripe = snap.data() as SchoolStripeDoc | undefined;
+  return stripe && sameStripeMode(stripe.livemode, livemode) ? stripe : null;
+}
+
+/** Codes promo actifs de l'école qui n'appartiennent pas à ce compte Stripe : désactivés. */
+async function deactivateOtherAccountPromos(schoolId: string, accountId: string): Promise<void> {
+  const courses = await db().collection("courses").where("creatorId", "==", schoolId).get();
+  for (const course of courses.docs) {
+    const promos = await course.ref.collection("promoCodes").where("active", "==", true).get();
+    const stale = promos.docs.filter(
+      (promo) => (promo.data() as PromoCodeDoc).stripeAccountId !== accountId,
+    );
+    if (!stale.length) continue;
+    const batch = db().batch();
+    for (const promo of stale) batch.update(promo.ref, { active: false });
+    await batch.commit();
+  }
 }
 
 /** Lien d'onboarding Stripe (compte créé au premier appel). */
@@ -170,7 +201,7 @@ export async function connectStripe(params: {
   client: PaymentsClient;
 }): Promise<string> {
   const { schoolId, client } = params;
-  let stripe = await schoolStripe(schoolId);
+  let stripe = await schoolStripe(schoolId, client.livemode);
   if (!stripe) {
     const creator = (await db().doc(`creators/${schoolId}`).get()).data() as CreatorDoc | undefined;
     if (!creator) throw new PaymentError("École introuvable.");
@@ -179,7 +210,13 @@ export async function connectStripe(params: {
       schoolName: creator.name,
       schoolId,
     });
-    stripe = { accountId, chargesEnabled: false, detailsSubmitted: false, updatedAt: null };
+    stripe = {
+      accountId,
+      chargesEnabled: false,
+      detailsSubmitted: false,
+      livemode: client.livemode,
+      updatedAt: null,
+    };
     const batch = db().batch();
     batch.set(db().doc(`creators/${schoolId}/private/stripe`), {
       ...stripe,
@@ -187,6 +224,8 @@ export async function connectStripe(params: {
     });
     batch.set(db().doc(`stripeAccounts/${accountId}`), { schoolId });
     await batch.commit();
+    // Changement de mode (test → réel) : les codes de l'ancien compte n'existent pas ici.
+    await deactivateOtherAccountPromos(schoolId, accountId);
   }
   const back = `${params.appUrl}${routes.adminSettings}`;
   return client.accountLink(stripe.accountId, `${back}?stripe=retour`, `${back}?stripe=relance`);
@@ -197,7 +236,7 @@ export async function refreshStripeAccount(
   schoolId: string,
   client: PaymentsClient,
 ): Promise<SchoolStripeDoc | null> {
-  const stripe = await schoolStripe(schoolId);
+  const stripe = await schoolStripe(schoolId, client.livemode);
   if (!stripe) return null;
   const status = await client.getAccount(stripe.accountId);
   await db()
@@ -232,7 +271,7 @@ export async function createCheckout(params: {
     CourseDoc | undefined;
   if (!course || course.status !== "published") throw new PaymentError("Formation introuvable.");
   if (!course.price) throw new PaymentError("Cette formation n'est pas en vente.");
-  const stripe = await schoolStripe(course.creatorId);
+  const stripe = await schoolStripe(course.creatorId, params.client.livemode);
   if (!stripe?.chargesEnabled) {
     throw new PaymentError("Le paiement en ligne n'est pas encore activé pour cette formation.");
   }
@@ -260,6 +299,7 @@ export interface CompletedCheckout {
   currency: string;
   paymentIntentId: string | null;
   promoCode: string | null;
+  livemode: boolean;
 }
 
 /** Paiement réussi : commande enregistrée et accès donné (idempotent, les webhooks sont rejoués). */
@@ -287,6 +327,7 @@ export async function completeCheckout(
     promoCode: checkout.promoCode,
     paymentIntentId: checkout.paymentIntentId,
     status: "paid",
+    livemode: checkout.livemode,
     createdAt: FieldValue.serverTimestamp(),
   };
   await orderRef.set(order, { merge: true });
@@ -331,7 +372,7 @@ export async function createPromoCode(
   const course = (await db().doc(`courses/${input.courseId}`).get()).data() as
     CourseDoc | undefined;
   if (!course) throw new PaymentError("Formation introuvable.");
-  const stripe = await schoolStripe(course.creatorId);
+  const stripe = await schoolStripe(course.creatorId, client.livemode);
   if (!stripe?.chargesEnabled) throw new PaymentError("Relie d'abord ton compte Stripe.");
   const existing = await db()
     .collection(`courses/${input.courseId}/promoCodes`)
@@ -354,6 +395,7 @@ export async function createPromoCode(
       timesRedeemed: 0,
       stripePromotionCodeId: created.promotionCodeId,
       stripeCouponId: created.couponId,
+      stripeAccountId: stripe.accountId,
       createdAt: FieldValue.serverTimestamp(),
     });
   return ref.id;
@@ -363,14 +405,18 @@ export async function createPromoCode(
 export async function syncPromoCodes(courseId: string, client: PaymentsClient): Promise<void> {
   const course = (await db().doc(`courses/${courseId}`).get()).data() as CourseDoc | undefined;
   if (!course) return;
-  const stripe = await schoolStripe(course.creatorId);
+  const stripe = await schoolStripe(course.creatorId, client.livemode);
   if (!stripe) return;
   const promos = await db()
     .collection(`courses/${courseId}/promoCodes`)
     .where("active", "==", true)
     .get();
+  const current = promos.docs.filter((promo) => {
+    const accountId = (promo.data() as PromoCodeDoc).stripeAccountId;
+    return !accountId || accountId === stripe.accountId;
+  });
   await Promise.all(
-    promos.docs.map(async (promo) => {
+    current.map(async (promo) => {
       const timesRedeemed = await client.promoRedemptions(
         stripe.accountId,
         promo.data().stripePromotionCodeId,
@@ -387,10 +433,14 @@ export async function deactivatePromoCode(
 ): Promise<void> {
   const course = (await db().doc(`courses/${courseId}`).get()).data() as CourseDoc | undefined;
   const ref = db().doc(`courses/${courseId}/promoCodes/${promoId}`);
-  const promo = (await ref.get()).data() as { stripePromotionCodeId: string } | undefined;
+  const promo = (await ref.get()).data() as PromoCodeDoc | undefined;
   if (!course || !promo) throw new PaymentError("Code promo introuvable.");
-  const stripe = await schoolStripe(course.creatorId);
-  if (stripe) await client.deactivatePromo(stripe.accountId, promo.stripePromotionCodeId);
+  const stripe = await schoolStripe(course.creatorId, client.livemode);
+  // Code d'un ancien compte (autre mode) : il n'existe plus chez Stripe, on le désactive ici.
+  const sameAccount = !promo.stripeAccountId || promo.stripeAccountId === stripe?.accountId;
+  if (stripe && sameAccount) {
+    await client.deactivatePromo(stripe.accountId, promo.stripePromotionCodeId);
+  }
   await ref.update({ active: false });
 }
 
@@ -399,9 +449,10 @@ export async function deactivatePromoCode(
  * validé immédiatement par la callable (voir createCheckoutSession).
  */
 let fakeCounter = 0;
-export function fakePaymentsClient(): PaymentsClient {
+export function fakePaymentsClient(livemode = false): PaymentsClient {
   const id = (prefix: string) => `${prefix}_demo_${Date.now()}_${++fakeCounter}`;
   return {
+    livemode,
     async createAccount() {
       return id("acct");
     },

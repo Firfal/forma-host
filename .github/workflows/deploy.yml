@@ -137,6 +137,8 @@ jobs:
         if: ${{ !inputs.accounts_only }}
         env:
           PAYMENTS_ENABLED: ${{ secrets.STRIPE_SECRET_KEY != '' }}
+          # Clé réelle ou de test : seul le préfixe est testé, la clé n'est pas exposée.
+          STRIPE_LIVEMODE: ${{ startsWith(secrets.STRIPE_SECRET_KEY, 'sk_live_') || startsWith(secrets.STRIPE_SECRET_KEY, 'rk_live_') }}
         run: npx tsx scripts/migrate.ts --project "$PROJECT_ID"
 
       - name: App Hosting (backend)

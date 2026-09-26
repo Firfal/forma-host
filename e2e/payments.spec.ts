@@ -5,11 +5,15 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
   page,
   browser,
 }) => {
+  // Deux navigateurs, inscription et achat : plus long que les autres scénarios.
+  test.setTimeout(120_000);
   await login(page, THEO);
   await page.goto("/admin/parametres");
   await page.getByRole("button", { name: "Connecter mon compte Stripe" }).click();
   await expect(page.getByText("Compte Stripe relié")).toBeVisible();
   await expect(page.getByText("Ton compte Stripe est actif")).toBeVisible();
+  // Clé de test sur la plateforme : aucun vrai paiement, c'est affiché.
+  await expect(page.getByText("Mode test", { exact: true })).toBeVisible();
 
   // Prix et code promo de la formation.
   await page.goto("/admin/formations/after-effects/vente");
@@ -40,6 +44,7 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
   // La vente apparaît côté formateur, puis la vente directe est désactivée.
   await page.reload();
   await expect(page.getByText("1 vente")).toBeVisible();
+  await expect(page.getByText("Test", { exact: true })).toBeVisible();
   await page.fill("#course-price", "");
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Vente directe désactivée")).toBeVisible();

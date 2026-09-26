@@ -43,12 +43,29 @@ export interface SchoolStripeDoc<T = unknown> {
   accountId: string;
   chargesEnabled: boolean;
   detailsSubmitted: boolean;
+  /** Compte créé avec une clé réelle (absent : mode test). */
+  livemode?: boolean;
   updatedAt: T;
+}
+
+/** Clé Stripe réelle (`sk_live_…`, `rk_live_…`) ou de test. */
+export function isLiveKey(key: string): boolean {
+  return /^(sk|rk)_live_/.test(key);
+}
+
+/**
+ * Même mode Stripe (test ou réel) ? Les comptes, produits et codes promo créés en test
+ * n'existent pas en réel : au changement de clé, ils sont ignorés et recréés.
+ */
+export function sameStripeMode(a: boolean | undefined, b: boolean | undefined): boolean {
+  return (a ?? false) === (b ?? false);
 }
 
 /** Réglage public de la plateforme (platform/settings). */
 export interface PlatformSettingsDoc {
   paymentsEnabled: boolean;
+  /** Clé Stripe réelle (absent ou false : mode test). */
+  stripeLivemode?: boolean;
 }
 
 export const createCheckoutInput = z.object({ courseId: z.string().min(1).max(128) });
@@ -96,6 +113,8 @@ export interface PromoCodeDoc<T = unknown> {
   timesRedeemed: number;
   stripePromotionCodeId: string;
   stripeCouponId: string;
+  /** Compte Stripe de l'école au moment de la création (absent sur les codes plus anciens). */
+  stripeAccountId?: string;
   createdAt: T;
 }
 
@@ -114,5 +133,7 @@ export interface OrderDoc<T = unknown> {
   promoCode: string | null;
   paymentIntentId: string | null;
   status: "paid" | "refunded";
+  /** Paiement réel (absent ou false : paiement de test). */
+  livemode?: boolean;
   createdAt: T;
 }

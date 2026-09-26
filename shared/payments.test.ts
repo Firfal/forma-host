@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatPrice, parsePriceInput, promoCodeInput, promoLabel } from "./payments";
+import {
+  formatPrice,
+  isLiveKey,
+  parsePriceInput,
+  promoCodeInput,
+  promoLabel,
+  sameStripeMode,
+} from "./payments";
 
 describe("prix", () => {
   it("formate en euros", () => {
@@ -30,5 +37,20 @@ describe("codes promo", () => {
     expect(promoCodeInput.safeParse({ ...base, expiresAt: "2020-01-01T00:00:00Z" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("mode Stripe", () => {
+  it("reconnaît les clés réelles et de test", () => {
+    expect(isLiveKey("sk_live_abc")).toBe(true);
+    expect(isLiveKey("rk_live_abc")).toBe(true);
+    expect(isLiveKey("sk_test_abc")).toBe(false);
+    expect(isLiveKey("unset")).toBe(false);
+  });
+
+  it("un compte sans mode enregistré vient du mode test", () => {
+    expect(sameStripeMode(undefined, false)).toBe(true);
+    expect(sameStripeMode(undefined, true)).toBe(false);
+    expect(sameStripeMode(true, true)).toBe(true);
   });
 });

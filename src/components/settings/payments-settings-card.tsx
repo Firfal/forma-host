@@ -8,14 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { callConnectStripe, callRefreshStripeStatus, errorMessage } from "@/lib/firebase/callables";
-import { usePaymentsEnabled, useSchoolStripe } from "@/lib/payments";
+import { useSchoolPayments } from "@/lib/payments";
 import { useSchool } from "@/lib/school";
 
 /** Compte Stripe de l'école : l'argent des ventes va directement au formateur (0 % de commission). */
 export function PaymentsSettingsCard() {
   const { schoolId } = useSchool();
-  const { data: stripe, loading } = useSchoolStripe(schoolId);
-  const { enabled, loading: platformLoading } = usePaymentsEnabled();
+  const { stripe, enabled, livemode, staleAccount, loading } = useSchoolPayments(schoolId);
   const [busy, setBusy] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -51,12 +50,17 @@ export function PaymentsSettingsCard() {
     <Card>
       <CardHeader>
         <CardTitle>Paiements</CardTitle>
-        {loading || platformLoading ? null : status === "active" ? (
-          <Badge tone="success">Actif</Badge>
-        ) : status === "incomplete" ? (
-          <Badge tone="warning">À finaliser</Badge>
-        ) : (
-          <Badge tone="neutral">Non connecté</Badge>
+        {loading ? null : (
+          <div className="flex gap-1.5">
+            {enabled && !livemode ? <Badge tone="info">Mode test</Badge> : null}
+            {status === "active" ? (
+              <Badge tone="success">Actif</Badge>
+            ) : status === "incomplete" ? (
+              <Badge tone="warning">À finaliser</Badge>
+            ) : (
+              <Badge tone="neutral">Non connecté</Badge>
+            )}
+          </div>
         )}
       </CardHeader>
       <CardBody className="space-y-4">
@@ -66,7 +70,20 @@ export function PaymentsSettingsCard() {
           Stripe, sans commission de la plateforme (seuls les frais Stripe s&apos;appliquent).
         </p>
 
-        {!platformLoading && !enabled ? (
+        {enabled && !livemode && !loading ? (
+          <p className="rounded-md bg-info-soft px-3 py-2.5 text-[13px] text-info">
+            Mode test : aucun vrai paiement. Pour essayer un achat, utilise la carte 4242 4242 4242
+            4242, une date future et n&apos;importe quel code.
+          </p>
+        ) : null}
+        {staleAccount && enabled ? (
+          <p className="rounded-md bg-warning-soft px-3 py-2.5 text-[13px] text-warning">
+            Les paiements réels sont ouverts : reconnecte ton compte Stripe (le compte relié en mode
+            test ne peut pas encaisser).
+          </p>
+        ) : null}
+
+        {!loading && !enabled ? (
           <div className="flex gap-2.5 rounded-md bg-surface px-3 py-2.5 text-[13px] text-muted">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <p>Les paiements en ligne ne sont pas encore activés sur la plateforme.</p>

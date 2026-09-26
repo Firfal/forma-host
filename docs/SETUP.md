@@ -102,6 +102,13 @@ Chaque école encaisse sur **son propre compte Stripe** : 0 % de commission pour
 1. Crée un compte Stripe au nom de la plateforme, puis active **Connect** (*Tableau de bord > Connect > Commencer*, modèle « plateforme »).
 2. Ajoute le secret GitHub `STRIPE_SECRET_KEY`. Utilise la clé secrète `sk_test_…` pour tester, `sk_live_…` en production.
 3. Relance le déploiement. Il crée automatiquement le webhook Stripe Connect (et stocke son secret) et active les paiements.
+4. Avec une clé de test, l'app affiche « Mode test » (Paramètres > Paiements) et les ventes portent le badge « Test ». Carte de test : `4242 4242 4242 4242`.
+
+**Passage en réel** (après activation du compte Stripe : identité, IBAN, profil de plateforme Connect) :
+
+1. Remplace le secret GitHub par la clé `sk_live_…` et relance le déploiement : un webhook réel est créé.
+2. Chaque école reconnecte Stripe (*Paramètres > Paiements*) : le compte relié en test n'encaisse pas en réel. Ses codes promo de test sont désactivés ; les produits Stripe sont recréés automatiquement, et le chiffre d'affaires ne compte que les ventes réelles.
+3. Dans Stripe, en mode test, supprime l'ancien webhook de test (*Développeurs > Webhooks*) : il échouerait désormais.
 
 **Pour chaque formateur** :
 

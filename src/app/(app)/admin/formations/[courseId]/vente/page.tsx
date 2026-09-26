@@ -10,6 +10,7 @@ import {
   parsePriceInput,
   promoCodeInput,
   promoLabel,
+  sameStripeMode,
   type OrderDoc,
   type PromoCodeDoc,
 } from "@shared/payments";
@@ -31,7 +32,7 @@ import {
 import { db } from "@/lib/firebase/client";
 import { formatDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
-import { usePaymentsEnabled, useSchoolStripe } from "@/lib/payments";
+import { useSchoolPayments } from "@/lib/payments";
 
 function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActive: boolean }) {
   const [value, setValue] = useState(course.price ? String(course.price.amount / 100) : "");
@@ -274,7 +275,7 @@ function PromoCodesCard({ course }: { course: CourseWithId }) {
   );
 }
 
-function OrdersCard({ course }: { course: CourseWithId }) {
+function OrdersCard({ course, livemode }: { course: CourseWithId; livemode: boolean }) {
   const ordersQuery = useMemo(
     () =>
       query(
@@ -287,7 +288,10 @@ function OrdersCard({ course }: { course: CourseWithId }) {
     [course.creatorId, course.id],
   );
   const { data: orders } = useQueryData<OrderDoc<TimestampLike>>(ordersQuery);
-  const paid = orders.filter((order) => order.status === "paid");
+  // Le total ne mélange pas les ventes de test et les ventes réelles.
+  const paid = orders.filter(
+    (order) => order.status === "paid" && sameStripeMode(order.livemode, livemode),
+  );
   const revenue = paid.reduce((sum, order) => sum + order.amount, 0);
 
   return (
@@ -312,6 +316,7 @@ function OrdersCard({ course }: { course: CourseWithId }) {
                 <span className="w-20 text-right font-medium tabular-nums">
                   {formatPrice(order.amount, order.currency)}
                 </span>
+                {order.livemode ? null : <Badge tone="info">Test</Badge>}
                 {order.status === "refunded" ? <Badge tone="danger">Remboursée</Badge> : null}
               </li>
             ))}
@@ -324,14 +329,12 @@ function OrdersCard({ course }: { course: CourseWithId }) {
 
 export default function CourseSalesPage() {
   const course = useLoadedCourse();
-  const { data: stripe } = useSchoolStripe(course.creatorId);
-  const { enabled } = usePaymentsEnabled();
-  const stripeActive = Boolean(enabled && stripe?.chargesEnabled);
+  const { active: stripeActive, livemode } = useSchoolPayments(course.creatorId);
   return (
     <div className="max-w-3xl space-y-4">
       <PriceCard course={course} stripeActive={stripeActive} />
       {stripeActive && course.price ? <PromoCodesCard course={course} /> : null}
-      <OrdersCard course={course} />
+      <OrdersCard course={course} livemode={livemode} />
     </div>
   );
 }

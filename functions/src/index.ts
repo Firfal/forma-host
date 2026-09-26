@@ -587,6 +587,7 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
           currency: "eur",
           paymentIntentId: `pi_${session.id}`,
           promoCode: null,
+          livemode: false,
         },
         appUrlFor,
       );
@@ -681,6 +682,7 @@ export const stripeWebhook = onRequest(
                   ? session.payment_intent
                   : (session.payment_intent?.id ?? null),
               promoCode: null,
+              livemode: event.livemode,
             },
             appUrlFor,
           );
@@ -690,13 +692,15 @@ export const stripeWebhook = onRequest(
           const account = event.data.object as Stripe.Account;
           const mapping = (await db().doc(`stripeAccounts/${account.id}`).get()).data() as
             { schoolId: string } | undefined;
-          if (mapping) {
-            await db()
-              .doc(`creators/${mapping.schoolId}/private/stripe`)
-              .update({
-                chargesEnabled: Boolean(account.charges_enabled),
-                detailsSubmitted: Boolean(account.details_submitted),
-              });
+          if (!mapping) break;
+          const ref = db().doc(`creators/${mapping.schoolId}/private/stripe`);
+          const current = (await ref.get()).data() as { accountId?: string } | undefined;
+          // Ancien compte de l'école (ex. compte de test après le passage en réel) : ignoré.
+          if (current?.accountId === account.id) {
+            await ref.update({
+              chargesEnabled: Boolean(account.charges_enabled),
+              detailsSubmitted: Boolean(account.details_submitted),
+            });
           }
           break;
         }
