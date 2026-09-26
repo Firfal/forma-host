@@ -518,6 +518,30 @@ describe("utilisateurs et zones serveur", () => {
     await assertFails(getDoc(doc(db(STRANGER), "users/anne")));
   });
 
+  it("appareils push : gérés par leur propriétaire seul", async () => {
+    const token = {
+      token: "fcm-token-de-test-123456",
+      userAgent: "Chrome sur Mac",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    const ref = (firestore: Firestore) => doc(firestore, "users/anne/pushTokens/abc");
+    await assertSucceeds(setDoc(ref(db(ANNE)), token));
+    await assertSucceeds(
+      updateDoc(ref(db(ANNE)), { token: "fcm-token-renouvele-7890", updatedAt: serverTimestamp() }),
+    );
+    // createdAt figé, champs imposés, token non vide.
+    await assertFails(updateDoc(ref(db(ANNE)), { createdAt: serverTimestamp() }));
+    await assertFails(setDoc(doc(db(ANNE), "users/anne/pushTokens/x"), { ...token, extra: 1 }));
+    await assertFails(setDoc(doc(db(ANNE), "users/anne/pushTokens/y"), { ...token, token: "" }));
+    // Personne d'autre ne lit, n'ajoute ni ne supprime.
+    await assertFails(getDoc(ref(db(STRANGER))));
+    await assertFails(setDoc(doc(db(STRANGER), "users/anne/pushTokens/z"), token));
+    await assertFails(deleteDoc(ref(creatorDb())));
+    await assertSucceeds(getDocs(collection(db(ANNE), "users/anne/pushTokens")));
+    await assertSucceeds(deleteDoc(ref(db(ANNE))));
+  });
+
   it("invitations et emails inaccessibles au client", async () => {
     await assertFails(getDoc(doc(creatorDb(), "invites/abc")));
     await assertFails(setDoc(doc(creatorDb(), "mail/x"), { to: "a@b.c", creatorId: THEO }));

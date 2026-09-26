@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PushSettingsCard } from "@/components/settings/push-settings-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth";
@@ -80,6 +81,7 @@ export default function AccountPage() {
             </form>
           </CardBody>
         </Card>
+        <PushSettingsCard />
         {isCreator ? (
           <Card>
             <CardBody className="flex items-center justify-between gap-4">

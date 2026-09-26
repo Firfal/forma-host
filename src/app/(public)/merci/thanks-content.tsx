@@ -29,8 +29,8 @@ export function ThanksContent() {
       <CheckCircle2 className="mx-auto size-10 text-success" />
       <h1 className="text-xl font-semibold">Merci pour ton achat !</h1>
       <p className="text-sm text-muted">
-        Ton paiement est confirmé. Tu vas recevoir un email avec ton accès à la formation (pense
-        à vérifier tes spams).
+        Ton paiement est confirmé. Tu vas recevoir un email avec ton accès à la formation (pense à
+        vérifier tes spams).
       </p>
       {loading ? null : user && courseId ? (
         ready ? (

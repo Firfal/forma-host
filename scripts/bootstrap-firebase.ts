@@ -116,6 +116,9 @@ const REQUIRED_APIS = [
   "cloudresourcemanager.googleapis.com",
   "iam.googleapis.com",
   "cloudbilling.googleapis.com",
+  "fcm.googleapis.com",
+  "fcmregistrations.googleapis.com",
+  "firebaseinstallations.googleapis.com",
 ];
 
 async function enableApis() {
@@ -412,7 +415,8 @@ async function grantAppHostingFirestoreAccess() {
 
 /**
  * Domaines d'école (Paramètres > Domaine) : les Functions ajoutent le domaine au backend
- * App Hosting et aux domaines autorisés d'Authentication.
+ * App Hosting et aux domaines autorisés d'Authentication. Elles envoient aussi les
+ * notifications push (Firebase Cloud Messaging).
  */
 async function grantFunctionsDomainAccess() {
   const project = await api<{ projectNumber?: string }>(
@@ -426,6 +430,11 @@ async function grantFunctionsDomainAccess() {
     "Functions : domaines App Hosting",
   );
   await grantProjectRole(member, "roles/firebaseauth.admin", "Functions : domaines autorisés Auth");
+  await grantProjectRole(
+    member,
+    "roles/firebasecloudmessaging.admin",
+    "Functions : notifications push",
+  );
 }
 
 interface DnsRecord {

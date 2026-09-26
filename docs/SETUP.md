@@ -109,7 +109,16 @@ Chaque école encaisse sur **son propre compte Stripe** : 0 % de commission pour
 2. Dans une formation, onglet *Vente* : fixer le prix, puis créer des codes promo (%, montant, nombre d'utilisations, expiration). Les élèves saisissent le code sur la page de paiement Stripe.
 3. Le bouton de la page de vente devient « … — 197 € ». Les ventes s'affichent dans l'onglet *Vente*. Un remboursement total depuis Stripe retire l'accès.
 
-## 6. Migration depuis Podia
+## 6. Notifications push
+
+Rien à configurer : le déploiement active Firebase Cloud Messaging et donne aux Functions le droit d'envoyer.
+
+- Chacun les active dans *Mon compte > Notifications sur cet appareil*, sur chaque appareil (ordinateur, téléphone).
+- Elles reprennent la cloche : nouvel élève, commentaire, réponse, demande d'espace formateur… et le clic ouvre la bonne page.
+- **iPhone / iPad** (iOS 16.4 ou plus) : ajouter d'abord l'app à l'écran d'accueil depuis Safari (*Partager > Sur l'écran d'accueil*), puis l'ouvrir depuis l'icône et activer les notifications.
+- Une personne qui se déconnecte ne reçoit plus les notifications sur cet appareil.
+
+## 7. Migration depuis Podia
 
 1. Ré-uploade les vidéos sur Vimeo (télécharge les originaux depuis Podia si besoin).
 2. Recrée la formation, les chapitres et les leçons dans *Admin > Formations*.

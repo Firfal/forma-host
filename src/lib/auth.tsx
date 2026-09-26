@@ -15,6 +15,7 @@ import {
 import { schoolsFromClaims } from "@shared/school";
 import type { UserDoc } from "@shared/types";
 import { auth, db } from "./firebase/client";
+import { forgetPushDevice } from "./push";
 
 interface AuthState {
   user: User | null;
@@ -103,7 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, [uid]);
 
-  const signOut = useCallback(() => firebaseSignOut(auth), []);
+  const signOut = useCallback(async () => {
+    // L'appareil ne doit plus recevoir les notifications de ce compte.
+    if (auth.currentUser) await forgetPushDevice(auth.currentUser.uid).catch(() => undefined);
+    await firebaseSignOut(auth);
+  }, []);
   const refreshClaims = useCallback(async () => {
     if (!auth.currentUser) return;
     await auth.currentUser.getIdToken(true);

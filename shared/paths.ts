@@ -22,6 +22,7 @@ export const paths = {
   comments: (courseId: string) => `courses/${courseId}/comments`,
   enrollment: (courseId: string, uid: string) => `enrollments/${enrollmentId(courseId, uid)}`,
   notifications: (uid: string) => `users/${uid}/notifications`,
+  pushTokens: (uid: string) => `users/${uid}/pushTokens`,
   invite: (token: string) => `invites/${token}`,
   mail: (id: string) => `mail/${id}`,
   creatorRequest: (uid: string) => `creatorRequests/${uid}`,

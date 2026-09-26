@@ -44,3 +44,24 @@ export async function mailsTo(
       state: doc.fields.delivery?.mapValue.fields.state?.stringValue ?? null,
     }));
 }
+
+/** Notifications push envoyées (FCM simulé en local : collection `_fakePush`). */
+export async function pushesSent(): Promise<{ tokens: string[]; title: string; link: string }[]> {
+  const response = await fetch(
+    "http://127.0.0.1:8080/v1/projects/demo-forma/databases/(default)/documents/_fakePush?pageSize=300",
+    { headers: { Authorization: "Bearer owner" } },
+  );
+  const body = (await response.json()) as {
+    documents?: {
+      fields: {
+        tokens: { arrayValue: { values?: { stringValue: string }[] } };
+        data: { mapValue: { fields: Record<string, { stringValue: string }> } };
+      };
+    }[];
+  };
+  return (body.documents ?? []).map((doc) => ({
+    tokens: (doc.fields.tokens.arrayValue.values ?? []).map((value) => value.stringValue),
+    title: doc.fields.data.mapValue.fields.title.stringValue,
+    link: doc.fields.data.mapValue.fields.link.stringValue,
+  }));
+}

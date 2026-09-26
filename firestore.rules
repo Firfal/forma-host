@@ -92,6 +92,24 @@ service cloud.firestore {
         allow read, delete: if isUser(userId);
         allow update: if isUser(userId) && changedOnly(['read']) && request.resource.data.read is bool;
       }
+
+      // Appareils qui reçoivent les notifications push (un token FCM par navigateur).
+      match /pushTokens/{tokenId} {
+        allow read, delete: if isUser(userId);
+        allow create: if isUser(userId)
+          && isValidPushToken()
+          && request.resource.data.createdAt == request.time;
+        allow update: if isUser(userId)
+          && isValidPushToken()
+          && request.resource.data.createdAt == resource.data.createdAt;
+      }
+    }
+
+    function isValidPushToken() {
+      return onlyKeys(['token', 'userAgent', 'createdAt', 'updatedAt'])
+        && isShortString(request.resource.data.token, 20, 4096)
+        && isNullableString(request.resource.data.userAgent, 500)
+        && request.resource.data.updatedAt == request.time;
     }
 
     // Profil public (nom, avatar), affiché dans les commentaires et la liste des membres.

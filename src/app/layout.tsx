@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: { default: brand.name, template: `%s · ${brand.name}` },
   description: `Formations en ligne — ${brand.name}`,
   metadataBase: new URL(brand.appUrl),
+  appleWebApp: { capable: true, title: brand.name, statusBarStyle: "default" },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -10,6 +10,10 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_FIREBASE_CONFIG: firebaseConfig,
   },
+  async headers() {
+    // Le service worker des notifications doit être revérifié à chaque visite.
+    return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] }];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "firebasestorage.googleapis.com" },

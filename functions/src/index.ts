@@ -24,7 +24,7 @@ import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";
 import { enrollmentId, paths } from "@shared/paths";
 import { emailLayout, escapeHtml } from "@shared/template";
-import type { CommentDoc, CoursePrivateSettings, CreatorDoc } from "@shared/types";
+import type { CommentDoc, CoursePrivateSettings, CreatorDoc, NotificationDoc } from "@shared/types";
 import { grantAccessToStudents, resendAccessEmail } from "./access";
 import { auth, db } from "./db";
 import {
@@ -97,6 +97,7 @@ import {
   saveVimeoSettings as saveVimeoSettingsImpl,
   VimeoSetupError,
 } from "./vimeo-settings";
+import { fakePushSender, fcmSender, pushNotification } from "./push";
 
 // SMTP simulé uniquement dans les émulateurs (SMTP_FAKE=true dans functions/.env.demo-forma).
 const fakeSmtp = process.env.FUNCTIONS_EMULATOR === "true" && process.env.SMTP_FAKE === "true";
@@ -346,6 +347,31 @@ export const onMailCreated = onDocumentCreated(
       await deliverMail(event.params.mailId, mailDeps);
     } catch (error) {
       logger.error("onMailCreated", error);
+    }
+  },
+);
+
+// FCM simulé dans les émulateurs (PUSH_FAKE=true) : envois consignés dans _fakePush.
+const pushSender =
+  process.env.FUNCTIONS_EMULATOR === "true" && process.env.PUSH_FAKE === "true"
+    ? fakePushSender
+    : fcmSender;
+
+/** Chaque notification in-app part aussi en push sur les appareils activés dans Mon compte. */
+export const onNotificationCreated = onDocumentCreated(
+  "users/{uid}/notifications/{notificationId}",
+  async (event) => {
+    const notification = event.data?.data() as NotificationDoc | undefined;
+    if (!notification) return;
+    try {
+      await pushNotification(
+        event.params.uid,
+        event.params.notificationId,
+        notification,
+        pushSender,
+      );
+    } catch (error) {
+      logger.error("onNotificationCreated", error);
     }
   },
 );
