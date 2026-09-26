@@ -28,6 +28,7 @@ export const RESERVED_SLUGS = new Set([
   "formations",
   "inscription",
   "merci",
+  "messages",
   "mot-de-passe-oublie",
   "notifications",
   "plateforme",

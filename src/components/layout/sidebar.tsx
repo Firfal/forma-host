@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  MessagesSquare,
   Settings,
   ShieldCheck,
   UserRound,
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
+import { useStudentConversations, useUnreadConversations } from "@/lib/chat";
 import { cn } from "@/lib/cn";
 import { useCreator } from "@/lib/creator";
 import { useSchool, useSchoolDocs } from "@/lib/school";
@@ -48,6 +50,7 @@ const adminNav: NavItem[] = [
   { href: routes.admin, label: "Accueil", icon: House, exact: true },
   { href: routes.adminCourses, label: "Formations", icon: BookOpen },
   { href: routes.adminMembers, label: "Membres", icon: Users },
+  { href: routes.adminMessages, label: "Messages", icon: MessagesSquare },
   { href: routes.adminComments, label: "Commentaires", icon: MessageSquare },
   { href: routes.adminSettings, label: "Paramètres", icon: Settings },
 ];
@@ -55,6 +58,12 @@ const adminNav: NavItem[] = [
 const memberNav: NavItem[] = [
   { href: routes.myCourses, label: "Mes formations", icon: LayoutGrid },
 ];
+
+const studentMessagesNav: NavItem = {
+  href: routes.messages,
+  label: "Messages",
+  icon: MessagesSquare,
+};
 
 const becomeCreatorNav: NavItem = {
   href: routes.becomeCreator,
@@ -66,7 +75,16 @@ const platformNav: NavItem[] = [
   { href: routes.platformRequests, label: "Demandes formateurs", icon: ShieldCheck },
 ];
 
-function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }) {
+function NavLink({
+  item,
+  onNavigate,
+  badge,
+}: {
+  item: NavItem;
+  onNavigate: () => void;
+  /** Nombre affiché à droite (ex. conversations non lues). */
+  badge?: number;
+}) {
   const pathname = usePathname();
   const active = item.exact
     ? pathname === item.href
@@ -84,6 +102,14 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
     >
       <Icon className="size-4 shrink-0" />
       {item.label}
+      {badge ? (
+        <span
+          className="ml-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[11px] font-semibold text-white"
+          aria-label={`${badge} non lu${badge > 1 ? "s" : ""}`}
+        >
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -151,8 +177,13 @@ function SchoolSwitcher({ onNavigate }: { onNavigate: () => void }) {
 
 function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
   const { user, isCreator, isPlatformAdmin, signOut } = useAuth();
-  const { schools } = useSchool();
+  const { schoolId, schools } = useSchool();
   const displayName = user?.displayName || user?.email || "";
+  const schoolUnread = useUnreadConversations("school", isCreator ? schoolId : null);
+  const studentUnread = useUnreadConversations("student", user?.uid);
+  // Formateur : « Messages » côté élève seulement s'il écrit lui-même à une autre école.
+  const { data: studentConversations } = useStudentConversations(isCreator ? user?.uid : undefined);
+  const showStudentMessages = !isCreator || studentConversations.length > 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -170,7 +201,12 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
             <p className="px-2 pb-1 text-[12px] font-medium text-muted">Admin</p>
             <div className="space-y-0.5">
               {adminNav.map((item) => (
-                <NavLink key={item.href} item={item} onNavigate={onNavigate} />
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  onNavigate={onNavigate}
+                  badge={item.href === routes.adminMessages ? schoolUnread : undefined}
+                />
               ))}
             </div>
           </div>
@@ -181,6 +217,9 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
             {memberNav.map((item) => (
               <NavLink key={item.href} item={item} onNavigate={onNavigate} />
             ))}
+            {showStudentMessages ? (
+              <NavLink item={studentMessagesNav} onNavigate={onNavigate} badge={studentUnread} />
+            ) : null}
             {isCreator ? null : <NavLink item={becomeCreatorNav} onNavigate={onNavigate} />}
           </div>
         </div>

@@ -124,3 +124,41 @@ export function buildMemberInviteEmail(input: {
     replyTo: input.brand.supportEmail,
   });
 }
+
+/** Nouveau message de l'école dans le chat (envoyé au premier message non lu). */
+export function buildMessageEmail(input: {
+  creatorId: string;
+  to: string;
+  studentName: string;
+  authorName: string;
+  excerpt: string;
+  brand: Brand;
+  ctaUrl: string;
+}): MailDoc {
+  const subject = `Nouveau message de ${input.brand.name}`;
+  const intro = `${input.authorName} t'a écrit :`;
+  // Sans nom, l'élève est désigné par son email : on ne le reprend pas dans la salutation.
+  const name = input.studentName.includes("@") ? "" : firstName(input.studentName);
+  const greeting = name ? `Bonjour ${name}` : "Bonjour";
+  const ctaLabel = "Lire et répondre";
+  const html = emailLayout({
+    bodyHtml: textToHtml("{{greeting}},\n\n{{intro}}\n\n« {{excerpt}} »", {
+      greeting,
+      intro,
+      excerpt: input.excerpt,
+    }),
+    ctaLabel,
+    ctaUrl: input.ctaUrl,
+    brandName: input.brand.name,
+    brandColor: input.brand.color,
+    footer: "Tu reçois cet email car tu as un message non lu. Réponds directement dans l'app.",
+  });
+  return mailDoc({
+    creatorId: input.creatorId,
+    to: input.to,
+    subject,
+    html,
+    text: `${greeting},\n\n${intro}\n\n« ${input.excerpt} »\n\n${ctaLabel} : ${input.ctaUrl}`,
+    replyTo: input.brand.supportEmail,
+  });
+}

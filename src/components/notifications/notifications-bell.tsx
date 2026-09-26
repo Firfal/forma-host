@@ -7,6 +7,7 @@ import {
   BookOpen,
   GraduationCap,
   MessageSquare,
+  MessagesSquare,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const icons: Record<NotificationType, typeof Bell> = {
   team_member: Users,
   creator_request: GraduationCap,
   creator_request_decision: BadgeCheck,
+  new_message: MessagesSquare,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

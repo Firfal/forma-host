@@ -344,6 +344,35 @@ service cloud.firestore {
 
     // ---------- Demandes d'espace formateur ----------
 
+    // ---------- Chat école ↔ élève ----------
+
+    // Conversation créée par la callable openConversation (inscription vérifiée) ; aperçu et
+    // compteurs tenus par le trigger onMessageCreated. Chaque côté remet son compteur à zéro.
+    match /conversations/{conversationId} {
+      allow read: if isSchoolAdmin(resource.data.schoolId) || isUser(resource.data.studentUid);
+      allow update: if (isSchoolAdmin(resource.data.schoolId)
+          && changedOnly(['unreadForSchool']) && request.resource.data.unreadForSchool == 0)
+        || (isUser(resource.data.studentUid)
+          && changedOnly(['unreadForStudent']) && request.resource.data.unreadForStudent == 0);
+
+      match /messages/{messageId} {
+        function conversation() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        }
+
+        allow read: if isSchoolAdmin(conversation().schoolId) || isUser(conversation().studentUid);
+        // L'élève n'écrit plus dans une conversation bloquée par l'école.
+        allow create: if signedIn()
+          && onlyKeys(['authorUid', 'authorName', 'body', 'createdAt'])
+          && request.resource.data.authorUid == request.auth.uid
+          && isShortString(request.resource.data.authorName, 1, 80)
+          && isShortString(request.resource.data.body, 1, 5000)
+          && request.resource.data.createdAt == request.time
+          && (isSchoolAdmin(conversation().schoolId)
+            || (isUser(conversation().studentUid) && conversation().blocked == false));
+      }
+    }
+
     // Une demande par compte (id = uid), traitée par les Functions (acceptée ou refusée).
     // Après un refus, le demandeur peut la supprimer pour en refaire une.
     match /creatorRequests/{uid} {

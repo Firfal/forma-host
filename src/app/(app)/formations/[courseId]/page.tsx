@@ -1,8 +1,10 @@
 "use client";
 
-import { PlayCircle } from "lucide-react";
+import { MessagesSquare, PlayCircle } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { completedCount, resumeLesson, visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
@@ -17,6 +19,28 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreator } from "@/lib/creator";
+import { callOpenConversation, errorMessage } from "@/lib/firebase/callables";
+
+/** Ouvre (ou crée) la conversation avec l'école de la formation. */
+function WriteToSchoolButton({ schoolId }: { schoolId: string }) {
+  const router = useRouter();
+  const [opening, setOpening] = useState(false);
+  async function open() {
+    setOpening(true);
+    try {
+      const { conversationId } = await callOpenConversation({ schoolId });
+      router.push(routes.conversation(conversationId));
+    } catch (error) {
+      toast.error(errorMessage(error));
+      setOpening(false);
+    }
+  }
+  return (
+    <Button variant="secondary" className="w-full" onClick={open} disabled={opening}>
+      <MessagesSquare /> {opening ? "Ouverture…" : "Écrire au formateur"}
+    </Button>
+  );
+}
 
 export default function StudentCoursePage() {
   const { course, enrollment, hasAccess, isOwner, loading } = useStudentCourse();
@@ -88,6 +112,9 @@ export default function StudentCoursePage() {
                   {done === 0 ? "Commencer" : done === total ? "Revoir" : "Continuer"}
                 </Link>
               </Button>
+            ) : null}
+            {!isOwner && enrollment?.status === "active" ? (
+              <WriteToSchoolButton schoolId={course.creatorId} />
             ) : null}
           </div>
         </Card>

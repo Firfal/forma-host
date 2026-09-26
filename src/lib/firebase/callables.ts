@@ -9,6 +9,7 @@ import type {
   InviteTokenInput,
   ResolveVimeoInput,
 } from "@shared/schemas";
+import type { OpenConversationInput, UpdateConversationInput } from "@shared/chat";
 import type {
   ApproveCreatorRequestInput,
   RejectCreatorRequestInput,
@@ -79,6 +80,13 @@ export const callDeactivatePromoCode = callable<PromoCodeIdInput, { ok: true }>(
 );
 export const callUpdateSchoolProfile = callable<SchoolProfileInput, { ok: true }>(
   "updateSchoolProfile",
+);
+
+export const callOpenConversation = callable<OpenConversationInput, { conversationId: string }>(
+  "openConversation",
+);
+export const callUpdateConversation = callable<UpdateConversationInput, { ok: true }>(
+  "updateConversation",
 );
 
 /** Message lisible pour une erreur Firebase (callable, auth, firestore). */

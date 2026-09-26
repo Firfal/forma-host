@@ -1,5 +1,5 @@
 import "./setup";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import Stripe from "stripe";
 import { logger } from "firebase-functions";
@@ -16,6 +16,7 @@ import {
   rejectCreatorRequestInput,
   type CreatorRequestDoc,
 } from "@shared/creator-requests";
+import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
 import { schoolDomainInput } from "@shared/domains";
 import { mailSettingsInput } from "@shared/mail-settings";
 import { createCheckoutInput, promoCodeIdInput, promoCodeInput } from "@shared/payments";
@@ -29,6 +30,7 @@ import { grantAccessToStudents, resendAccessEmail } from "./access";
 import { auth, db } from "./db";
 import {
   parseInput,
+  requireAuth,
   requireCourseAdmin,
   requireCreator,
   requirePlatformAdmin,
@@ -97,7 +99,13 @@ import {
   saveVimeoSettings as saveVimeoSettingsImpl,
   VimeoSetupError,
 } from "./vimeo-settings";
-import { fakePushSender, fcmSender, pushNotification } from "./push";
+import { fakePushSender, fcmSender, isNewNotification, pushNotification } from "./push";
+import {
+  ChatError,
+  handleNewMessage,
+  openConversation as openConversationImpl,
+  updateConversation as updateConversationImpl,
+} from "./chat";
 
 // SMTP simulé uniquement dans les émulateurs (SMTP_FAKE=true dans functions/.env.demo-forma).
 const fakeSmtp = process.env.FUNCTIONS_EMULATOR === "true" && process.env.SMTP_FAKE === "true";
@@ -357,21 +365,20 @@ const pushSender =
     ? fakePushSender
     : fcmSender;
 
-/** Chaque notification in-app part aussi en push sur les appareils activés dans Mon compte. */
-export const onNotificationCreated = onDocumentCreated(
+/**
+ * Chaque notification in-app part aussi en push sur les appareils activés dans Mon compte :
+ * à sa création, et quand elle est réémise (nouvelle date, ex. nouveau message du chat).
+ */
+export const onNotificationWritten = onDocumentWritten(
   "users/{uid}/notifications/{notificationId}",
   async (event) => {
-    const notification = event.data?.data() as NotificationDoc | undefined;
-    if (!notification) return;
+    const before = event.data?.before.data() as NotificationDoc | undefined;
+    const after = event.data?.after.data() as NotificationDoc | undefined;
+    if (!after || !isNewNotification(before, after)) return;
     try {
-      await pushNotification(
-        event.params.uid,
-        event.params.notificationId,
-        notification,
-        pushSender,
-      );
+      await pushNotification(event.params.uid, event.params.notificationId, after, pushSender);
     } catch (error) {
-      logger.error("onNotificationCreated", error);
+      logger.error("onNotificationWritten", error);
     }
   },
 );
@@ -709,6 +716,49 @@ export const stripeWebhook = onRequest(
     } catch (error) {
       logger.error("stripeWebhook", event.type, error);
       res.status(500).send("Erreur");
+    }
+  },
+);
+
+/** Ouvre la conversation avec l'école (élève) ou avec un élève (équipe de l'école). */
+export const openConversation = onCall(async (request) => {
+  const caller = requireAuth(request);
+  const input = parseInput(openConversationInput, request.data);
+  try {
+    return await openConversationImpl(caller, input);
+  } catch (error) {
+    if (error instanceof ChatError) throw new HttpsError("failed-precondition", error.message);
+    throw error;
+  }
+});
+
+/** Archiver, bloquer (équipe) ou mettre en sourdine une conversation. */
+export const updateConversation = onCall(async (request) => {
+  const caller = requireAuth(request);
+  const input = parseInput(updateConversationInput, request.data);
+  try {
+    await updateConversationImpl(caller, input);
+  } catch (error) {
+    if (error instanceof ChatError) throw new HttpsError("failed-precondition", error.message);
+    throw error;
+  }
+  return { ok: true };
+});
+
+export const onMessageCreated = onDocumentCreated(
+  "conversations/{conversationId}/messages/{messageId}",
+  async (event) => {
+    const message = event.data?.data() as MessageDoc | undefined;
+    if (!message) return;
+    try {
+      await handleNewMessage(
+        event.params.conversationId,
+        event.params.messageId,
+        message,
+        APP_URL.value(),
+      );
+    } catch (error) {
+      logger.error("onMessageCreated", error);
     }
   },
 );

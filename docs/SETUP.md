@@ -117,6 +117,7 @@ Rien à configurer : le déploiement active Firebase Cloud Messaging et donne au
 - Elles reprennent la cloche : nouvel élève, commentaire, réponse, demande d'espace formateur… et le clic ouvre la bonne page.
 - **iPhone / iPad** (iOS 16.4 ou plus) : ajouter d'abord l'app à l'écran d'accueil depuis Safari (*Partager > Sur l'écran d'accueil*), puis l'ouvrir depuis l'icône et activer les notifications.
 - Une personne qui se déconnecte ne reçoit plus les notifications sur cet appareil.
+- Messages du chat : une notification par conversation, mise à jour à chaque message. L'élève reçoit aussi un email au premier message non lu de l'école (via l'envoi des emails de l'école).
 
 ## 7. Migration depuis Podia
 

@@ -9,21 +9,23 @@ Plateforme d'hébergement de formations en ligne, pensée comme une alternative 
 - Plan détaillé : [`docs/PLAN.md`](docs/PLAN.md)
 - Mise en production : [`docs/SETUP.md`](docs/SETUP.md)
 
-## Fonctionnalités (V1)
+## Fonctionnalités
 
 | Espace | Fonctionnalités |
 |---|---|
-| Comptes | Inscription, connexion, mot de passe oublié, activation par invitation (`/bienvenue/[token]`) |
-| Formateur (`/admin`) | Formations (titre, description, miniature, slug), plan avec chapitres, sous-chapitres et leçons, leçons (vidéo Vimeo, miniature, description, liens, pièces jointes), élèves (invitation, import CSV, progression), commentaires, notifications, mail de bienvenue, envoi des emails par son propre SMTP (Brevo, Gmail…) |
-| Élève (`/formations`) | Mes formations (tous formateurs confondus), lecteur vidéo, progression, reprise, commentaires |
-| Public | Page de vente `/{formateur}/{formation}` |
+| Comptes | Inscription, connexion, mot de passe oublié, activation par invitation (`/bienvenue/[token]`), notifications push sur ordinateur et téléphone (*Mon compte*) |
+| Formateur (`/admin`) | Formations (titre, description, miniature, slug), plan avec chapitres, sous-chapitres et leçons, leçons (vidéo Vimeo, miniature, description, liens, pièces jointes), élèves (invitation, import CSV, progression), commentaires, messages (chat avec les élèves), notifications, mail de bienvenue |
+| École (*Paramètres*) | Profil (nom, adresse, logo, couleur), équipe (co-administrateurs), domaine personnalisé, envoi des emails par son propre SMTP (Brevo, Gmail…), compte Vimeo, paiements Stripe Connect |
+| Vente | Prix, paiement Stripe (0 % de commission), codes promo, accès automatique après paiement |
+| Élève (`/formations`) | Mes formations (tous formateurs confondus), lecteur vidéo, progression, reprise, commentaires, « Écrire au formateur » (`/messages`) |
+| Plateforme | Demandes d'espace formateur validées par l'administrateur (`/plateforme/demandes`) |
+| Public | Page de l'école `/{ecole}` et page de vente `/{ecole}/{formation}`, ou `/{formation}` sur le domaine de l'école |
 
 ## État d'avancement
 
-- **Fait** : toute la V1 du plan (Phases 0 à 6), testée de bout en bout sur émulateurs.
+- **Fait** : la V1 du plan (Phases 0 à 6), puis la V2 : paramètres de l'école, Vimeo par école, co-gestion, domaines, inscription des formateurs, paiements Stripe Connect et codes promo, notifications push, chat formateur ↔ élève. Chaque fonctionnalité est testée de bout en bout sur émulateurs.
 - **Production** : en ligne sur https://forma-host--forma-host.europe-west4.hosted.app (projet Firebase `forma-host`), déployé automatiquement par GitHub Actions à chaque push (accès sans clé, Workload Identity Federation). Voir [`docs/SETUP.md`](docs/SETUP.md).
 - **Comptes formateur** : Ecole Motion (`/ecole-motion`) et un compte d'administration du site. Mot de passe à définir via « Mot de passe oublié ».
-- **V2** : Stripe (abonnement formateur) et coupons / codes promo, chat formateur ↔ élève, onboarding self-service des formateurs.
 
 ## Structure
 

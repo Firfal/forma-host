@@ -371,6 +371,90 @@ describe("paiements", () => {
   });
 });
 
+describe("chat école ↔ élève", () => {
+  const CONV = "conversations/theo_anne";
+  const message = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    authorUid: uid,
+    authorName: "Anne",
+    body: "Bonjour !",
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      await setDoc(doc(admin, CONV), {
+        schoolId: THEO,
+        schoolName: "Ecole Motion",
+        studentUid: ANNE,
+        studentName: "Anne",
+        unreadForSchool: 2,
+        unreadForStudent: 1,
+        archived: false,
+        blocked: false,
+        mutedBy: [],
+        lastAt: Timestamp.now(),
+      });
+      await setDoc(doc(admin, `${CONV}/messages/m1`), {
+        ...message(ANNE),
+        createdAt: Timestamp.now(),
+      });
+    });
+  });
+
+  it("lisible par l'élève et l'équipe de l'école seulement", async () => {
+    await assertSucceeds(getDoc(doc(db(ANNE), CONV)));
+    await assertSucceeds(getDoc(doc(coAdminDb(), CONV)));
+    await assertSucceeds(getDocs(collection(db(ANNE), `${CONV}/messages`)));
+    await assertSucceeds(getDocs(collection(creatorDb(), `${CONV}/messages`)));
+    await assertFails(getDoc(doc(db(STRANGER), CONV)));
+    await assertFails(getDocs(collection(db(STRANGER), `${CONV}/messages`)));
+    await assertFails(getDoc(doc(db(OTHER_CREATOR, { creator: true }), CONV)));
+    await assertSucceeds(
+      getDocs(query(collection(creatorDb(), "conversations"), where("schoolId", "==", THEO))),
+    );
+    await assertSucceeds(
+      getDocs(query(collection(db(ANNE), "conversations"), where("studentUid", "==", ANNE))),
+    );
+    await assertFails(getDocs(collection(db(ANNE), "conversations")));
+  });
+
+  it("messages : auteur imposé, 1 à 5 000 caractères, date du serveur", async () => {
+    const ref = (firestore: Firestore, id: string) => doc(firestore, `${CONV}/messages/${id}`);
+    await assertSucceeds(setDoc(ref(db(ANNE), "a"), message(ANNE)));
+    await assertSucceeds(setDoc(ref(coAdminDb(), "b"), message(COADMIN, { authorName: "Q" })));
+    await assertFails(setDoc(ref(db(ANNE), "c"), message(THEO)));
+    await assertFails(setDoc(ref(db(ANNE), "d"), message(ANNE, { body: "" })));
+    await assertFails(setDoc(ref(db(ANNE), "e"), message(ANNE, { body: "x".repeat(5001) })));
+    await assertFails(setDoc(ref(db(ANNE), "f"), message(ANNE, { createdAt: Timestamp.now() })));
+    await assertFails(setDoc(ref(db(ANNE), "g"), { ...message(ANNE), extra: true }));
+    await assertFails(setDoc(ref(db(STRANGER), "h"), message(STRANGER)));
+    // Ni modification ni suppression.
+    await assertFails(updateDoc(ref(db(ANNE), "m1"), { body: "modifié" }));
+    await assertFails(deleteDoc(ref(creatorDb(), "m1")));
+  });
+
+  it("conversation bloquée : l'élève ne peut plus écrire, l'équipe si", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), CONV), { blocked: true });
+    });
+    await assertFails(setDoc(doc(db(ANNE), `${CONV}/messages/x`), message(ANNE)));
+    await assertSucceeds(setDoc(doc(creatorDb(), `${CONV}/messages/y`), message(THEO)));
+  });
+
+  it("chaque côté remet seulement son compteur à zéro ; le reste est au serveur", async () => {
+    await assertFails(updateDoc(doc(db(ANNE), CONV), { unreadForSchool: 0 }));
+    await assertSucceeds(updateDoc(doc(db(ANNE), CONV), { unreadForStudent: 0 }));
+    await assertSucceeds(updateDoc(doc(coAdminDb(), CONV), { unreadForSchool: 0 }));
+    await assertFails(updateDoc(doc(db(ANNE), CONV), { blocked: true }));
+    await assertFails(updateDoc(doc(creatorDb(), CONV), { unreadForSchool: 3 }));
+    await assertFails(updateDoc(doc(creatorDb(), CONV), { archived: true }));
+    await assertFails(setDoc(doc(db(ANNE), "conversations/theo_x"), { schoolId: THEO }));
+    await assertFails(deleteDoc(doc(creatorDb(), CONV)));
+  });
+});
+
 describe("leçons", () => {
   it("contenu protégé : inscrit actif ou formateur", async () => {
     await assertSucceeds(getDoc(doc(db(ANNE), "courses/c1/lessons/l2")));

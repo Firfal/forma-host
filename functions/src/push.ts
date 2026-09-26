@@ -1,3 +1,4 @@
+import { Timestamp } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 import { MAX_PUSH_DEVICES, pushData, type PushData, type PushTokenDoc } from "@shared/push";
 import { paths } from "@shared/paths";
@@ -51,6 +52,18 @@ export const fakePushSender: PushSender = {
     return outcomes;
   },
 };
+
+/** Notification créée, ou réémise avec une nouvelle date (le simple « lu » ne renvoie rien). */
+export function isNewNotification(
+  before: Pick<NotificationDoc, "createdAt"> | undefined,
+  after: Pick<NotificationDoc, "createdAt" | "read">,
+): boolean {
+  if (after.read) return false;
+  if (!before) return true;
+  const date = (value: unknown) =>
+    value instanceof Timestamp ? value.toMillis() : value == null ? null : String(value);
+  return date(before.createdAt) !== date(after.createdAt);
+}
 
 /** Envoie une notification in-app sur les appareils de la personne, puis oublie les tokens périmés. */
 export async function pushNotification(

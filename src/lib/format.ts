@@ -12,6 +12,14 @@ const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", {
   minute: "2-digit",
 });
 
+const timeFormatter = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+/** Heure seule : « 17:17 ». */
+export function formatTime(value: TimestampLike | Date | null | undefined): string {
+  const date = toDate(value);
+  return date ? timeFormatter.format(date) : "—";
+}
+
 export function toDate(value: TimestampLike | Date | null | undefined): Date | null {
   if (!value) return null;
   return value instanceof Date ? value : value.toDate();
