@@ -6,8 +6,9 @@ name: Déploiement Firebase
 # Accès au projet sans clé (Workload Identity Federation) : lancer une fois
 # scripts/setup-github-deploy.sh dans Cloud Shell, puis renseigner PROJECT_NUMBER ci-dessous.
 #
-# Secret GitHub optionnel (Settings > Secrets and variables > Actions) :
+# Secrets GitHub optionnels (Settings > Secrets and variables > Actions) :
 #   VIMEO_ACCESS_TOKEN   token personnel Vimeo, scope « private »
+#   STRIPE_SECRET_KEY    clé secrète Stripe de la plateforme (Connect activé) : active les paiements
 # L'envoi des emails se configure dans l'application (Admin > Paramètres).
 
 on:
@@ -104,6 +105,7 @@ jobs:
         if: ${{ !inputs.accounts_only }}
         env:
           VIMEO_ACCESS_TOKEN: ${{ secrets.VIMEO_ACCESS_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           PLATFORM_DOMAIN: ${{ inputs.platform_domain }}
         run: |
           npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID" \
@@ -133,6 +135,8 @@ jobs:
 
       - name: Migrations de données
         if: ${{ !inputs.accounts_only }}
+        env:
+          PAYMENTS_ENABLED: ${{ secrets.STRIPE_SECRET_KEY != '' }}
         run: npx tsx scripts/migrate.ts --project "$PROJECT_ID"
 
       - name: App Hosting (backend)

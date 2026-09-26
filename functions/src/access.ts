@@ -34,6 +34,8 @@ export interface GrantAccessParams {
   source: EnrollmentSource;
   sendEmail: boolean;
   appUrl: string;
+  /** Achat Stripe (id de la session Checkout). */
+  orderId?: string | null;
 }
 
 export function newInviteToken(): string {
@@ -145,7 +147,7 @@ async function grantOne(
         email: student.email,
         displayName: student.name || user.displayName || null,
         source: params.source,
-        orderId: null,
+        orderId: params.orderId ?? null,
         status: "active",
         joinedAt,
         progress: { completedLessonIds: [], lastLessonId: null, lastActivityAt: null },

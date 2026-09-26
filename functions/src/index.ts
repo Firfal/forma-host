@@ -1,6 +1,7 @@
 import "./setup";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
+import Stripe from "stripe";
 import { logger } from "firebase-functions";
 import {
   acceptInviteInput,
@@ -17,6 +18,7 @@ import {
 } from "@shared/creator-requests";
 import { schoolDomainInput } from "@shared/domains";
 import { mailSettingsInput } from "@shared/mail-settings";
+import { createCheckoutInput, promoCodeIdInput, promoCodeInput } from "@shared/payments";
 import { inviteSchoolAdminInput, removeSchoolAdminInput } from "@shared/school";
 import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";
@@ -42,7 +44,29 @@ import {
   recordSendResult,
   saveMailSettings as saveMailSettingsImpl,
 } from "./mail-settings";
-import { APP_URL, SETTINGS_ENCRYPTION_KEY, VIMEO_ACCESS_TOKEN, settingsKey } from "./params";
+import {
+  APP_URL,
+  SETTINGS_ENCRYPTION_KEY,
+  STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET,
+  VIMEO_ACCESS_TOKEN,
+  settingsKey,
+  stripeKey,
+} from "./params";
+import {
+  completeCheckout,
+  connectStripe as connectStripeImpl,
+  createCheckout,
+  createPromoCode as createPromoCodeImpl,
+  deactivatePromoCode as deactivatePromoCodeImpl,
+  fakePaymentsClient,
+  paymentErrorMessage,
+  refreshStripeAccount,
+  refundOrder,
+  stripeClient,
+  syncPromoCodes as syncPromoCodesImpl,
+  type PaymentsClient,
+} from "./payments";
 import { handleNewComment } from "./comments";
 import {
   approveCreatorRequest as approveCreatorRequestImpl,
@@ -453,3 +477,212 @@ export const rejectCreatorRequest = onCall(async (request) => {
   }
   return { ok: true };
 });
+
+// Stripe simulé dans les émulateurs (STRIPE_FAKE=true) : aucun appel réel, paiement immédiat.
+const fakePayments =
+  process.env.FUNCTIONS_EMULATOR === "true" && process.env.STRIPE_FAKE === "true";
+
+function paymentsClient(): PaymentsClient {
+  if (fakePayments) return fakePaymentsClient();
+  const key = stripeKey();
+  if (!key) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Les paiements ne sont pas encore activés sur la plateforme.",
+    );
+  }
+  return stripeClient(key);
+}
+
+function paymentError(error: unknown): never {
+  if (error instanceof HttpsError) throw error;
+  logger.warn("paiement", error);
+  throw new HttpsError("failed-precondition", paymentErrorMessage(error));
+}
+
+const appUrlFor = (schoolId: string) => schoolBaseUrl(schoolId, APP_URL.value());
+
+/** Relie le compte Stripe de l'école (propriétaire) : retourne le lien d'onboarding Stripe. */
+export const connectStripe = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const caller = await requireSchoolOwner(request);
+  const email = await callerEmail(caller);
+  try {
+    const url = await connectStripeImpl({
+      schoolId: caller.uid,
+      email,
+      appUrl: await appUrlFor(caller.uid),
+      client: paymentsClient(),
+    });
+    return { url };
+  } catch (error) {
+    paymentError(error);
+  }
+});
+
+/** Relit l'état du compte Stripe (retour de l'onboarding). */
+export const refreshStripeStatus = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const caller = await requireSchoolOwner(request);
+  try {
+    const stripe = await refreshStripeAccount(caller.uid, paymentsClient());
+    return { chargesEnabled: stripe?.chargesEnabled ?? false };
+  } catch (error) {
+    paymentError(error);
+  }
+});
+
+/** Paiement d'une formation (visiteur ou élève connecté) : URL de la page de paiement Stripe. */
+export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const input = parseInput(createCheckoutInput, request.data);
+  const email = request.auth?.token.email ?? null;
+  try {
+    const client = paymentsClient();
+    const course = (await db().doc(`courses/${input.courseId}`).get()).data() as
+      { creatorId: string } | undefined;
+    const appUrl = course ? await appUrlFor(course.creatorId) : APP_URL.value();
+    const session = await createCheckout({ courseId: input.courseId, email, appUrl, client });
+    if (fakePayments && course) {
+      // Émulateurs : paiement simulé, validé tout de suite (le webhook ne passe pas).
+      const stripe = (await db().doc(`creators/${course.creatorId}/private/stripe`).get()).data();
+      await completeCheckout(
+        {
+          sessionId: session.id,
+          accountId: stripe?.accountId,
+          courseId: input.courseId,
+          email: email ?? "acheteur@exemple.fr",
+          name: null,
+          amount: 0,
+          currency: "eur",
+          paymentIntentId: `pi_${session.id}`,
+          promoCode: null,
+        },
+        appUrlFor,
+      );
+    }
+    return { url: session.url };
+  } catch (error) {
+    paymentError(error);
+  }
+});
+
+export const createPromoCode = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const input = parseInput(promoCodeInput, request.data);
+  await requireCourseAdmin(request, input.courseId);
+  try {
+    return { id: await createPromoCodeImpl(input, paymentsClient()) };
+  } catch (error) {
+    paymentError(error);
+  }
+});
+
+/** Met à jour le nombre d'utilisations des codes promo de la formation. */
+export const syncPromoCodes = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const input = parseInput(courseIdInput, request.data);
+  await requireCourseAdmin(request, input.courseId);
+  try {
+    await syncPromoCodesImpl(input.courseId, paymentsClient());
+  } catch (error) {
+    paymentError(error);
+  }
+  return { ok: true };
+});
+
+export const deactivatePromoCode = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const input = parseInput(promoCodeIdInput, request.data);
+  await requireCourseAdmin(request, input.courseId);
+  try {
+    await deactivatePromoCodeImpl(input.courseId, input.promoId, paymentsClient());
+  } catch (error) {
+    paymentError(error);
+  }
+  return { ok: true };
+});
+
+/**
+ * Webhook Stripe Connect (créé par bootstrap-firebase.ts) : paiement réussi → accès ;
+ * compte mis à jour → état du compte ; remboursement total → accès retiré.
+ */
+export const stripeWebhook = onRequest(
+  { secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] },
+  async (req, res) => {
+    const key = stripeKey();
+    let secret = "";
+    try {
+      secret = STRIPE_WEBHOOK_SECRET.value();
+    } catch {
+      secret = "";
+    }
+    if (!key || !secret || secret === "unset") {
+      res.status(503).send("Paiements non activés");
+      return;
+    }
+    let event: Stripe.Event;
+    try {
+      event = new Stripe(key).webhooks.constructEvent(
+        req.rawBody,
+        req.headers["stripe-signature"] as string,
+        secret,
+      );
+    } catch {
+      res.status(400).send("Signature invalide");
+      return;
+    }
+    try {
+      switch (event.type) {
+        case "checkout.session.completed":
+        case "checkout.session.async_payment_succeeded": {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const email = session.customer_details?.email;
+          const courseId = session.metadata?.courseId;
+          if (session.payment_status !== "paid" || !event.account || !email || !courseId) break;
+          await completeCheckout(
+            {
+              sessionId: session.id,
+              accountId: event.account,
+              courseId,
+              email,
+              name: session.customer_details?.name ?? null,
+              amount: session.amount_total ?? 0,
+              currency: session.currency ?? "eur",
+              paymentIntentId:
+                typeof session.payment_intent === "string"
+                  ? session.payment_intent
+                  : (session.payment_intent?.id ?? null),
+              promoCode: null,
+            },
+            appUrlFor,
+          );
+          break;
+        }
+        case "account.updated": {
+          const account = event.data.object as Stripe.Account;
+          const mapping = (await db().doc(`stripeAccounts/${account.id}`).get()).data() as
+            { schoolId: string } | undefined;
+          if (mapping) {
+            await db()
+              .doc(`creators/${mapping.schoolId}/private/stripe`)
+              .update({
+                chargesEnabled: Boolean(account.charges_enabled),
+                detailsSubmitted: Boolean(account.details_submitted),
+              });
+          }
+          break;
+        }
+        case "charge.refunded": {
+          const charge = event.data.object as Stripe.Charge;
+          const paymentIntent =
+            typeof charge.payment_intent === "string"
+              ? charge.payment_intent
+              : charge.payment_intent?.id;
+          if (charge.refunded && paymentIntent) await refundOrder(paymentIntent);
+          break;
+        }
+        default:
+          break;
+      }
+      res.status(200).send("ok");
+    } catch (error) {
+      logger.error("stripeWebhook", event.type, error);
+      res.status(500).send("Erreur");
+    }
+  },
+);

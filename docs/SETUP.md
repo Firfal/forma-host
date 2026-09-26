@@ -93,7 +93,23 @@ L'envoi se configure **dans l'application**, par chaque formateur : *Admin > Par
 2. *Actions > Déploiement Firebase > Run workflow* avec `platform_domain` (ex. `formahost.fr`). Le résumé du workflow liste les enregistrements DNS à créer.
 3. Une fois le domaine actif, mettre l'adresse dans `apphosting.yaml` (`NEXT_PUBLIC_APP_URL`) et `functions/.env.forma-host` (`APP_URL`), puis relancer le déploiement.
 
-## 5. Migration depuis Podia
+## 5. Paiements (Stripe Connect)
+
+Chaque école encaisse sur **son propre compte Stripe** : 0 % de commission pour la plateforme, seuls les frais Stripe s'appliquent. L'accès à la formation est donné automatiquement après paiement.
+
+**Une seule fois, pour la plateforme** :
+
+1. Crée un compte Stripe au nom de la plateforme, puis active **Connect** (*Tableau de bord > Connect > Commencer*, modèle « plateforme »).
+2. Ajoute le secret GitHub `STRIPE_SECRET_KEY`. Utilise la clé secrète `sk_test_…` pour tester, `sk_live_…` en production.
+3. Relance le déploiement. Il crée automatiquement le webhook Stripe Connect (et stocke son secret) et active les paiements.
+
+**Pour chaque formateur** :
+
+1. *Paramètres > Paiements > Connecter mon compte Stripe*, puis compléter l'inscription Stripe (identité, IBAN).
+2. Dans une formation, onglet *Vente* : fixer le prix, puis créer des codes promo (%, montant, nombre d'utilisations, expiration). Les élèves saisissent le code sur la page de paiement Stripe.
+3. Le bouton de la page de vente devient « … — 197 € ». Les ventes s'affichent dans l'onglet *Vente*. Un remboursement total depuis Stripe retire l'accès.
+
+## 6. Migration depuis Podia
 
 1. Ré-uploade les vidéos sur Vimeo (télécharge les originaux depuis Podia si besoin).
 2. Recrée la formation, les chapitres et les leçons dans *Admin > Formations*.

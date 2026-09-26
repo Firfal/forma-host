@@ -15,6 +15,7 @@ import type {
 } from "@shared/creator-requests";
 import type { SchoolDomain, SchoolDomainInput } from "@shared/domains";
 import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
+import type { CreateCheckoutInput, PromoCodeIdInput, PromoCodeInput } from "@shared/payments";
 import type {
   InviteSchoolAdminInput,
   RemoveSchoolAdminInput,
@@ -63,6 +64,18 @@ export const callApproveCreatorRequest = callable<ApproveCreatorRequestInput, { 
 );
 export const callRejectCreatorRequest = callable<RejectCreatorRequestInput, { ok: true }>(
   "rejectCreatorRequest",
+);
+export const callConnectStripe = callable<void, { url: string }>("connectStripe");
+export const callRefreshStripeStatus = callable<void, { chargesEnabled: boolean }>(
+  "refreshStripeStatus",
+);
+export const callCreateCheckoutSession = callable<CreateCheckoutInput, { url: string }>(
+  "createCheckoutSession",
+);
+export const callCreatePromoCode = callable<PromoCodeInput, { id: string }>("createPromoCode");
+export const callSyncPromoCodes = callable<CourseIdInput, { ok: true }>("syncPromoCodes");
+export const callDeactivatePromoCode = callable<PromoCodeIdInput, { ok: true }>(
+  "deactivatePromoCode",
 );
 export const callUpdateSchoolProfile = callable<SchoolProfileInput, { ok: true }>(
   "updateSchoolProfile",

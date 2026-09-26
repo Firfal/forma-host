@@ -23,3 +23,19 @@ export function settingsKey(): Buffer {
   if (!raw && process.env.FUNCTIONS_EMULATOR === "true") raw = EMULATOR_KEY;
   return parseKey(raw);
 }
+
+/** Clé secrète Stripe de la plateforme (« unset » tant que les paiements ne sont pas activés). */
+export const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
+
+/** Secret de signature du webhook Connect, créé par bootstrap-firebase.ts. */
+export const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
+
+/** Clé Stripe utilisable, ou null (paiements non activés sur la plateforme). */
+export function stripeKey(): string | null {
+  try {
+    const key = STRIPE_SECRET_KEY.value();
+    return key && key !== "unset" ? key : null;
+  } catch {
+    return null;
+  }
+}

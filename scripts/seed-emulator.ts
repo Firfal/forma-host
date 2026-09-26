@@ -92,6 +92,8 @@ async function main() {
   const theoUser = await auth.getUser(theo);
   await auth.setCustomUserClaims(theo, { ...(theoUser.customClaims ?? {}), platformAdmin: true });
   await db.doc(`platformAdmins/${theo}`).set({ email: "theo@ecolemotion.com" });
+  // Paiements simulés en local (STRIPE_FAKE) : activés sur la plateforme.
+  await db.doc("platform/settings").set({ paymentsEnabled: true });
 
   const courseId = "after-effects";
   const items: OutlineItem[] = [];

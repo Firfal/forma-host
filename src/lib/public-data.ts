@@ -66,3 +66,12 @@ export async function getPreviewVideo(course: PublicCourse) {
   const lesson = snap.data() as LessonDoc | undefined;
   return lesson?.video ? { lessonTitle: preview.title, video: lesson.video } : null;
 }
+
+/** Vente directe possible : paiements activés sur la plateforme et compte Stripe de l'école actif. */
+export async function isCheckoutAvailable(creatorId: string): Promise<boolean> {
+  const [platform, stripe] = await Promise.all([
+    adminDb.doc("platform/settings").get(),
+    adminDb.doc(`creators/${creatorId}/private/stripe`).get(),
+  ]);
+  return Boolean(platform.data()?.paymentsEnabled && stripe.data()?.chargesEnabled);
+}

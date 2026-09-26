@@ -27,6 +27,7 @@ export const RESERVED_SLUGS = new Set([
   "devenir-formateur",
   "formations",
   "inscription",
+  "merci",
   "mot-de-passe-oublie",
   "notifications",
   "plateforme",

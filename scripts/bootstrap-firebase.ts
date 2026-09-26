@@ -286,6 +286,91 @@ async function ensureEncryptionKey() {
   ok(`Secret ${name} créé (clé aléatoire)`);
 }
 
+const secretsBase = () => `https://secretmanager.googleapis.com/v1/projects/${PROJECT}/secrets`;
+
+/** Dernière valeur d'un secret (null s'il n'existe pas ou n'a pas de version). */
+async function readSecret(name: string): Promise<string | null> {
+  const version = await api<{ payload?: { data?: string } }>(
+    "GET",
+    `${secretsBase()}/${name}/versions/latest:access`,
+    undefined,
+    { allow404: true },
+  );
+  return version?.payload?.data ? Buffer.from(version.payload.data, "base64").toString() : null;
+}
+
+/** Crée le secret si besoin et y écrit `value` (ou « unset » si le secret n'a aucune valeur). */
+async function writeSecret(name: string, value: string | null): Promise<void> {
+  const existing = await api("GET", `${secretsBase()}/${name}`, undefined, { allow404: true });
+  if (!existing) {
+    await api("POST", `${secretsBase()}?secretId=${name}`, {
+      replication: { automatic: {} },
+      labels: { "firebase-managed": "true" },
+    });
+  }
+  const current = await readSecret(name);
+  const next = value ?? (current === null ? "unset" : null);
+  if (next === null || next === current) return;
+  await api("POST", `${secretsBase()}/${name}:addVersion`, {
+    payload: { data: Buffer.from(next).toString("base64") },
+  });
+}
+
+async function stripeApi<T>(key: string, method: string, path: string, form?: URLSearchParams) {
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form?.toString(),
+  });
+  const body = (await response.json()) as T & { error?: { message?: string } };
+  if (!response.ok) throw new Error(`Stripe ${response.status} : ${body.error?.message ?? ""}`);
+  return body;
+}
+
+/**
+ * Paiements (Stripe Connect) : clé secrète de la plateforme (secret GitHub STRIPE_SECRET_KEY)
+ * et webhook Connect vers la fonction stripeWebhook, dont le secret de signature est stocké
+ * dans Secret Manager. Sans clé, les secrets valent « unset » et les paiements sont désactivés.
+ */
+async function ensureStripe() {
+  const key = process.env.STRIPE_SECRET_KEY?.trim() || null;
+  await writeSecret("STRIPE_SECRET_KEY", key);
+  if (!key) {
+    await writeSecret("STRIPE_WEBHOOK_SECRET", null);
+    info("Paiements : pas de clé Stripe (secret GitHub STRIPE_SECRET_KEY), paiements désactivés");
+    return;
+  }
+  const url = `https://${REGION}-${PROJECT}.cloudfunctions.net/stripeWebhook`;
+  const endpoints = await stripeApi<{ data: { id: string; url: string }[] }>(
+    key,
+    "GET",
+    "webhook_endpoints?limit=100",
+  );
+  const found = endpoints.data.find((endpoint) => endpoint.url === url);
+  const current = await readSecret("STRIPE_WEBHOOK_SECRET");
+  if (found && current && current !== "unset") {
+    ok("Paiements : clé Stripe et webhook Connect en place");
+    return;
+  }
+  // Le secret de signature n'est lisible qu'à la création : on recrée le webhook.
+  if (found) await stripeApi(key, "DELETE", `webhook_endpoints/${found.id}`);
+  const form = new URLSearchParams({ url, connect: "true", description: "Forma Host (Connect)" });
+  for (const event of [
+    "checkout.session.completed",
+    "checkout.session.async_payment_succeeded",
+    "account.updated",
+    "charge.refunded",
+  ]) {
+    form.append("enabled_events[]", event);
+  }
+  const endpoint = await stripeApi<{ secret: string }>(key, "POST", "webhook_endpoints", form);
+  await writeSecret("STRIPE_WEBHOOK_SECRET", endpoint.secret);
+  ok("Paiements : webhook Stripe Connect créé");
+}
+
 type IamPolicy = { bindings?: { role: string; members: string[] }[]; etag?: string };
 
 /** Ajoute un rôle IAM au niveau du projet (idempotent). */
@@ -404,6 +489,7 @@ async function main() {
   await ensureStorage();
   await ensureVimeoSecret();
   await ensureEncryptionKey();
+  await ensureStripe();
   await grantAppHostingFirestoreAccess();
   await grantFunctionsDomainAccess();
   await ensurePlatformDomain();

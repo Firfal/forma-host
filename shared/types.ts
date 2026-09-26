@@ -4,6 +4,7 @@
  */
 
 import type { SchoolDomain } from "./domains";
+import type { CoursePrice } from "./payments";
 
 export interface TimestampLike {
   toMillis(): number;
@@ -70,6 +71,8 @@ export interface CourseDoc<T = TimestampLike> {
   items: OutlineItem[];
   outlineVersion: number;
   salesPage: SalesPage | null;
+  /** Prix de vente (paiement Stripe) ; null : pas de vente directe. */
+  price?: CoursePrice | null;
   createdAt: T;
   updatedAt: T;
 }

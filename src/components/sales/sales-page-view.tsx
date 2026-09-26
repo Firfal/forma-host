@@ -1,12 +1,14 @@
 import { ArrowRight, CheckCircle2, ChevronDown, Clock, PlayCircle, Unlock } from "lucide-react";
 import type { CSSProperties } from "react";
 import { formatDuration, groupByChapter, visibleLessons } from "@shared/outline";
+import { formatPrice, type CoursePrice } from "@shared/payments";
 import { routes } from "@shared/paths";
 import type { CourseDoc, CreatorDoc, SalesPage, VimeoVideo } from "@shared/types";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
 import { RichText } from "@/components/editor/rich-text";
 import { LogoMark } from "@/components/logo";
 import { VimeoPlayer } from "@/components/video/vimeo-player";
+import { BuyButton } from "./buy-button";
 
 export interface SalesPageViewProps {
   course: CourseDoc & { id: string };
@@ -14,33 +16,52 @@ export interface SalesPageViewProps {
   page: SalesPage;
   ctaUrl: string | null;
   preview: { lessonTitle: string; video: VimeoVideo } | null;
+  /** Vente directe (prix + compte Stripe actif) : bouton d'achat au lieu du lien. */
+  checkout: { price: CoursePrice } | null;
 }
+
+const ctaClass =
+  "inline-flex items-center gap-2 rounded-full bg-[var(--brand)] px-7 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-[var(--brand)]/25 transition hover:brightness-110 disabled:opacity-70";
 
 function CtaButton({
   page,
   ctaUrl,
   courseId,
+  checkout,
 }: {
   page: SalesPage;
   ctaUrl: string | null;
   courseId: string;
+  checkout: { price: CoursePrice } | null;
 }) {
   const href = ctaUrl ?? routes.course(courseId);
   return (
     <div className="flex flex-col items-center gap-2">
-      <a
-        href={href}
-        className="inline-flex items-center gap-2 rounded-full bg-[var(--brand)] px-7 py-3.5 text-[15px] font-semibold text-white shadow-lg shadow-[var(--brand)]/25 transition hover:brightness-110"
-      >
-        {page.ctaLabel} <ArrowRight className="size-4" />
-      </a>
+      {checkout ? (
+        <BuyButton
+          courseId={courseId}
+          label={`${page.ctaLabel} — ${formatPrice(checkout.price.amount)}`}
+          className={ctaClass}
+        />
+      ) : (
+        <a href={href} className={ctaClass}>
+          {page.ctaLabel} <ArrowRight className="size-4" />
+        </a>
+      )}
       {page.priceLabel ? <p className="text-[13px] text-muted">{page.priceLabel}</p> : null}
     </div>
   );
 }
 
 /** Page de vente publique : un modèle fixe, dans l'esprit des landing pages de la maquette. */
-export function SalesPageView({ course, creator, page, ctaUrl, preview }: SalesPageViewProps) {
+export function SalesPageView({
+  course,
+  creator,
+  page,
+  ctaUrl,
+  preview,
+  checkout,
+}: SalesPageViewProps) {
   const lessons = visibleLessons(course.items);
   const chapters = groupByChapter(course.items);
   const totalSeconds = lessons.reduce((sum, lesson) => sum + (lesson.durationSec ?? 0), 0);
@@ -82,7 +103,7 @@ export function SalesPageView({ course, creator, page, ctaUrl, preview }: SalesP
           </p>
         ) : null}
         <div className="mt-8">
-          <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} />
+          <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} checkout={checkout} />
         </div>
         <div className="mx-auto mt-10 max-w-3xl overflow-hidden rounded-xl border border-line shadow-xl shadow-black/5">
           {preview ? (
@@ -171,7 +192,7 @@ export function SalesPageView({ course, creator, page, ctaUrl, preview }: SalesP
           ))}
         </ol>
         <div className="mt-10">
-          <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} />
+          <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} checkout={checkout} />
         </div>
       </section>
 
@@ -226,7 +247,7 @@ export function SalesPageView({ course, creator, page, ctaUrl, preview }: SalesP
             ))}
           </div>
           <div className="mt-10">
-            <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} />
+            <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} checkout={checkout} />
           </div>
         </section>
       ) : null}

@@ -17,6 +17,7 @@ const tabs = [
   { segment: "contenu", label: "Contenu", href: routes.adminCourseContent },
   { segment: "details", label: "Détails", href: routes.adminCourseDetails },
   { segment: "page-de-vente", label: "Page de vente", href: routes.adminCourseSalesPage },
+  { segment: "vente", label: "Vente", href: routes.adminCourseSales },
 ] as const;
 
 function CourseShell({ courseId, children }: { courseId: string; children: ReactNode }) {

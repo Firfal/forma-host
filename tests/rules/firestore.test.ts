@@ -335,6 +335,42 @@ describe("demandes d'espace formateur", () => {
   });
 });
 
+describe("paiements", () => {
+  it("prix de la formation : centimes en euros, bornés", async () => {
+    const ref = doc(creatorDb(), "courses/c1");
+    await assertSucceeds(
+      updateDoc(ref, { price: { amount: 19700, currency: "eur" }, updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(updateDoc(ref, { price: null, updatedAt: serverTimestamp() }));
+    await assertFails(
+      updateDoc(ref, { price: { amount: 50, currency: "eur" }, updatedAt: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(ref, { price: { amount: 19700, currency: "usd" }, updatedAt: serverTimestamp() }),
+    );
+  });
+
+  it("commandes, codes promo et compte Stripe : lecture équipe, écriture serveur", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      await setDoc(doc(admin, "orders/cs_1"), { schoolId: THEO, courseId: "c1", email: "a@b.c" });
+      await setDoc(doc(admin, "courses/c1/promoCodes/p1"), { code: "BIENVENUE" });
+      await setDoc(doc(admin, "courses/c1/private/stripe"), { productId: "prod_1" });
+    });
+    await assertSucceeds(getDoc(doc(coAdminDb(), "orders/cs_1")));
+    await assertFails(getDoc(doc(db(ANNE), "orders/cs_1")));
+    await assertFails(setDoc(doc(creatorDb(), "orders/cs_2"), { schoolId: THEO }));
+    await assertSucceeds(getDoc(doc(creatorDb(), "courses/c1/promoCodes/p1")));
+    await assertFails(setDoc(doc(creatorDb(), "courses/c1/promoCodes/p2"), { code: "X" }));
+    await assertFails(setDoc(doc(creatorDb(), "courses/c1/private/stripe"), { productId: "x" }));
+    await assertSucceeds(
+      setDoc(doc(creatorDb(), "courses/c1/private/settings"), { externalCtaUrl: null }),
+    );
+    await assertSucceeds(getDoc(doc(db(null), "platform/settings")));
+    await assertFails(setDoc(doc(creatorDb(), "platform/settings"), { paymentsEnabled: true }));
+  });
+});
+
 describe("leçons", () => {
   it("contenu protégé : inscrit actif ou formateur", async () => {
     await assertSucceeds(getDoc(doc(db(ANNE), "courses/c1/lessons/l2")));

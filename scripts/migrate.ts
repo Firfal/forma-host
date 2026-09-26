@@ -5,6 +5,7 @@
  *   npx tsx scripts/migrate.ts --emulators
  *
  * - Co-gestion : chaque école a sa fiche « owner », adminUids et les claims `schools`.
+ * - Paiements : platform/settings.paymentsEnabled (clé Stripe présente, PAYMENTS_ENABLED=true).
  */
 import { initAdmin, parseArgs } from "./admin";
 import { ensureSchoolOwner } from "./school-owner";
@@ -20,6 +21,10 @@ async function main() {
     }
   }
   console.log(`✔ ${projectId} : ${creators.size} école(s) à jour (équipe et droits).`);
+
+  const paymentsEnabled = process.env.PAYMENTS_ENABLED === "true";
+  await db.doc("platform/settings").set({ paymentsEnabled }, { merge: true });
+  console.log(`✔ Paiements ${paymentsEnabled ? "activés" : "désactivés"} sur la plateforme.`);
 }
 
 main().catch((error) => {

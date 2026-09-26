@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { PageContainer } from "@/components/layout/page";
 import { DomainSettingsCard } from "@/components/settings/domain-settings-card";
 import { MailSettingsCard } from "@/components/settings/mail-settings-card";
+import { PaymentsSettingsCard } from "@/components/settings/payments-settings-card";
 import { SchoolSettingsCard } from "@/components/settings/school-settings-card";
 import { TeamSettingsCard } from "@/components/settings/team-settings-card";
 import { VimeoSettingsCard } from "@/components/settings/vimeo-settings-card";
@@ -21,6 +23,10 @@ export default function SettingsPage() {
           <>
             <TeamSettingsCard />
             <DomainSettingsCard />
+            {/* useSearchParams (retour de Stripe) : rendu côté client uniquement. */}
+            <Suspense fallback={null}>
+              <PaymentsSettingsCard />
+            </Suspense>
             <MailSettingsCard />
             <VimeoSettingsCard />
           </>

@@ -138,8 +138,9 @@ service cloud.firestore {
     function isValidCourse(data) {
       return data.keys().hasOnly([
           'creatorId', 'title', 'slug', 'description', 'summary', 'thumbnailUrl', 'status',
-          'visibility', 'commentsMode', 'items', 'outlineVersion', 'salesPage',
+          'visibility', 'commentsMode', 'items', 'outlineVersion', 'salesPage', 'price',
           'createdAt', 'updatedAt'])
+        && isValidPrice(data.get('price', null))
         && isShortString(data.title, 1, 200)
         && data.slug is string && data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
         && data.summary is string && data.summary.size() <= 500
@@ -150,6 +151,15 @@ service cloud.firestore {
         && data.items is list && data.items.size() <= 500
         && data.outlineVersion is int
         && data.updatedAt == request.time;
+    }
+
+    // Prix en centimes (1 € à 10 000 €), paiement Stripe.
+    function isValidPrice(price) {
+      return price == null
+        || (price is map
+            && price.keys().hasOnly(['amount', 'currency'])
+            && price.amount is int && price.amount >= 100 && price.amount <= 1000000
+            && price.currency == 'eur');
     }
 
     match /courses/{courseId} {
@@ -175,9 +185,17 @@ service cloud.firestore {
       allow delete: if isSchoolAdmin(resource.data.creatorId)
         && resource.data.status == 'draft';
 
-      // Réglages privés du formateur (modèle d'email, lien de paiement externe).
+      // Réglages privés du formateur (modèle d'email, lien de paiement externe) ;
+      // private/stripe (produit Stripe) est écrit par les Functions.
       match /private/{docId} {
-        allow read, write: if isCourseAdmin(courseId);
+        allow read: if isCourseAdmin(courseId);
+        allow write: if docId == 'settings' && isCourseAdmin(courseId);
+      }
+
+      // Codes promo (miroir de Stripe), gérés par les Functions.
+      match /promoCodes/{promoId} {
+        allow read: if isCourseAdmin(courseId);
+        allow write: if false;
       }
 
       // Contenu protégé des leçons (vidéo, description, liens, pièces jointes).
@@ -286,6 +304,24 @@ service cloud.firestore {
 
     match /mail/{mailId} {
       allow read, write: if false;
+    }
+
+    // ---------- Paiements ----------
+
+    // Achats (webhook Stripe) : lus par l'équipe de l'école.
+    match /orders/{orderId} {
+      allow read: if isSchoolAdmin(resource.data.schoolId);
+      allow write: if false;
+    }
+
+    match /stripeAccounts/{accountId} {
+      allow read, write: if false;
+    }
+
+    // Réglages publics de la plateforme (paiements activés…), écrits au déploiement.
+    match /platform/{docId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // ---------- Demandes d'espace formateur ----------
