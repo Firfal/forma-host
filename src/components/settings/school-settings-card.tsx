@@ -13,10 +13,10 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { useCreator } from "@/lib/creator";
 import { callUpdateSchoolProfile, errorMessage } from "@/lib/firebase/callables";
+import { useSchool } from "@/lib/school";
 
 interface SchoolForm {
   name: string;
@@ -38,8 +38,8 @@ const appHost = (() => {
 
 /** Profil public de l'école : nom, adresse, logo, couleur, email de support. */
 export function SchoolSettingsCard() {
-  const { user } = useAuth();
-  const { data: creator, loading } = useCreator(user?.uid);
+  const { schoolId } = useSchool();
+  const { data: creator, loading } = useCreator(schoolId);
   const [form, setForm] = useState<SchoolForm | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
@@ -55,7 +55,7 @@ export function SchoolSettingsCard() {
     });
   }, [form, loading, creator]);
 
-  if (!form || !user) {
+  if (!form || !schoolId) {
     return (
       <Card>
         <CardBody className="space-y-3">
@@ -89,7 +89,7 @@ export function SchoolSettingsCard() {
     }
     setSaving(true);
     try {
-      await callUpdateSchoolProfile(parsed.data);
+      await callUpdateSchoolProfile({ ...parsed.data, schoolId });
       update("slug", parsed.data.slug);
       toast.success("École enregistrée");
     } catch (error) {
@@ -151,7 +151,7 @@ export function SchoolSettingsCard() {
             <ImageUpload
               value={form.logoUrl}
               onChange={(url) => update("logoUrl", url)}
-              pathFor={(fileName) => storagePaths.creatorLogo(user.uid, fileName)}
+              pathFor={(fileName) => storagePaths.creatorLogo(schoolId, fileName)}
               label="Choisir un logo"
               hint="Carré de préférence, PNG ou JPEG, 2 Mo max."
               maxMb={2}

@@ -21,10 +21,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/client";
 import { formatDate, memberSeniority, toDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
+import { useSchool } from "@/lib/school";
 
 interface Member {
   uid: string;
@@ -35,22 +35,22 @@ interface Member {
 }
 
 export default function MembersPage() {
-  const { user } = useAuth();
+  const { schoolId } = useSchool();
   const [search, setSearch] = useState("");
   const enrollmentsQuery = useMemo(
     () =>
-      user
+      schoolId
         ? query(
             collection(db, "enrollments"),
-            where("creatorId", "==", user.uid),
+            where("creatorId", "==", schoolId),
             orderBy("joinedAt", "desc"),
           )
         : null,
-    [user],
+    [schoolId],
   );
   const coursesQuery = useMemo(
-    () => (user ? query(collection(db, "courses"), where("creatorId", "==", user.uid)) : null),
-    [user],
+    () => (schoolId ? query(collection(db, "courses"), where("creatorId", "==", schoolId)) : null),
+    [schoolId],
   );
   const { data: enrollments, loading } = useQueryData<EnrollmentDoc>(enrollmentsQuery);
   const { data: courses } = useQueryData<CourseDoc>(coursesQuery);

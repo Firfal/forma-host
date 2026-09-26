@@ -10,12 +10,13 @@ export async function readInvite(token: string): Promise<InviteInfo> {
   const invite = snap.data() as InviteDoc<Timestamp> | undefined;
   assertUsable(invite);
   const [courseSnap, creatorSnap] = await Promise.all([
-    db().doc(`courses/${invite.courseId}`).get(),
+    invite.courseId ? db().doc(`courses/${invite.courseId}`).get() : null,
     db().doc(`creators/${invite.creatorId}`).get(),
   ]);
   return {
     email: invite.email,
-    courseTitle: (courseSnap.data() as CourseDoc | undefined)?.title ?? "",
+    // Invitation à co-gérer une école : pas de formation.
+    courseTitle: courseSnap ? ((courseSnap.data() as CourseDoc | undefined)?.title ?? "") : null,
     creatorName: (creatorSnap.data() as CreatorDoc | undefined)?.name ?? "",
   };
 }

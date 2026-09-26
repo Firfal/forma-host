@@ -11,6 +11,7 @@ import {
   resolveVimeoInput,
 } from "@shared/schemas";
 import { mailSettingsInput } from "@shared/mail-settings";
+import { inviteSchoolAdminInput, removeSchoolAdminInput } from "@shared/school";
 import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";
 import { enrollmentId, paths } from "@shared/paths";
@@ -18,7 +19,13 @@ import { emailLayout, escapeHtml } from "@shared/template";
 import type { CommentDoc, CoursePrivateSettings, CreatorDoc } from "@shared/types";
 import { grantAccessToStudents, resendAccessEmail } from "./access";
 import { auth, db } from "./db";
-import { parseInput, requireCourseOwner, requireCreator } from "./guards";
+import {
+  parseInput,
+  requireCourseAdmin,
+  requireCreator,
+  requireSchoolAdmin,
+  requireSchoolOwner,
+} from "./guards";
 import { acceptInvite as acceptInviteImpl, readInvite } from "./invites";
 import { brandFromCreator, buildWelcomeEmail } from "./mail";
 import { deliverMail, resendWaitingMail } from "./mail-delivery";
@@ -30,7 +37,12 @@ import {
 } from "./mail-settings";
 import { APP_URL, SETTINGS_ENCRYPTION_KEY, VIMEO_ACCESS_TOKEN, settingsKey } from "./params";
 import { handleNewComment } from "./comments";
-import { SchoolError, updateSchoolProfile as updateSchoolProfileImpl } from "./schools";
+import {
+  inviteSchoolAdmin as inviteSchoolAdminImpl,
+  removeSchoolAdmin as removeSchoolAdminImpl,
+  SchoolError,
+  updateSchoolProfile as updateSchoolProfileImpl,
+} from "./schools";
 import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
 import { resolveVimeo } from "./vimeo";
 import {
@@ -60,9 +72,8 @@ async function callerEmail(caller: { uid: string; email: string | null }): Promi
 
 /** Donne l'accès à une formation (invitation unitaire ou import CSV). */
 export const grantAccess = onCall({ timeoutSeconds: 300 }, async (request) => {
-  const caller = requireCreator(request);
   const input = parseInput(grantAccessInput, request.data);
-  const course = await requireCourseOwner(input.courseId, caller.uid);
+  const { course } = await requireCourseAdmin(request, input.courseId);
   return grantAccessToStudents({
     courseId: input.courseId,
     course,
@@ -75,9 +86,8 @@ export const grantAccess = onCall({ timeoutSeconds: 300 }, async (request) => {
 
 /** Retire l'accès (l'inscription est conservée, statut « revoked »). */
 export const revokeAccess = onCall(async (request) => {
-  const caller = requireCreator(request);
   const input = parseInput(courseStudentInput, request.data);
-  await requireCourseOwner(input.courseId, caller.uid);
+  await requireCourseAdmin(request, input.courseId);
   const ref = db().doc(`enrollments/${enrollmentId(input.courseId, input.uid)}`);
   if (!(await ref.get()).exists) throw new HttpsError("not-found", "Inscription introuvable");
   await ref.update({ status: "revoked" });
@@ -86,9 +96,8 @@ export const revokeAccess = onCall(async (request) => {
 
 /** Renvoie le mail d'accès (nouveau lien d'activation si le compte n'est pas activé). */
 export const resendInvite = onCall(async (request) => {
-  const caller = requireCreator(request);
   const input = parseInput(courseStudentInput, request.data);
-  const course = await requireCourseOwner(input.courseId, caller.uid);
+  const { course } = await requireCourseAdmin(request, input.courseId);
   try {
     await resendAccessEmail({
       courseId: input.courseId,
@@ -104,14 +113,13 @@ export const resendInvite = onCall(async (request) => {
 
 /** Envoie le mail de bienvenue de la formation au formateur, pour tester le modèle. */
 export const sendTestWelcomeEmail = onCall(async (request) => {
-  const caller = requireCreator(request);
   const input = parseInput(courseIdInput, request.data);
-  const course = await requireCourseOwner(input.courseId, caller.uid);
+  const { caller, course } = await requireCourseAdmin(request, input.courseId);
   const email = await callerEmail(caller);
   const [settingsSnap, creatorSnap, mailSettingsSnap] = await Promise.all([
     db().doc(`courses/${input.courseId}/private/settings`).get(),
-    db().doc(`creators/${caller.uid}`).get(),
-    db().doc(paths.creatorMailSettings(caller.uid)).get(),
+    db().doc(`creators/${course.creatorId}`).get(),
+    db().doc(paths.creatorMailSettings(course.creatorId)).get(),
   ]);
   if (!mailSettingsSnap.exists) {
     throw new HttpsError(
@@ -123,7 +131,7 @@ export const sendTestWelcomeEmail = onCall(async (request) => {
     .collection("mail")
     .add(
       buildWelcomeEmail({
-        creatorId: caller.uid,
+        creatorId: course.creatorId,
         to: email,
         studentName: "Prénom",
         courseTitle: course.title,
@@ -155,11 +163,9 @@ export const acceptInvite = onCall(async (request) => {
 export const resolveVimeoVideo = onCall(
   { secrets: [VIMEO_ACCESS_TOKEN, SETTINGS_ENCRYPTION_KEY] },
   async (request) => {
-    const caller = requireCreator(request);
     const input = parseInput(resolveVimeoInput, request.data);
-    const schoolId = input.schoolId ?? caller.uid;
-    if (schoolId !== caller.uid)
-      throw new HttpsError("permission-denied", "École d'un autre formateur");
+    const schoolId = input.schoolId ?? request.auth?.uid ?? "";
+    requireSchoolAdmin(request, schoolId);
     let token: string | null = null;
     try {
       token = await loadVimeoToken(schoolId, settingsKey);
@@ -183,7 +189,7 @@ export const resolveVimeoVideo = onCall(
 
 /** Relie un compte Vimeo à l'école : token vérifié auprès de Vimeo, puis chiffré. */
 export const saveVimeoSettings = onCall({ secrets: [SETTINGS_ENCRYPTION_KEY] }, async (request) => {
-  const caller = requireCreator(request);
+  const caller = await requireSchoolOwner(request);
   const input = parseInput(vimeoSettingsInput, request.data);
   try {
     return await saveVimeoSettingsImpl(caller.uid, input.token, {
@@ -199,7 +205,7 @@ export const saveVimeoSettings = onCall({ secrets: [SETTINGS_ENCRYPTION_KEY] }, 
 });
 
 export const deleteVimeoSettings = onCall(async (request) => {
-  const caller = requireCreator(request);
+  const caller = await requireSchoolOwner(request);
   await deleteVimeoSettingsImpl(caller.uid);
   return { ok: true };
 });
@@ -229,7 +235,7 @@ export const onCommentCreated = onDocumentCreated(
 export const saveMailSettings = onCall(
   { secrets: [SETTINGS_ENCRYPTION_KEY], timeoutSeconds: 300 },
   async (request) => {
-    const caller = requireCreator(request);
+    const caller = await requireSchoolOwner(request);
     const input = parseInput(mailSettingsInput, request.data);
     try {
       await saveMailSettingsImpl(caller.uid, input, mailDeps);
@@ -243,14 +249,14 @@ export const saveMailSettings = onCall(
 
 /** Désactive l'envoi des emails (les prochains restent en attente). */
 export const deleteMailSettings = onCall(async (request) => {
-  const caller = requireCreator(request);
+  const caller = await requireSchoolOwner(request);
   await deleteMailSettingsImpl(caller.uid);
   return { ok: true };
 });
 
 /** Envoie tout de suite un email de test au formateur avec ses réglages. */
 export const sendTestMail = onCall({ secrets: [SETTINGS_ENCRYPTION_KEY] }, async (request) => {
-  const caller = requireCreator(request);
+  const caller = await requireSchoolOwner(request);
   const email = await callerEmail(caller);
   const [config, creatorSnap] = await Promise.all([
     loadSmtpConfig(caller.uid, settingsKey),
@@ -295,10 +301,42 @@ export const onMailCreated = onDocumentCreated(
 
 /** Profil public de l'école : nom, adresse, logo, couleur, email de support. */
 export const updateSchoolProfile = onCall(async (request) => {
-  const caller = requireCreator(request);
   const input = parseInput(schoolProfileInput, request.data);
+  const schoolId = input.schoolId ?? request.auth?.uid ?? "";
+  requireSchoolAdmin(request, schoolId);
   try {
-    await updateSchoolProfileImpl(caller.uid, input);
+    await updateSchoolProfileImpl(schoolId, input);
+  } catch (error) {
+    if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
+    throw error;
+  }
+  return { ok: true };
+});
+
+/** Invite un co-administrateur dans l'équipe de l'école (propriétaire uniquement). */
+export const inviteSchoolAdmin = onCall(async (request) => {
+  const caller = await requireSchoolOwner(request);
+  const input = parseInput(inviteSchoolAdminInput, request.data);
+  const inviter = await auth().getUser(caller.uid);
+  try {
+    return await inviteSchoolAdminImpl({
+      schoolId: caller.uid,
+      email: input.email,
+      inviterName: inviter.displayName || inviter.email || "Le propriétaire",
+      appUrl: APP_URL.value(),
+    });
+  } catch (error) {
+    if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
+    throw error;
+  }
+});
+
+/** Retire un co-administrateur de l'équipe (propriétaire uniquement). */
+export const removeSchoolAdmin = onCall(async (request) => {
+  const caller = await requireSchoolOwner(request);
+  const input = parseInput(removeSchoolAdminInput, request.data);
+  try {
+    await removeSchoolAdminImpl(caller.uid, input.uid);
   } catch (error) {
     if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
     throw error;

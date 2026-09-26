@@ -2,7 +2,9 @@
 
 import {
   BookOpen,
+  Check,
   ChevronDown,
+  ChevronsUpDown,
   House,
   LayoutGrid,
   LogOut,
@@ -14,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
 import { routes } from "@shared/paths";
 import { LogoMark } from "@/components/logo";
@@ -31,6 +33,7 @@ import { useAuth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { cn } from "@/lib/cn";
 import { useCreator } from "@/lib/creator";
+import { useSchool, useSchoolDocs } from "@/lib/school";
 
 interface NavItem {
   href: string;
@@ -73,36 +76,80 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
   );
 }
 
-/** Formateur : nom et logo de son école ; élève : nom de la plateforme. */
+function SchoolLogo({ logoUrl, size }: { logoUrl: string | null | undefined; size: number }) {
+  return logoUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={logoUrl}
+      alt=""
+      className="shrink-0 rounded-md object-cover"
+      style={{ width: size, height: size }}
+    />
+  ) : (
+    <LogoMark size={size} />
+  );
+}
+
+/** Formateur : nom et logo de l'école active ; élève : nom de la plateforme. */
 function SidebarBrand({ size }: { size: number }) {
-  const { user, isCreator } = useAuth();
-  const { data: school } = useCreator(isCreator ? user?.uid : null);
+  const { isCreator } = useAuth();
+  const { schoolId } = useSchool();
+  const { data: school } = useCreator(isCreator ? schoolId : null);
   return (
     <>
-      {school?.logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={school.logoUrl}
-          alt=""
-          className="shrink-0 rounded-md object-cover"
-          style={{ width: size, height: size }}
-        />
-      ) : (
-        <LogoMark size={size} />
-      )}
+      <SchoolLogo logoUrl={school?.logoUrl} size={size} />
       <span className="truncate text-sm font-semibold">{school?.name ?? brand.name}</span>
     </>
   );
 }
 
+/** Sélecteur d'école, pour qui administre plusieurs écoles. */
+function SchoolSwitcher({ onNavigate }: { onNavigate: () => void }) {
+  const { schoolId, schools, setSchoolId } = useSchool();
+  const { data: docs } = useSchoolDocs(schools);
+  const router = useRouter();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-black/5"
+        aria-label="Changer d'école"
+      >
+        <SidebarBrand size={26} />
+        <ChevronsUpDown className="ml-auto size-3.5 shrink-0 text-muted" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {docs.map((school) => (
+          <DropdownMenuItem
+            key={school.id}
+            onSelect={() => {
+              setSchoolId(school.id);
+              onNavigate();
+              router.push(routes.admin);
+            }}
+          >
+            <SchoolLogo logoUrl={school.logoUrl} size={18} />
+            <span className="flex-1 truncate">{school.name}</span>
+            {school.id === schoolId ? <Check /> : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
   const { user, isCreator, signOut } = useAuth();
+  const { schools } = useSchool();
   const displayName = user?.displayName || user?.email || "";
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-3 pb-4 pt-4">
-        <SidebarBrand size={26} />
+        {isCreator && schools.length > 1 ? (
+          <SchoolSwitcher onNavigate={onNavigate} />
+        ) : (
+          <SidebarBrand size={26} />
+        )}
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-2" aria-label="Navigation principale">

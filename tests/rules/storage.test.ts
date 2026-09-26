@@ -56,6 +56,25 @@ describe("storage", () => {
     await assertFails(uploadBytes(ref(storage("anne"), path), PNG, { contentType: "image/png" }));
   });
 
+  it("un co-administrateur de l'école gère miniatures, pièces jointes et logo", async () => {
+    const coadmin = storage("quentin", { creator: true, schools: ["theo"] });
+    await assertSucceeds(
+      uploadBytes(ref(coadmin, "courses/c1/thumbnail/cover.png"), PNG, {
+        contentType: "image/png",
+      }),
+    );
+    await assertSucceeds(getBytes(ref(coadmin, "courses/c1/lessons/l1/attachments/projet.pdf")));
+    await assertSucceeds(
+      uploadBytes(ref(coadmin, "creators/theo/logo/logo.png"), PNG, { contentType: "image/png" }),
+    );
+    const removed = storage("quentin", { creator: true, schools: [] });
+    await assertFails(
+      uploadBytes(ref(removed, "courses/c1/thumbnail/cover.png"), PNG, {
+        contentType: "image/png",
+      }),
+    );
+  });
+
   it("la miniature doit être une image", async () => {
     await assertFails(
       uploadBytes(ref(storage("theo"), "courses/c1/thumbnail/x.pdf"), PDF, {

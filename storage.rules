@@ -8,9 +8,15 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function isCourseOwner(courseId) {
+    // Propriétaire de l'école ou co-administrateur (custom claim `schools`).
+    function isSchoolAdmin(schoolId) {
       return signedIn()
-        && firestore.get(/databases/(default)/documents/courses/$(courseId)).data.creatorId == request.auth.uid;
+        && (request.auth.uid == schoolId || schoolId in request.auth.token.get('schools', []));
+    }
+
+    function isCourseOwner(courseId) {
+      return isSchoolAdmin(
+        firestore.get(/databases/(default)/documents/courses/$(courseId)).data.creatorId);
     }
 
     function isEnrolled(courseId) {
@@ -47,7 +53,7 @@ service firebase.storage {
 
     match /creators/{creatorId}/logo/{fileName} {
       allow read: if true;
-      allow write: if signedIn() && request.auth.uid == creatorId
+      allow write: if isSchoolAdmin(creatorId)
         && request.auth.token.creator == true
         && (request.resource == null || isImage(2));
     }

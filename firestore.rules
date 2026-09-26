@@ -31,8 +31,15 @@ service cloud.firestore {
       return get(coursePath(courseId)).data;
     }
 
-    function isCourseOwner(courseId) {
-      return signedIn() && course(courseId).creatorId == request.auth.uid;
+    // Administrateur d'une école : son propriétaire (schoolId = uid du propriétaire) ou un
+    // co-administrateur (custom claim `schools`, posé par les Functions).
+    function isSchoolAdmin(schoolId) {
+      return signedIn()
+        && (request.auth.uid == schoolId || schoolId in request.auth.token.get('schools', []));
+    }
+
+    function isCourseAdmin(courseId) {
+      return isSchoolAdmin(course(courseId).creatorId);
     }
 
     function enrollmentPath(courseId) {
@@ -103,10 +110,15 @@ service cloud.firestore {
       // Profil modifié par la callable updateSchoolProfile (unicité de l'adresse publique).
       allow write: if false;
 
-      // Réglages d'envoi des emails : écrits par les Functions (connexion SMTP vérifiée),
-      // lus par le formateur pour afficher l'état de l'envoi.
+      // Réglages (emails, Vimeo) : écrits par les Functions, lus par l'équipe pour afficher leur état.
       match /private/{docId} {
-        allow read: if isUser(creatorId);
+        allow read: if isSchoolAdmin(creatorId);
+        allow write: if false;
+      }
+
+      // Équipe de l'école : gérée par les Functions (invitation, retrait).
+      match /members/{memberId} {
+        allow read: if isSchoolAdmin(creatorId);
         allow write: if false;
       }
 
@@ -138,57 +150,54 @@ service cloud.firestore {
     match /courses/{courseId} {
       // Publiée : visible par tous (page de vente). Dépublier ne coupe pas l'accès des inscrits.
       allow read: if resource.data.status == 'published'
-        || (signedIn() && resource.data.creatorId == request.auth.uid)
+        || isSchoolAdmin(resource.data.creatorId)
         || isEnrolled(courseId);
       allow create: if isCreator()
-        && request.resource.data.creatorId == request.auth.uid
+        && isSchoolAdmin(request.resource.data.creatorId)
+        && exists(/databases/$(database)/documents/creators/$(request.resource.data.creatorId))
         && isValidCourse(request.resource.data)
         && request.resource.data.outlineVersion == 0
         && request.resource.data.createdAt == request.time;
       // Le plan (items) est versionné : chaque écriture incrémente outlineVersion de 1,
       // ce qui empêche deux onglets de s'écraser mutuellement.
-      allow update: if signedIn()
-        && resource.data.creatorId == request.auth.uid
+      allow update: if isSchoolAdmin(resource.data.creatorId)
         && request.resource.data.creatorId == resource.data.creatorId
         && request.resource.data.createdAt == resource.data.createdAt
         && isValidCourse(request.resource.data)
         && (request.resource.data.outlineVersion == resource.data.outlineVersion
             ? request.resource.data.items == resource.data.items
             : request.resource.data.outlineVersion == resource.data.outlineVersion + 1);
-      allow delete: if signedIn()
-        && resource.data.creatorId == request.auth.uid
+      allow delete: if isSchoolAdmin(resource.data.creatorId)
         && resource.data.status == 'draft';
 
       // Réglages privés du formateur (modèle d'email, lien de paiement externe).
       match /private/{docId} {
-        allow read, write: if isCourseOwner(courseId);
+        allow read, write: if isCourseAdmin(courseId);
       }
 
       // Contenu protégé des leçons (vidéo, description, liens, pièces jointes).
       match /lessons/{lessonId} {
-        allow read: if (signedIn() && resource.data.creatorId == request.auth.uid)
+        allow read: if isSchoolAdmin(resource.data.creatorId)
           || isEnrolled(courseId)
           || (resource.data.isPreview == true && resource.data.courseStatus == 'published');
-        allow create: if signedIn()
-          && request.resource.data.creatorId == request.auth.uid
+        allow create: if isSchoolAdmin(request.resource.data.creatorId)
           && request.resource.data.courseId == courseId
-          && isCourseOwner(courseId)
+          && isCourseAdmin(courseId)
           && isValidLesson(request.resource.data);
-        allow update: if signedIn()
-          && resource.data.creatorId == request.auth.uid
-          && request.resource.data.creatorId == request.auth.uid
+        allow update: if isSchoolAdmin(resource.data.creatorId)
+          && request.resource.data.creatorId == resource.data.creatorId
           && request.resource.data.courseId == courseId
           && isValidLesson(request.resource.data);
-        allow delete: if signedIn() && resource.data.creatorId == request.auth.uid;
+        allow delete: if isSchoolAdmin(resource.data.creatorId);
       }
 
       // Commentaires (1 niveau de réponse).
       match /comments/{commentId} {
-        allow read: if (signedIn() && resource.data.creatorId == request.auth.uid)
+        allow read: if isSchoolAdmin(resource.data.creatorId)
           || (isEnrolled(courseId) && course(courseId).commentsMode != 'hidden');
         allow create: if signedIn()
           && isValidNewComment(courseId, request.resource.data)
-          && (isCourseOwner(courseId)
+          && (isCourseAdmin(courseId)
               || (isEnrolled(courseId) && course(courseId).commentsMode == 'active'));
         allow update: if signedIn()
           && resource.data.authorUid == request.auth.uid
@@ -197,7 +206,7 @@ service cloud.firestore {
           && request.resource.data.editedAt == request.time;
         allow delete: if signedIn()
           && (resource.data.authorUid == request.auth.uid
-              || resource.data.creatorId == request.auth.uid);
+              || isSchoolAdmin(resource.data.creatorId));
       }
     }
 
@@ -237,7 +246,7 @@ service cloud.firestore {
 
     // Page « Commentaires » du formateur : requête collection group filtrée sur creatorId.
     match /{path=**}/comments/{commentId} {
-      allow read: if signedIn() && resource.data.creatorId == request.auth.uid;
+      allow read: if isSchoolAdmin(resource.data.creatorId);
     }
 
     // ---------- Inscriptions ----------
@@ -246,7 +255,7 @@ service cloud.firestore {
     // L'élève met à jour sa progression, rien d'autre.
     match /enrollments/{enrollmentId} {
       allow read: if signedIn()
-        && (resource.data.uid == request.auth.uid || resource.data.creatorId == request.auth.uid);
+        && (resource.data.uid == request.auth.uid || isSchoolAdmin(resource.data.creatorId));
       allow update: if signedIn()
         && resource.data.uid == request.auth.uid
         && resource.data.status == 'active'

@@ -35,7 +35,8 @@ export type InviteTokenInput = z.infer<typeof inviteTokenInput>;
 
 export interface InviteInfo {
   email: string;
-  courseTitle: string;
+  /** Null pour une invitation à co-gérer une école. */
+  courseTitle: string | null;
   creatorName: string;
 }
 

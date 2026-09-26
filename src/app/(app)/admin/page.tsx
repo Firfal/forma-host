@@ -13,11 +13,11 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildActivity, groupByDay, type ActivityEvent } from "@/lib/activity";
-import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/client";
 import { toDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
 import { useMailSettings } from "@/lib/mail-settings";
+import { useSchool, useSchoolStaff } from "@/lib/school";
 
 const DAY = 86_400_000;
 
@@ -80,8 +80,8 @@ function ActivityLine({ event }: { event: ActivityEvent }) {
 }
 
 export default function AdminHomePage() {
-  const { user } = useAuth();
-  const uid = user?.uid;
+  const { schoolId: uid } = useSchool();
+  const staff = useSchoolStaff(uid);
   const enrollmentsQuery = useMemo(
     () => (uid ? query(collection(db, "enrollments"), where("creatorId", "==", uid)) : null),
     [uid],
@@ -131,15 +131,14 @@ export default function AdminHomePage() {
         ? Math.round((percents.reduce((a, b) => a + b, 0) / percents.length) * 100)
         : 0,
       comments: comments.filter(
-        (c) => c.authorUid !== uid && (toDate(c.createdAt)?.getTime() ?? 0) > now - 30 * DAY,
+        (c) => !staff.has(c.authorUid) && (toDate(c.createdAt)?.getTime() ?? 0) > now - 30 * DAY,
       ).length,
     };
-  }, [enrollments, courseMap, comments, uid]);
+  }, [enrollments, courseMap, comments, staff]);
 
   const activity = useMemo(
-    () =>
-      uid ? groupByDay(buildActivity(enrollments, comments, courseMap, { creatorId: uid })) : [],
-    [enrollments, comments, courseMap, uid],
+    () => (uid ? groupByDay(buildActivity(enrollments, comments, courseMap, { staff })) : []),
+    [enrollments, comments, courseMap, staff, uid],
   );
 
   return (

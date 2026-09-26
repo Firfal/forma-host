@@ -211,6 +211,48 @@ describe("invitations", () => {
   });
 });
 
+describe("équipe de l'école", () => {
+  it("notifie chaque administrateur : nouvel élève et commentaire d'élève", async () => {
+    await db()
+      .doc("creators/theo")
+      .update({ adminUids: ["theo", "quentin"] });
+    await db().doc("users/quentin").set({ email: "quentin@test.fr", notifyOnComment: false });
+    await grantAccessToStudents({
+      courseId: "c1",
+      course,
+      students: [{ email: "lea@test.fr" }],
+      source: "invite",
+      sendEmail: false,
+      appUrl: APP_URL,
+    });
+    const lea = await auth().getUserByEmail("lea@test.fr");
+    for (const admin of ["theo", "quentin"]) {
+      expect(
+        (await db().doc(`users/${admin}/notifications/student_c1_${lea.uid}`).get()).exists,
+      ).toBe(true);
+    }
+
+    // Réponse d'un co-administrateur : pas de notification « nouveau commentaire ».
+    await handleNewComment(
+      "c1",
+      "by-admin",
+      {
+        courseId: "c1",
+        creatorId: "theo",
+        lessonId: "l1",
+        authorUid: "quentin",
+        authorName: "Quentin",
+        authorAvatarUrl: null,
+        body: "Bonne question !",
+        parentId: null,
+        createdAt: Timestamp.now(),
+      },
+      APP_URL,
+    );
+    expect((await db().doc("users/theo/notifications/comment_by-admin").get()).exists).toBe(false);
+  });
+});
+
 describe("handleNewComment", () => {
   it("notifie le formateur, l'auteur du parent, et envoie l'email", async () => {
     await db()
@@ -238,7 +280,7 @@ describe("handleNewComment", () => {
       link: "/formations/c1/l1#comment-reply1",
     });
     expect((await db().doc("users/anne/notifications/reply_reply1").get()).exists).toBe(true);
-    expect((await db().doc("mail/comment_reply1").get()).data()?.to).toBe("theo@test.fr");
+    expect((await db().doc("mail/comment_reply1_theo").get()).data()?.to).toBe("theo@test.fr");
   });
 
   it("ne notifie pas le formateur de ses propres commentaires", async () => {

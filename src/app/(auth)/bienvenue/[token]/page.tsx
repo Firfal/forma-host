@@ -88,9 +88,18 @@ export default function WelcomePage() {
       <div>
         <h1 className="text-[15px] font-semibold">Bienvenue !</h1>
         <p className="mt-1 text-[13px] text-muted">
-          {invite.creatorName ? `${invite.creatorName} t'a donné accès à ` : "Tu as accès à "}
-          <strong className="text-ink">« {invite.courseTitle} »</strong>. Choisis un mot de passe
-          pour activer ton compte.
+          {invite.courseTitle === null ? (
+            <>
+              Tu rejoins l&apos;équipe de l&apos;école{" "}
+              <strong className="text-ink">« {invite.creatorName} »</strong>.
+            </>
+          ) : (
+            <>
+              {invite.creatorName ? `${invite.creatorName} t'a donné accès à ` : "Tu as accès à "}
+              <strong className="text-ink">« {invite.courseTitle} »</strong>.
+            </>
+          )}{" "}
+          Choisis un mot de passe pour activer ton compte.
         </p>
       </div>
       <Field label="Email" htmlFor="email">

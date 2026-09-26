@@ -287,7 +287,13 @@ export function CourseStudents({ course }: { course: CourseWithId }) {
               icon={<Users />}
               title="Aucun élève pour l'instant"
               description="Invite tes élèves par email ou importe l'export clients de Podia."
-              action={<GrantAccessDialog courseId={course.id} courseTitle={course.title} />}
+              action={
+                <GrantAccessDialog
+                  courseId={course.id}
+                  courseTitle={course.title}
+                  schoolId={course.creatorId}
+                />
+              }
             />
           </div>
         ) : (
@@ -363,7 +369,11 @@ export function CourseStudents({ course }: { course: CourseWithId }) {
       <div className="space-y-4">
         <Card>
           <CardBody className="space-y-2">
-            <GrantAccessDialog courseId={course.id} courseTitle={course.title} />
+            <GrantAccessDialog
+              courseId={course.id}
+              courseTitle={course.title}
+              schoolId={course.creatorId}
+            />
             <div>
               <WelcomeEmailDialog course={course} />
             </div>

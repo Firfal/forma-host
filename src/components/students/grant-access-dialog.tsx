@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/input";
-import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { callGrantAccess, errorMessage } from "@/lib/firebase/callables";
 import { useMailSettings } from "@/lib/mail-settings";
@@ -36,12 +35,13 @@ function summary(result: GrantAccessResult): string {
 export function GrantAccessDialog({
   courseId,
   courseTitle,
+  schoolId,
 }: {
   courseId: string;
   courseTitle: string;
+  schoolId: string;
 }) {
-  const { user } = useAuth();
-  const { data: mailSettings, loading: mailLoading } = useMailSettings(user?.uid);
+  const { data: mailSettings, loading: mailLoading } = useMailSettings(schoolId);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("invite");
   const [text, setText] = useState("");

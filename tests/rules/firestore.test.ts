@@ -41,6 +41,9 @@ function db(uid: string | null, claims: Record<string, unknown> = {}): Firestore
 }
 
 const creatorDb = () => db(THEO, { creator: true });
+const COADMIN = "quentin";
+/** Co-administrateur de l'école de Théo (custom claim `schools`). */
+const coAdminDb = () => db(COADMIN, { creator: true, schools: [THEO] });
 
 function courseData(overrides: Record<string, unknown> = {}) {
   return {
@@ -134,6 +137,7 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
     const admin = ctx.firestore();
+    await setDoc(doc(admin, "creators/theo"), { name: "Ecole Motion", slug: "ecole-motion" });
     await setDoc(doc(admin, "courses/c1"), courseData());
     await setDoc(doc(admin, "courses/draft"), courseData({ status: "draft" }));
     await setDoc(
@@ -216,6 +220,68 @@ describe("formations", () => {
       getDocs(query(collection(creatorDb(), "courses"), where("creatorId", "==", THEO))),
     );
     await assertFails(getDocs(collection(db(ANNE), "courses")));
+  });
+});
+
+describe("co-gestion d'une école", () => {
+  it("un co-administrateur gère les formations, leçons, élèves et commentaires", async () => {
+    const coadmin = coAdminDb();
+    await assertSucceeds(getDoc(doc(coadmin, "courses/draft")));
+    await assertSucceeds(
+      updateDoc(doc(coadmin, "courses/c1"), {
+        title: "Nouveau titre",
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(coadmin, "courses/new"),
+        courseData({ status: "draft", createdAt: serverTimestamp(), updatedAt: serverTimestamp() }),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(doc(coadmin, "courses/c1/lessons/l9"), lessonData({ updatedAt: serverTimestamp() })),
+    );
+    await assertSucceeds(getDoc(doc(coadmin, "courses/c1/private/settings")));
+    await assertSucceeds(
+      getDocs(query(collection(coadmin, "enrollments"), where("creatorId", "==", THEO))),
+    );
+    await assertSucceeds(
+      getDocs(query(collectionGroup(coadmin, "comments"), where("creatorId", "==", THEO))),
+    );
+    await assertSucceeds(deleteDoc(doc(coadmin, "courses/c1/comments/root")));
+  });
+
+  it("équipe et réglages : lisibles par l'équipe, secrets jamais", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      await setDoc(doc(admin, "creators/theo/members/quentin"), { role: "admin" });
+      await setDoc(doc(admin, "creators/theo/private/mail"), { host: "smtp.gmail.com" });
+      await setDoc(doc(admin, "creators/theo/secrets/mail"), { password: "v1:x" });
+    });
+    await assertSucceeds(getDoc(doc(coAdminDb(), "creators/theo/members/quentin")));
+    await assertSucceeds(getDoc(doc(coAdminDb(), "creators/theo/private/mail")));
+    await assertFails(getDoc(doc(coAdminDb(), "creators/theo/secrets/mail")));
+    await assertFails(setDoc(doc(coAdminDb(), "creators/theo/members/intrus"), { role: "admin" }));
+    await assertFails(getDoc(doc(db(ANNE), "creators/theo/members/quentin")));
+  });
+
+  it("un co-administrateur retiré (claims sans l'école) perd l'accès", async () => {
+    const removed = db(COADMIN, { creator: false, schools: [] });
+    await assertFails(getDoc(doc(removed, "courses/draft")));
+    await assertFails(
+      updateDoc(doc(removed, "courses/c1"), { title: "Piratée", updatedAt: serverTimestamp() }),
+    );
+  });
+
+  it("pas de formation dans une école qui n'existe pas", async () => {
+    const data = courseData({
+      creatorId: OTHER_CREATOR,
+      status: "draft",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    await assertFails(setDoc(doc(db(OTHER_CREATOR, { creator: true }), "courses/fantome"), data));
   });
 });
 

@@ -29,7 +29,7 @@ export function StudentCourseProvider({
   courseId: string;
   children: ReactNode;
 }) {
-  const { user } = useAuth();
+  const { user, schools } = useAuth();
   const courseRef = useMemo(() => doc(db, "courses", courseId), [courseId]);
   const enrollmentRef = useMemo(
     () => (user ? doc(db, "enrollments", enrollmentId(courseId, user.uid)) : null),
@@ -39,7 +39,8 @@ export function StudentCourseProvider({
   const enrollment = useDocData<EnrollmentDoc>(enrollmentRef);
 
   const value = useMemo<StudentCourseState>(() => {
-    const isOwner = Boolean(user && course.data?.creatorId === user.uid);
+    // Équipe de l'école (propriétaire ou co-administrateur) : aperçu complet.
+    const isOwner = Boolean(user && course.data && schools.includes(course.data.creatorId));
     const isEnrolled = enrollment.data?.status === "active";
     return {
       course: course.data,
@@ -49,7 +50,7 @@ export function StudentCourseProvider({
       hasAccess: isOwner || isEnrolled,
       loading: course.loading || enrollment.loading,
     };
-  }, [user, course.data, course.loading, enrollment.data, enrollment.loading]);
+  }, [user, schools, course.data, course.loading, enrollment.data, enrollment.loading]);
 
   return <StudentCourseContext.Provider value={value}>{children}</StudentCourseContext.Provider>;
 }

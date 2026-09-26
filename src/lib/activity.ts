@@ -22,7 +22,7 @@ export function buildActivity(
   enrollments: WithId<EnrollmentDoc>[],
   comments: WithId<CommentDoc>[],
   courses: Map<string, WithId<CourseDoc>>,
-  { creatorId, limit = 30 }: { creatorId: string; limit?: number },
+  { staff, limit = 30 }: { staff: Set<string>; limit?: number },
 ): ActivityEvent[] {
   const events: ActivityEvent[] = [];
   const lessonTitle = (courseId: string, lessonId: string | null | undefined) =>
@@ -63,7 +63,7 @@ export function buildActivity(
   }
 
   for (const comment of comments) {
-    if (comment.authorUid === creatorId) continue;
+    if (staff.has(comment.authorUid)) continue;
     push(
       {
         id: `comment-${comment.id}`,

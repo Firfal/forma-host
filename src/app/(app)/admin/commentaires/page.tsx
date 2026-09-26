@@ -28,6 +28,7 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/firebase/client";
 import { toDate } from "@/lib/format";
 import { useDocData, useQueryData } from "@/lib/hooks";
+import { useSchool, useSchoolStaff } from "@/lib/school";
 
 type Comment = CommentDoc & { id: string };
 
@@ -49,7 +50,7 @@ interface LessonGroup {
 
 const time = (comment: Comment) => toDate(comment.createdAt)?.getTime() ?? 0;
 
-function buildGroups(comments: Comment[], creatorId: string): LessonGroup[] {
+function buildGroups(comments: Comment[], staff: Set<string>): LessonGroup[] {
   const byId = new Map(comments.map((comment) => [comment.id, comment]));
   const threads = new Map<string, Thread>();
   for (const comment of [...comments].sort((a, b) => time(a) - time(b))) {
@@ -70,7 +71,7 @@ function buildGroups(comments: Comment[], creatorId: string): LessonGroup[] {
   const groups = new Map<string, LessonGroup>();
   for (const thread of threads.values()) {
     const last = thread.replies.at(-1) ?? thread.root;
-    thread.awaitingReply = last.authorUid !== creatorId;
+    thread.awaitingReply = !staff.has(last.authorUid);
     const key = `${thread.root.courseId}:${thread.root.lessonId}`;
     const group = groups.get(key) ?? {
       key,
@@ -90,7 +91,9 @@ function buildGroups(comments: Comment[], creatorId: string): LessonGroup[] {
 
 export default function AdminCommentsPage() {
   const { user } = useAuth();
-  const uid = user?.uid ?? "";
+  const { schoolId } = useSchool();
+  const uid = schoolId ?? "";
+  const staff = useSchoolStaff(schoolId);
   const [onlyAwaiting, setOnlyAwaiting] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const commentsQuery = useMemo(
@@ -109,13 +112,13 @@ export default function AdminCommentsPage() {
     () => (uid ? query(collection(db, "courses"), where("creatorId", "==", uid)) : null),
     [uid],
   );
-  const profileRef = useMemo(() => (uid ? doc(db, "profiles", uid) : null), [uid]);
+  const profileRef = useMemo(() => (user ? doc(db, "profiles", user.uid) : null), [user]);
   const { data: comments, loading } = useQueryData<CommentDoc>(commentsQuery);
   const { data: courses } = useQueryData<CourseDoc>(coursesQuery);
   const { data: profile } = useDocData<ProfileDoc>(profileRef);
   const courseMap = useMemo(() => new Map(courses.map((course) => [course.id, course])), [courses]);
 
-  const groups = useMemo(() => buildGroups(comments, uid), [comments, uid]);
+  const groups = useMemo(() => buildGroups(comments, staff), [comments, staff]);
   const awaitingCount = groups.reduce(
     (sum, group) => sum + group.threads.filter((t) => t.awaitingReply).length,
     0,
@@ -130,9 +133,9 @@ export default function AdminCommentsPage() {
   async function reply(root: Comment, body: string) {
     await addDoc(collection(db, "courses", root.courseId, "comments"), {
       courseId: root.courseId,
-      creatorId: uid,
+      creatorId: root.creatorId,
       lessonId: root.lessonId,
-      authorUid: uid,
+      authorUid: user?.uid,
       authorName: profile?.displayName || user?.displayName || "Formateur",
       authorAvatarUrl: profile?.avatarUrl ?? null,
       body,
@@ -226,7 +229,7 @@ export default function AdminCommentsPage() {
                     <div key={thread.root.id} className="space-y-3 p-4">
                       <CommentItem
                         comment={thread.root}
-                        creatorId={uid}
+                        staff={staff}
                         canDelete
                         onReply={() => setReplyTo(thread.root.id)}
                       />
@@ -236,7 +239,7 @@ export default function AdminCommentsPage() {
                             <CommentItem
                               key={replyComment.id}
                               comment={replyComment}
-                              creatorId={uid}
+                              staff={staff}
                               canDelete
                             />
                           ))}

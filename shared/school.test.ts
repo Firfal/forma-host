@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextPreviousSlugs, schoolProfileInput } from "./school";
+import { nextPreviousSlugs, schoolAdminSet, schoolProfileInput, schoolsFromClaims } from "./school";
 
 const base = {
   name: "Ecole Motion",
@@ -41,5 +41,25 @@ describe("nextPreviousSlugs", () => {
       nextPreviousSlugs({ slug: "motion", previousSlugs: ["ecole-motion"] }, "ecole-motion"),
     ).toEqual(["motion"]);
     expect(nextPreviousSlugs({ slug: "motion", previousSlugs: ["a"] }, "motion")).toEqual(["a"]);
+  });
+});
+
+describe("écoles gérées", () => {
+  it("lit les écoles dans les claims", () => {
+    expect(schoolsFromClaims("anne", { creator: true, schools: ["theo", "anne"] })).toEqual([
+      "theo",
+      "anne",
+    ]);
+    // Ancien jeton de propriétaire, sans claim « schools ».
+    expect(schoolsFromClaims("theo", { creator: true })).toEqual(["theo"]);
+    expect(schoolsFromClaims("eleve", {})).toEqual([]);
+  });
+
+  it("liste les administrateurs d'une école", () => {
+    expect([...schoolAdminSet("theo", { adminUids: ["theo", "quentin"] })]).toEqual([
+      "theo",
+      "quentin",
+    ]);
+    expect([...schoolAdminSet("theo", null)]).toEqual(["theo"]);
   });
 });

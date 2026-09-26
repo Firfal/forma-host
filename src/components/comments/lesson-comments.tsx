@@ -25,6 +25,7 @@ import { errorMessage } from "@/lib/firebase/callables";
 import { db } from "@/lib/firebase/client";
 import { formatRelative } from "@/lib/format";
 import { useDocData, useQueryData } from "@/lib/hooks";
+import { useSchoolStaff } from "@/lib/school";
 
 type CommentWithId = CommentDoc & { id: string };
 
@@ -92,16 +93,17 @@ export function Composer({
 
 export function CommentItem({
   comment,
-  creatorId,
+  staff,
   canDelete,
   onReply,
 }: {
   comment: CommentWithId;
-  creatorId: string;
+  /** Équipe de l'école (badge « Créateur »). */
+  staff: Set<string>;
   canDelete: boolean;
   onReply?: () => void;
 }) {
-  const isCreator = comment.authorUid === creatorId;
+  const isCreator = staff.has(comment.authorUid);
   async function remove() {
     if (!window.confirm("Supprimer ce commentaire ?")) return;
     try {
@@ -167,6 +169,7 @@ export function LessonComments({
     [canRead, course.id, lessonId],
   );
   const { data: comments, loading } = useQueryData<CommentDoc>(commentsQuery);
+  const staff = useSchoolStaff(course.creatorId);
   const profileRef = useMemo(() => (user ? doc(db, "profiles", user.uid) : null), [user]);
   const { data: profile } = useDocData<ProfileDoc>(profileRef);
 
@@ -230,7 +233,7 @@ export function LessonComments({
           <div key={root.id} className="rounded-card border border-line p-4">
             <CommentItem
               comment={root}
-              creatorId={course.creatorId}
+              staff={staff}
               canDelete={isOwner || root.authorUid === user?.uid}
               onReply={canWrite ? () => setReplyTo(root.id) : undefined}
             />
@@ -240,7 +243,7 @@ export function LessonComments({
                   <CommentItem
                     key={reply.id}
                     comment={reply}
-                    creatorId={course.creatorId}
+                    staff={staff}
                     canDelete={isOwner || reply.authorUid === user?.uid}
                   />
                 ))}

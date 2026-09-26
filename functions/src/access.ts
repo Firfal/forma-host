@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { UserRecord } from "firebase-admin/auth";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import { INVITE_TTL_DAYS } from "@shared/constants";
+import { schoolAdminSet } from "@shared/school";
 import { enrollmentId, routes } from "@shared/paths";
 import type { GrantAccessResult } from "@shared/schemas";
 import type {
@@ -44,7 +45,7 @@ export function needsActivation(user: UserRecord): boolean {
   return user.providerData.length === 0 && !user.passwordHash;
 }
 
-async function getOrCreateUser(email: string, name?: string): Promise<UserRecord> {
+export async function getOrCreateUser(email: string, name?: string): Promise<UserRecord> {
   try {
     return await auth().getUserByEmail(email);
   } catch (error) {
@@ -58,9 +59,11 @@ async function loadCourseContext(courseId: string, creatorId: string) {
     db().doc(`creators/${creatorId}`).get(),
     db().doc(`courses/${courseId}/private/settings`).get(),
   ]);
+  const creator = creatorSnap.data() as CreatorDoc | undefined;
   return {
-    brand: brandFromCreator(creatorSnap.data() as CreatorDoc | undefined),
+    brand: brandFromCreator(creator),
     settings: settingsSnap.data() as CoursePrivateSettings | undefined,
+    admins: [...schoolAdminSet(creatorId, creator)],
   };
 }
 
@@ -90,11 +93,13 @@ async function ensureUserDocs(tx: Transaction, user: UserRecord, name: string | 
 export function inviteDoc(
   uid: string,
   email: string,
-  courseId: string,
+  courseId: string | null,
   creatorId: string,
+  kind: "course" | "member" = "course",
 ): InviteDoc<Timestamp> {
   const now = Date.now();
   return {
+    kind,
     uid,
     email,
     courseId,
@@ -109,7 +114,7 @@ type Outcome = "created" | "reactivated" | "alreadyEnrolled";
 
 async function grantOne(
   params: GrantAccessParams,
-  context: { brand: Brand; settings: CoursePrivateSettings | undefined },
+  context: { brand: Brand; settings: CoursePrivateSettings | undefined; admins: string[] },
   student: StudentInput,
 ): Promise<Outcome> {
   const { courseId, course } = params;
@@ -148,14 +153,16 @@ async function grantOne(
       outcome = "created";
       // Pas de notification pour un import en masse (migration Podia).
       if (params.source !== "import") {
-        tx.set(db().doc(`users/${course.creatorId}/notifications/student_${id}`), {
-          type: "new_student",
-          title: "Nouvel élève",
-          body: `${student.name || student.email} a rejoint « ${course.title} »`,
-          link: routes.adminCourse(courseId),
-          read: false,
-          createdAt: FieldValue.serverTimestamp(),
-        });
+        for (const adminUid of context.admins) {
+          tx.set(db().doc(`users/${adminUid}/notifications/student_${id}`), {
+            type: "new_student",
+            title: "Nouvel élève",
+            body: `${student.name || student.email} a rejoint « ${course.title} »`,
+            link: routes.adminCourse(courseId),
+            read: false,
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        }
       }
     }
 

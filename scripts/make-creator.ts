@@ -10,6 +10,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { isReservedSlug, isValidSlug, slugify } from "../shared/slug";
 import { initAdmin, parseArgs } from "./admin";
+import { ensureSchoolOwner } from "./school-owner";
 
 async function main() {
   const args = parseArgs();
@@ -37,7 +38,6 @@ async function main() {
     );
   }
 
-  await auth.setCustomUserClaims(user.uid, { ...(user.customClaims ?? {}), creator: true });
   const creatorRef = db.doc(`creators/${user.uid}`);
   const existing = await creatorRef.get();
   await creatorRef.set(
@@ -53,6 +53,8 @@ async function main() {
     },
     { merge: true },
   );
+  // Fiche « owner », adminUids et claims (creator, schools).
+  await ensureSchoolOwner(auth, db, user.uid);
   console.log(
     `✔ ${email} est formateur sur ${projectId} (creators/${user.uid}, slug « ${slug} »).`,
   );

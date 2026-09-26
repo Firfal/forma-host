@@ -93,3 +93,34 @@ export function mailDoc(input: {
     expireAt: Timestamp.fromMillis(Date.now() + MAIL_TTL_DAYS * 24 * 3600 * 1000),
   };
 }
+
+/** Invitation à co-gérer une école. */
+export function buildMemberInviteEmail(input: {
+  creatorId: string;
+  to: string;
+  schoolName: string;
+  inviterName: string;
+  brand: Brand;
+  ctaUrl: string;
+  activation: boolean;
+}): MailDoc {
+  const subject = `${input.inviterName} t'invite à gérer « ${input.schoolName} »`;
+  const intro = `${input.inviterName} t'a ajouté à l'équipe de l'école « ${input.schoolName} ». Tu peux désormais gérer ses formations, ses élèves et ses commentaires.`;
+  const ctaLabel = input.activation ? "Activer mon compte" : "Ouvrir l'administration";
+  const html = emailLayout({
+    bodyHtml: textToHtml("Bonjour,\n\n{{intro}}", { intro }),
+    ctaLabel,
+    ctaUrl: input.ctaUrl,
+    brandName: input.brand.name,
+    brandColor: input.brand.color,
+    footer: input.activation ? "Ce lien d'activation est valable 30 jours." : undefined,
+  });
+  return mailDoc({
+    creatorId: input.creatorId,
+    to: input.to,
+    subject,
+    html,
+    text: `Bonjour,\n\n${intro}\n\n${ctaLabel} : ${input.ctaUrl}`,
+    replyTo: input.brand.supportEmail,
+  });
+}

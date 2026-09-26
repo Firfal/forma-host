@@ -14,35 +14,35 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/lib/auth";
 import { db } from "@/lib/firebase/client";
 import { formatDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
+import { useSchool } from "@/lib/school";
 import { NewCourseDialog } from "./new-course-dialog";
 
 export default function AdminCoursesPage() {
-  const { user } = useAuth();
+  const { schoolId } = useSchool();
   const coursesQuery = useMemo(
     () =>
-      user
+      schoolId
         ? query(
             collection(db, "courses"),
-            where("creatorId", "==", user.uid),
+            where("creatorId", "==", schoolId),
             orderBy("createdAt", "desc"),
           )
         : null,
-    [user],
+    [schoolId],
   );
   const enrollmentsQuery = useMemo(
     () =>
-      user
+      schoolId
         ? query(
             collection(db, "enrollments"),
-            where("creatorId", "==", user.uid),
+            where("creatorId", "==", schoolId),
             where("status", "==", "active"),
           )
         : null,
-    [user],
+    [schoolId],
   );
   const { data: courses, loading } = useQueryData<CourseDoc>(coursesQuery);
   const { data: enrollments } = useQueryData<EnrollmentDoc>(enrollmentsQuery);

@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/lib/auth";
 import { createCourse } from "@/lib/courses";
 import { errorMessage } from "@/lib/firebase/callables";
+import { useSchool } from "@/lib/school";
 
 export function NewCourseDialog({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { schoolId } = useSchool();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -21,10 +21,10 @@ export function NewCourseDialog({ children }: { children: ReactNode }) {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!user || !title.trim()) return;
+    if (!schoolId || !title.trim()) return;
     setCreating(true);
     try {
-      const courseId = await createCourse(user.uid, title);
+      const courseId = await createCourse(schoolId, title);
       setOpen(false);
       router.push(routes.adminCourseContent(courseId));
     } catch (error) {

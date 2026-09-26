@@ -122,6 +122,10 @@ jobs:
           done
           exit 1
 
+      - name: Migrations de données
+        if: ${{ !inputs.accounts_only }}
+        run: npx tsx scripts/migrate.ts --project "$PROJECT_ID"
+
       - name: App Hosting (backend)
         if: ${{ !inputs.accounts_only }}
         run: |

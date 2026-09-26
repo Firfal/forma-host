@@ -10,7 +10,11 @@ import type {
   ResolveVimeoInput,
 } from "@shared/schemas";
 import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
-import type { SchoolProfileInput } from "@shared/school";
+import type {
+  InviteSchoolAdminInput,
+  RemoveSchoolAdminInput,
+  SchoolProfileInput,
+} from "@shared/school";
 import type { VimeoSettingsInput } from "@shared/vimeo-settings";
 import type { VimeoVideo } from "@shared/types";
 import { functions } from "./client";
@@ -39,6 +43,13 @@ export const callSaveVimeoSettings = callable<
   { name: string | null; account: string | null }
 >("saveVimeoSettings");
 export const callDeleteVimeoSettings = callable<void, { ok: true }>("deleteVimeoSettings");
+export const callInviteSchoolAdmin = callable<
+  InviteSchoolAdminInput,
+  { uid: string; activation: boolean }
+>("inviteSchoolAdmin");
+export const callRemoveSchoolAdmin = callable<RemoveSchoolAdminInput, { ok: true }>(
+  "removeSchoolAdmin",
+);
 export const callUpdateSchoolProfile = callable<SchoolProfileInput, { ok: true }>(
   "updateSchoolProfile",
 );

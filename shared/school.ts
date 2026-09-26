@@ -20,6 +20,8 @@ export const schoolProfileInput = z.object({
     .nullish(),
   brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (ex. #9d72f9)"),
   supportEmail: emailSchema.nullish(),
+  /** École modifiée (par défaut, celle de l'appelant). */
+  schoolId: z.string().min(1).max(128).nullish(),
 });
 export type SchoolProfileInput = z.infer<typeof schoolProfileInput>;
 
@@ -34,3 +36,29 @@ export function nextPreviousSlugs(
       : [...(current.previousSlugs ?? []), current.slug];
   return [...new Set(all)].filter((slug) => slug !== newSlug);
 }
+
+/** Écoles gérées d'après les custom claims (`schools`), plus la sienne pour un ancien jeton. */
+export function schoolsFromClaims(uid: string, claims: Record<string, unknown>): string[] {
+  const schools = Array.isArray(claims.schools)
+    ? claims.schools.filter((id): id is string => typeof id === "string")
+    : [];
+  if (claims.creator === true && schools.length === 0) return [uid];
+  return schools;
+}
+
+/** Administrateurs d'une école : propriétaire (schoolId) et co-administrateurs. */
+export function schoolAdminSet(
+  schoolId: string,
+  creator: { adminUids?: string[] } | null | undefined,
+): Set<string> {
+  return new Set([schoolId, ...(creator?.adminUids ?? [])]);
+}
+
+export const inviteSchoolAdminInput = z.object({ email: emailSchema });
+export type InviteSchoolAdminInput = z.infer<typeof inviteSchoolAdminInput>;
+
+export const removeSchoolAdminInput = z.object({ uid: z.string().min(1).max(128) });
+export type RemoveSchoolAdminInput = z.infer<typeof removeSchoolAdminInput>;
+
+/** École visée par une action (par défaut, celle de l'appelant). */
+export const schoolIdInput = z.object({ schoolId: z.string().min(1).max(128).nullish() });

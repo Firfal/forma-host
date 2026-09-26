@@ -163,9 +163,11 @@ export interface NotificationDoc<T = TimestampLike> {
 }
 
 export interface InviteDoc<T = TimestampLike> {
+  /** course : élève invité à une formation ; member : co-administrateur d'une école. */
+  kind?: "course" | "member";
   uid: string;
   email: string;
-  courseId: string;
+  courseId: string | null;
   creatorId: string;
   expiresAt: T;
   usedAt: T | null;
@@ -177,6 +179,8 @@ export interface CreatorDoc<T = TimestampLike> {
   slug: string;
   /** Anciennes adresses publiques, redirigées vers la nouvelle. */
   previousSlugs?: string[];
+  /** Administrateurs de l'école (propriétaire inclus), tenus à jour par les Functions. */
+  adminUids?: string[];
   logoUrl: string | null;
   brandColor: string;
   supportEmail: string | null;
@@ -193,6 +197,8 @@ export interface UserDoc<T = TimestampLike> {
   email: string;
   notifyOnComment: boolean;
   createdAt: T;
+  /** Custom claims modifiés (écoles gérées) : le client recharge son jeton. */
+  claimsUpdatedAt?: T;
 }
 
 /** Réglages d'envoi des emails du formateur (creators/{uid}/private/mail), écrits par les Functions. */
@@ -228,4 +234,14 @@ export interface VimeoSettingsDoc<T = TimestampLike> {
   /** Offre Vimeo : basic (gratuite), starter, standard, advanced, plus, pro… */
   account: string | null;
   updatedAt: T;
+}
+
+export type SchoolRole = "owner" | "admin";
+
+/** Membre de l'équipe d'une école (creators/{schoolId}/members/{uid}). */
+export interface SchoolMemberDoc<T = TimestampLike> {
+  role: SchoolRole;
+  email: string;
+  displayName: string | null;
+  addedAt: T;
 }

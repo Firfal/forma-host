@@ -53,7 +53,7 @@ describe("buildActivity", () => {
         comment("k2", "theo", "2026-06-18T13:00:00Z"),
       ],
       new Map([["c1", course]]),
-      { creatorId: "theo" },
+      { staff: new Set(["theo"]) },
     );
     expect(events.map((e) => `${e.kind}:${e.who}`)).toEqual([
       "commented:anne",

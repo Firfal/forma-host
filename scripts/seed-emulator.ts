@@ -9,6 +9,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { DEFAULT_WELCOME_EMAIL } from "../shared/constants";
 import type { OutlineItem, RichText } from "../shared/types";
+import { ensureSchoolOwner } from "./school-owner";
 import { initAdmin } from "./admin";
 
 const { auth, db } = initAdmin({ emulators: true });
@@ -86,6 +87,7 @@ async function main() {
     supportEmail: "theo@ecolemotion.com",
     createdAt: FieldValue.serverTimestamp(),
   });
+  await ensureSchoolOwner(auth, db, theo);
 
   const courseId = "after-effects";
   const items: OutlineItem[] = [];

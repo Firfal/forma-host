@@ -3,17 +3,31 @@
 import { PageContainer } from "@/components/layout/page";
 import { MailSettingsCard } from "@/components/settings/mail-settings-card";
 import { SchoolSettingsCard } from "@/components/settings/school-settings-card";
+import { TeamSettingsCard } from "@/components/settings/team-settings-card";
 import { VimeoSettingsCard } from "@/components/settings/vimeo-settings-card";
 import { PageHeader } from "@/components/ui/page-header";
+import { useSchool } from "@/lib/school";
 
 export default function SettingsPage() {
+  const { schoolId, isOwner } = useSchool();
   return (
     <PageContainer width="narrow">
       <PageHeader title="Paramètres" />
-      <div className="space-y-4">
+      {/* key : formulaires réinitialisés quand on change d'école. */}
+      <div key={schoolId ?? "aucune"} className="space-y-4">
         <SchoolSettingsCard />
-        <MailSettingsCard />
-        <VimeoSettingsCard />
+        {isOwner ? (
+          <>
+            <TeamSettingsCard />
+            <MailSettingsCard />
+            <VimeoSettingsCard />
+          </>
+        ) : (
+          <p className="rounded-md bg-surface px-3 py-2.5 text-[13px] text-muted">
+            L&apos;équipe, l&apos;envoi des emails et Vimeo sont réglés par le propriétaire de
+            l&apos;école.
+          </p>
+        )}
       </div>
     </PageContainer>
   );
