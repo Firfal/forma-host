@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
+import { routes } from "@shared/paths";
 import { resolveSalesPage } from "@shared/sales-page";
 import { SalesPageView } from "@/components/sales/sales-page-view";
 import {
@@ -7,6 +8,7 @@ import {
   getExternalCtaUrl,
   getPreviewVideo,
   getPublishedCourse,
+  getRenamedCreatorSlug,
 } from "@/lib/public-data";
 
 export const revalidate = 60;
@@ -40,8 +42,13 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 }
 
 export default async function SalesPageRoute({ params }: { params: Promise<Params> }) {
-  const data = await load(await params);
-  if (!data) notFound();
+  const { creatorSlug, courseSlug } = await params;
+  const data = await load({ creatorSlug, courseSlug });
+  if (!data) {
+    const renamed = await getRenamedCreatorSlug(creatorSlug);
+    if (renamed) permanentRedirect(routes.salesPage(renamed, courseSlug));
+    notFound();
+  }
   const [ctaUrl, preview] = await Promise.all([
     getExternalCtaUrl(data.course.id),
     getPreviewVideo(data.course),

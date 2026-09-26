@@ -30,6 +30,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { cn } from "@/lib/cn";
+import { useCreator } from "@/lib/creator";
 
 interface NavItem {
   href: string;
@@ -72,6 +73,28 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate: () => void }
   );
 }
 
+/** Formateur : nom et logo de son école ; élève : nom de la plateforme. */
+function SidebarBrand({ size }: { size: number }) {
+  const { user, isCreator } = useAuth();
+  const { data: school } = useCreator(isCreator ? user?.uid : null);
+  return (
+    <>
+      {school?.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={school.logoUrl}
+          alt=""
+          className="shrink-0 rounded-md object-cover"
+          style={{ width: size, height: size }}
+        />
+      ) : (
+        <LogoMark size={size} />
+      )}
+      <span className="truncate text-sm font-semibold">{school?.name ?? brand.name}</span>
+    </>
+  );
+}
+
 function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
   const { user, isCreator, signOut } = useAuth();
   const displayName = user?.displayName || user?.email || "";
@@ -79,8 +102,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-3 pb-4 pt-4">
-        <LogoMark size={26} />
-        <span className="truncate text-sm font-semibold">{brand.name}</span>
+        <SidebarBrand size={26} />
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-2" aria-label="Navigation principale">
@@ -146,8 +168,7 @@ export function Sidebar() {
         >
           <Menu className="size-5" />
         </button>
-        <LogoMark size={22} />
-        <span className="text-sm font-semibold">{brand.name}</span>
+        <SidebarBrand size={22} />
       </div>
       {open ? (
         <div className="fixed inset-0 z-40 md:hidden">

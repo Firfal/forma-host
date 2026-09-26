@@ -100,14 +100,8 @@ service cloud.firestore {
 
     match /creators/{creatorId} {
       allow read: if true;
-      allow create, update: if isUser(creatorId) && isCreator()
-        && onlyKeys(['name', 'slug', 'logoUrl', 'brandColor', 'supportEmail', 'createdAt'])
-        && isShortString(request.resource.data.name, 1, 80)
-        && request.resource.data.slug is string
-        && request.resource.data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
-        && isNullableString(request.resource.data.logoUrl, 2000)
-        && request.resource.data.brandColor.matches('^#[0-9a-fA-F]{6}$')
-        && isNullableString(request.resource.data.supportEmail, 200);
+      // Profil modifié par la callable updateSchoolProfile (unicité de l'adresse publique).
+      allow write: if false;
 
       // Réglages d'envoi des emails : écrits par les Functions (connexion SMTP vérifiée),
       // lus par le formateur pour afficher l'état de l'envoi.

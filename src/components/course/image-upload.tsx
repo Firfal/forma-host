@@ -15,6 +15,8 @@ export function ImageUpload({
   pathFor,
   label = "Choisir une image",
   hint = "PNG, JPEG, GIF ou WEBP, 5 Mo max. Format 16:9 conseillé (1280 × 720).",
+  maxMb = 5,
+  previewClassName = "aspect-video w-full max-w-sm",
   className,
 }: {
   value: string | null;
@@ -22,6 +24,9 @@ export function ImageUpload({
   pathFor: (fileName: string) => string;
   label?: string;
   hint?: string;
+  maxMb?: number;
+  /** Taille de l'aperçu (16:9 par défaut ; carré pour un logo). */
+  previewClassName?: string;
   className?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -31,7 +36,7 @@ export function ImageUpload({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    const invalid = validateImage(file);
+    const invalid = validateImage(file, maxMb);
     if (invalid) {
       toast.error(invalid);
       return;
@@ -49,7 +54,12 @@ export function ImageUpload({
   return (
     <div className={cn("space-y-2", className)}>
       {value ? (
-        <div className="relative aspect-video w-full max-w-sm overflow-hidden rounded-md border border-line bg-surface">
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-md border border-line bg-surface",
+            previewClassName,
+          )}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="" className="size-full object-cover" />
           <button

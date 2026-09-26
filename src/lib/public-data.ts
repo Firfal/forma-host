@@ -14,6 +14,16 @@ export const getCreatorBySlug = cache(async (slug: string): Promise<PublicCreato
   return doc ? ({ id: doc.id, ...(doc.data() as CreatorDoc) } as PublicCreator) : null;
 });
 
+/** Nouvelle adresse d'une école renommée (redirection des anciens liens). */
+export const getRenamedCreatorSlug = cache(async (slug: string): Promise<string | null> => {
+  const snap = await adminDb
+    .collection("creators")
+    .where("previousSlugs", "array-contains", slug)
+    .limit(1)
+    .get();
+  return (snap.docs[0]?.data() as CreatorDoc | undefined)?.slug ?? null;
+});
+
 export const getPublishedCourse = cache(
   async (creatorId: string, slug: string): Promise<PublicCourse | null> => {
     const snap = await adminDb

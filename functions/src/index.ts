@@ -11,6 +11,7 @@ import {
   resolveVimeoInput,
 } from "@shared/schemas";
 import { mailSettingsInput } from "@shared/mail-settings";
+import { schoolProfileInput } from "@shared/school";
 import { enrollmentId, paths } from "@shared/paths";
 import { emailLayout, escapeHtml } from "@shared/template";
 import type { CommentDoc, CoursePrivateSettings, CreatorDoc } from "@shared/types";
@@ -28,6 +29,7 @@ import {
 } from "./mail-settings";
 import { APP_URL, SETTINGS_ENCRYPTION_KEY, VIMEO_ACCESS_TOKEN, settingsKey } from "./params";
 import { handleNewComment } from "./comments";
+import { SchoolError, updateSchoolProfile as updateSchoolProfileImpl } from "./schools";
 import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
 import { resolveVimeo } from "./vimeo";
 
@@ -236,3 +238,16 @@ export const onMailCreated = onDocumentCreated(
     }
   },
 );
+
+/** Profil public de l'école : nom, adresse, logo, couleur, email de support. */
+export const updateSchoolProfile = onCall(async (request) => {
+  const caller = requireCreator(request);
+  const input = parseInput(schoolProfileInput, request.data);
+  try {
+    await updateSchoolProfileImpl(caller.uid, input);
+  } catch (error) {
+    if (error instanceof SchoolError) throw new HttpsError("failed-precondition", error.message);
+    throw error;
+  }
+  return { ok: true };
+});

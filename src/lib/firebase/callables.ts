@@ -10,6 +10,7 @@ import type {
   ResolveVimeoInput,
 } from "@shared/schemas";
 import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
+import type { SchoolProfileInput } from "@shared/school";
 import type { VimeoVideo } from "@shared/types";
 import { functions } from "./client";
 
@@ -32,6 +33,9 @@ export const callSaveMailSettings = callable<MailSettingsInput, SaveMailSettings
 );
 export const callDeleteMailSettings = callable<void, { ok: true }>("deleteMailSettings");
 export const callSendTestMail = callable<void, { email: string }>("sendTestMail");
+export const callUpdateSchoolProfile = callable<SchoolProfileInput, { ok: true }>(
+  "updateSchoolProfile",
+);
 
 /** Message lisible pour une erreur Firebase (callable, auth, firestore). */
 export function errorMessage(error: unknown): string {

@@ -372,6 +372,23 @@ describe("utilisateurs et zones serveur", () => {
     await assertFails(getDoc(doc(creatorDb(), "mail/x")));
   });
 
+  it("fiche école : publique, modifiable uniquement par le serveur", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "creators/theo"), {
+        name: "Ecole Motion",
+        slug: "ecole-motion",
+      });
+    });
+    await assertSucceeds(getDoc(doc(db(null), "creators/theo")));
+    await assertFails(updateDoc(doc(creatorDb(), "creators/theo"), { slug: "autre" }));
+    await assertFails(
+      setDoc(doc(db(OTHER_CREATOR, { creator: true }), "creators/autre"), {
+        name: "Autre",
+        slug: "ecole-motion",
+      }),
+    );
+  });
+
   it("réglages d'envoi : lus par le formateur seul, écrits par le serveur ; secret inaccessible", async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const admin = ctx.firestore();

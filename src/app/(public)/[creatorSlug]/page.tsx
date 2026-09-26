@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
 import { LogoMark } from "@/components/logo";
-import { getCreatorBySlug, getPublishedCourses } from "@/lib/public-data";
+import { getCreatorBySlug, getPublishedCourses, getRenamedCreatorSlug } from "@/lib/public-data";
 
 export const revalidate = 60;
 
@@ -23,8 +23,13 @@ export default async function CreatorPage({
 }: {
   params: Promise<{ creatorSlug: string }>;
 }) {
-  const creator = await getCreatorBySlug((await params).creatorSlug);
-  if (!creator) notFound();
+  const { creatorSlug } = await params;
+  const creator = await getCreatorBySlug(creatorSlug);
+  if (!creator) {
+    const renamed = await getRenamedCreatorSlug(creatorSlug);
+    if (renamed) permanentRedirect(routes.creatorPage(renamed));
+    notFound();
+  }
   const courses = await getPublishedCourses(creator.id);
 
   return (

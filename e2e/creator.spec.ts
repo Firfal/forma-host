@@ -109,3 +109,34 @@ test("l'envoi des emails se configure dans Paramètres", async ({ page }) => {
   await expect(page.getByText("Envoi des emails désactivé")).toBeVisible();
   await expect(page.getByText("Non configuré")).toBeVisible();
 });
+
+test("le profil de l'école se modifie dans Paramètres", async ({ page }) => {
+  await login(page, THEO);
+  await page.goto("/admin/parametres");
+  await expect(page.locator("#school-name")).toHaveValue("Ecole Motion");
+
+  await page.fill("#school-name", "Motion Academy");
+  await page.fill("#school-slug", "Motion Academy");
+  await page.locator("#school-slug").blur();
+  await expect(page.locator("#school-slug")).toHaveValue("motion-academy");
+  await page.fill("#school-color", "#12a150");
+  await page.getByRole("button", { name: "Enregistrer" }).first().click();
+  await expect(page.getByText("École enregistrée")).toBeVisible();
+  await expect(page.getByRole("complementary").getByText("Motion Academy")).toBeVisible();
+
+  // Nouvelle adresse publique ; l'ancienne redirige.
+  await page.goto("/motion-academy");
+  await expect(page.getByRole("heading", { name: "Motion Academy" })).toBeVisible();
+  await page.goto("/ecole-motion/maitriser-after-effects");
+  await expect(page).toHaveURL(/\/motion-academy\/maitriser-after-effects$/);
+
+  // Adresse déjà prise refusée côté serveur (réservée) puis retour à l'état initial.
+  await page.goto("/admin/parametres");
+  await page.fill("#school-slug", "admin");
+  await page.getByRole("button", { name: "Enregistrer" }).first().click();
+  await expect(page.getByText("Cette adresse est réservée")).toBeVisible();
+  await page.fill("#school-name", "Ecole Motion");
+  await page.fill("#school-slug", "ecole-motion");
+  await page.getByRole("button", { name: "Enregistrer" }).first().click();
+  await expect(page.getByText("École enregistrée")).toBeVisible();
+});

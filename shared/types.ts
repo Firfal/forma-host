@@ -175,6 +175,8 @@ export interface InviteDoc<T = TimestampLike> {
 export interface CreatorDoc<T = TimestampLike> {
   name: string;
   slug: string;
+  /** Anciennes adresses publiques, redirigées vers la nouvelle. */
+  previousSlugs?: string[];
   logoUrl: string | null;
   brandColor: string;
   supportEmail: string | null;
