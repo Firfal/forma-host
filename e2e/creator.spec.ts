@@ -140,3 +140,24 @@ test("le profil de l'école se modifie dans Paramètres", async ({ page }) => {
   await page.getByRole("button", { name: "Enregistrer" }).first().click();
   await expect(page.getByText("École enregistrée")).toBeVisible();
 });
+
+test("le compte Vimeo de l'école se relie dans Paramètres", async ({ page }) => {
+  await login(page, THEO);
+  await page.goto("/admin/parametres");
+  await expect(page.getByText("Non relié")).toBeVisible();
+
+  await page.fill("#vimeo-token", "refuse0123456789abcdefgh");
+  await page.getByRole("button", { name: "Relier le compte" }).click();
+  await expect(page.getByText("Token refusé par Vimeo")).toBeVisible();
+
+  await page.fill("#vimeo-token", "a1b2c3d4e5f6a7b8c9d0e1f2");
+  await page.getByRole("button", { name: "Relier le compte" }).click();
+  await expect(page.getByText("Compte Vimeo relié : Compte de démo")).toBeVisible();
+  await expect(page.getByText("Relié", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Avec l'offre gratuite, tes vidéos sont publiques/)).toBeVisible();
+
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: "Retirer" }).click();
+  await expect(page.getByText("Compte Vimeo retiré")).toBeVisible();
+  await expect(page.getByText("Non relié")).toBeVisible();
+});

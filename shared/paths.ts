@@ -12,6 +12,8 @@ export const paths = {
   creatorMailSettings: (uid: string) => `creators/${uid}/private/mail`,
   /** Mot de passe SMTP chiffré : Functions uniquement. */
   creatorMailSecret: (uid: string) => `creators/${uid}/secrets/mail`,
+  creatorVimeoSettings: (uid: string) => `creators/${uid}/private/vimeo`,
+  creatorVimeoSecret: (uid: string) => `creators/${uid}/secrets/vimeo`,
   course: (courseId: string) => `courses/${courseId}`,
   courseSettings: (courseId: string) => `courses/${courseId}/private/settings`,
   lesson: (courseId: string, lessonId: string) => `courses/${courseId}/lessons/${lessonId}`,

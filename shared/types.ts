@@ -221,3 +221,11 @@ export interface MailDelivery<T = TimestampLike> {
   leaseExpireAt?: T | null;
   updatedAt: T;
 }
+
+/** Compte Vimeo relié à l'école (creators/{uid}/private/vimeo). Le token reste côté serveur. */
+export interface VimeoSettingsDoc<T = TimestampLike> {
+  accountName: string | null;
+  /** Offre Vimeo : basic (gratuite), starter, standard, advanced, plus, pro… */
+  account: string | null;
+  updatedAt: T;
+}

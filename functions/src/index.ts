@@ -12,6 +12,7 @@ import {
 } from "@shared/schemas";
 import { mailSettingsInput } from "@shared/mail-settings";
 import { schoolProfileInput } from "@shared/school";
+import { vimeoSettingsInput } from "@shared/vimeo-settings";
 import { enrollmentId, paths } from "@shared/paths";
 import { emailLayout, escapeHtml } from "@shared/template";
 import type { CommentDoc, CoursePrivateSettings, CreatorDoc } from "@shared/types";
@@ -32,10 +33,24 @@ import { handleNewComment } from "./comments";
 import { SchoolError, updateSchoolProfile as updateSchoolProfileImpl } from "./schools";
 import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
 import { resolveVimeo } from "./vimeo";
+import {
+  deleteVimeoSettings as deleteVimeoSettingsImpl,
+  fetchVimeoMe,
+  loadVimeoToken,
+  saveVimeoSettings as saveVimeoSettingsImpl,
+  VimeoSetupError,
+} from "./vimeo-settings";
 
 // SMTP simulé uniquement dans les émulateurs (SMTP_FAKE=true dans functions/.env.demo-forma).
 const fakeSmtp = process.env.FUNCTIONS_EMULATOR === "true" && process.env.SMTP_FAKE === "true";
 const mailDeps = { key: settingsKey, client: fakeSmtp ? fakeSmtpClient : smtpClient };
+
+// Vimeo simulé dans les émulateurs (VIMEO_FAKE=true) : le token « refuse » est rejeté.
+const fakeVimeo = process.env.FUNCTIONS_EMULATOR === "true" && process.env.VIMEO_FAKE === "true";
+async function fakeFetchVimeoMe(token: string) {
+  if (token.startsWith("refuse")) throw new VimeoSetupError("Token refusé par Vimeo.");
+  return { name: "Compte de démo", account: "basic" };
+}
 
 async function callerEmail(caller: { uid: string; email: string | null }): Promise<string> {
   const email = caller.email ?? (await auth().getUser(caller.uid)).email;
@@ -133,21 +148,60 @@ export const acceptInvite = onCall(async (request) => {
   return acceptInviteImpl(input);
 });
 
-/** Récupère titre, durée et miniature d'une vidéo Vimeo. */
-export const resolveVimeoVideo = onCall({ secrets: [VIMEO_ACCESS_TOKEN] }, async (request) => {
-  requireCreator(request);
-  const input = parseInput(resolveVimeoInput, request.data);
-  let token: string | null = null;
+/**
+ * Récupère titre, durée et miniature d'une vidéo Vimeo. Token utilisé : celui de l'école,
+ * sinon le token global (secret VIMEO_ACCESS_TOKEN), sinon oEmbed (vidéos publiques).
+ */
+export const resolveVimeoVideo = onCall(
+  { secrets: [VIMEO_ACCESS_TOKEN, SETTINGS_ENCRYPTION_KEY] },
+  async (request) => {
+    const caller = requireCreator(request);
+    const input = parseInput(resolveVimeoInput, request.data);
+    const schoolId = input.schoolId ?? caller.uid;
+    if (schoolId !== caller.uid)
+      throw new HttpsError("permission-denied", "École d'un autre formateur");
+    let token: string | null = null;
+    try {
+      token = await loadVimeoToken(schoolId, settingsKey);
+    } catch (error) {
+      logger.warn("resolveVimeoVideo: token de l'école illisible", error);
+    }
+    if (!token) {
+      try {
+        token = VIMEO_ACCESS_TOKEN.value() || null;
+      } catch {
+        token = null;
+      }
+    }
+    try {
+      return await resolveVimeo(input.url, token, APP_URL.value());
+    } catch (error) {
+      throw new HttpsError("failed-precondition", (error as Error).message);
+    }
+  },
+);
+
+/** Relie un compte Vimeo à l'école : token vérifié auprès de Vimeo, puis chiffré. */
+export const saveVimeoSettings = onCall({ secrets: [SETTINGS_ENCRYPTION_KEY] }, async (request) => {
+  const caller = requireCreator(request);
+  const input = parseInput(vimeoSettingsInput, request.data);
   try {
-    token = VIMEO_ACCESS_TOKEN.value() || null;
-  } catch {
-    token = null;
-  }
-  try {
-    return await resolveVimeo(input.url, token, APP_URL.value());
+    return await saveVimeoSettingsImpl(caller.uid, input.token, {
+      key: settingsKey,
+      fetchMe: fakeVimeo ? fakeFetchVimeoMe : fetchVimeoMe,
+    });
   } catch (error) {
-    throw new HttpsError("failed-precondition", (error as Error).message);
+    if (error instanceof VimeoSetupError) {
+      throw new HttpsError("failed-precondition", error.message);
+    }
+    throw error;
   }
+});
+
+export const deleteVimeoSettings = onCall(async (request) => {
+  const caller = requireCreator(request);
+  await deleteVimeoSettingsImpl(caller.uid);
+  return { ok: true };
 });
 
 /** Notifications à la création d'un commentaire. */

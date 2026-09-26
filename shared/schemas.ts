@@ -52,7 +52,11 @@ export const courseStudentInput = z.object({
 });
 export type CourseStudentInput = z.infer<typeof courseStudentInput>;
 
-export const resolveVimeoInput = z.object({ url: z.string().trim().min(1).max(2000) });
+export const resolveVimeoInput = z.object({
+  url: z.string().trim().min(1).max(2000),
+  /** École dont le token Vimeo est utilisé (par défaut, celle de l'appelant). */
+  schoolId: z.string().min(1).max(128).nullish(),
+});
 export type ResolveVimeoInput = z.infer<typeof resolveVimeoInput>;
 
 export const courseIdInput = z.object({ courseId: z.string().min(1) });
