@@ -179,6 +179,10 @@ jobs:
 
       - name: Accès Firestore du serveur App Hosting
         if: ${{ !inputs.accounts_only }}
+        # Mêmes secrets que l'initialisation : sans eux, le script annonce à tort « pas de clé ».
+        env:
+          VIMEO_ACCESS_TOKEN: ${{ secrets.VIMEO_ACCESS_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
         run: npx tsx scripts/bootstrap-firebase.ts --project "$PROJECT_ID" --backend "$BACKEND_ID"
 
       - name: Administrateur de la plateforme
