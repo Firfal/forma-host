@@ -1,0 +1,58 @@
+name: Diagnostic domaine
+
+# État d'un domaine personnalisé chez App Hosting (onglet Actions > Diagnostic domaine > Run workflow).
+# Les enregistrements DNS affichés ne sont pas secrets : ils sont publics une fois créés.
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Domaine à diagnostiquer (ex. formation.ecolemotion.com)"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: forma-host
+  PROJECT_NUMBER: "1038452933800"
+  REGION: europe-west4
+  BACKEND_ID: forma-host
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github/providers/forma-host-repo
+          service_account: github-deploy@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: État App Hosting
+        run: |
+          HOST=$(jq -r '.inputs.host' "$GITHUB_EVENT_PATH" | tr 'A-Z' 'a-z')
+          TOKEN=$(gcloud auth print-access-token)
+          API="https://firebaseapphosting.googleapis.com/v1/projects/$PROJECT_ID/locations/$REGION"
+          echo "== Domaine $HOST"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$API/backends/$BACKEND_ID/domains/$HOST" | jq .
+          echo "== Domaines du backend"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$API/backends/$BACKEND_ID/domains" | jq '[.domains[]? | {name, customDomainStatus: (.customDomainStatus | {hostState, ownershipState, certState})}]'
+          echo "== Opérations liées au domaine"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$API/operations?pageSize=100" |
+            jq --arg host "$HOST" '[.operations[]? | select((.metadata.target // "") | contains($host)) | {name, done, error, metadata: {verb: .metadata.verb, createTime: .metadata.createTime, endTime: .metadata.endTime}}]'
+          echo "== DNS public"
+          for type in A AAAA CNAME TXT CAA; do
+            echo "-- $type $HOST"
+            curl -sS "https://dns.google/resolve?name=$HOST&type=$type" | jq -c '{Status, Answer}'
+          done
+
+      - name: Erreurs des Functions domaines (24 h)
+        run: |
+          gcloud logging read \
+            'resource.type="cloud_run_revision" AND resource.labels.service_name=~"(addschooldomain|refreshschooldomain|removeschooldomain)" AND severity>=WARNING' \
+            --project "$PROJECT_ID" --freshness=1d --limit 20 \
+            --format='value(timestamp, severity, textPayload, jsonPayload.message)' | cut -c1-600
