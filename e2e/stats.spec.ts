@@ -11,7 +11,8 @@ test("statistiques : chiffres clés, courbes mensuelles, formations et décrocha
     .click();
   await expect(page.getByRole("heading", { name: "Statistiques" })).toBeVisible();
   await expect(page.getByText("Nouveaux élèves", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Aucune vente sur la période.")).toBeVisible();
+  // Avec ou sans vente (selon les scénarios déjà passés) : graphique ou message vide.
+  await expect(page.getByRole("heading", { name: "Chiffre d'affaires par mois" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Nouveaux élèves par mois" })).toBeVisible();
 
   // Info-bulle au clavier sur une colonne, et vue tableau.

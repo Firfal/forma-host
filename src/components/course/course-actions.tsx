@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Eye, ExternalLink, MoreHorizontal, Trash2 } from "lucide-react";
+import { Copy, CopyPlus, Eye, ExternalLink, MoreHorizontal, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { duplicateCourse } from "@/lib/course-duplicate";
 import { deleteDraftCourse, setCourseStatus, type CourseWithId } from "@/lib/courses";
 import { useCreator } from "@/lib/creator";
 import { errorMessage } from "@/lib/firebase/callables";
@@ -46,6 +47,20 @@ export function CourseActions({ course }: { course: CourseWithId }) {
     if (!salesPath) return;
     await navigator.clipboard.writeText(`${window.location.origin}${salesPath}`);
     toast.success("Lien copié");
+  }
+
+  async function duplicate() {
+    setBusy(true);
+    const pending = toast.loading("Duplication de la formation…");
+    try {
+      const id = await duplicateCourse(course);
+      toast.success("Copie créée en brouillon", { id: pending });
+      router.push(routes.adminCourseContent(id));
+    } catch (error) {
+      toast.error(errorMessage(error), { id: pending });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function remove() {
@@ -94,6 +109,10 @@ export function CourseActions({ course }: { course: CourseWithId }) {
               <DropdownMenuSeparator />
             </>
           ) : null}
+          <DropdownMenuItem disabled={busy} onSelect={() => void duplicate()}>
+            <CopyPlus /> Dupliquer la formation
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem tone="danger" disabled={published} onSelect={() => void remove()}>
             <Trash2 /> {published ? "Dépublier pour supprimer" : "Supprimer…"}
           </DropdownMenuItem>

@@ -257,7 +257,13 @@ export async function setCourseStatus(course: CourseWithId, status: CourseStatus
 /** Supprime un brouillon et ses leçons. */
 export async function deleteDraftCourse(course: CourseWithId): Promise<void> {
   if (course.status !== "draft") throw new Error("Dépublie la formation avant de la supprimer.");
-  const lessons = await getDocs(collection(db, "courses", course.id, "lessons"));
+  // Filtre sur l'école : sans lui, les règles refusent la requête sur les leçons.
+  const lessons = await getDocs(
+    query(
+      collection(db, "courses", course.id, "lessons"),
+      where("creatorId", "==", course.creatorId),
+    ),
+  );
   const batch = writeBatch(db);
   lessons.docs.forEach((lesson) => batch.delete(lesson.ref));
   batch.delete(doc(db, "courses", course.id, "private", "settings"));
