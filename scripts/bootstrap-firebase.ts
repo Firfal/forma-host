@@ -127,20 +127,25 @@ const REQUIRED_APIS = [
   "firebaseinstallations.googleapis.com",
 ];
 
+/** batchEnable accepte au plus 20 services par appel. */
+const ENABLE_BATCH_SIZE = 20;
+
 async function enableApis() {
-  const operation = await api<{ name?: string; done?: boolean }>(
-    "POST",
-    `https://serviceusage.googleapis.com/v1/projects/${PROJECT}/services:batchEnable`,
-    { serviceIds: REQUIRED_APIS },
-  ).catch((error: ApiError) => {
-    if (/billing/i.test(error.message)) {
-      throw new Error(
-        `Le projet ${PROJECT} n'est pas en offre Blaze : Console Firebase > Paramètres > Utilisation et facturation > Modifier l'offre.`,
-      );
-    }
-    throw error;
-  });
-  await waitOperation("https://serviceusage.googleapis.com/v1", operation!);
+  for (let start = 0; start < REQUIRED_APIS.length; start += ENABLE_BATCH_SIZE) {
+    const operation = await api<{ name?: string; done?: boolean }>(
+      "POST",
+      `https://serviceusage.googleapis.com/v1/projects/${PROJECT}/services:batchEnable`,
+      { serviceIds: REQUIRED_APIS.slice(start, start + ENABLE_BATCH_SIZE) },
+    ).catch((error: ApiError) => {
+      if (/billing/i.test(error.message)) {
+        throw new Error(
+          `Le projet ${PROJECT} n'est pas en offre Blaze : Console Firebase > Paramètres > Utilisation et facturation > Modifier l'offre.`,
+        );
+      }
+      throw error;
+    });
+    await waitOperation("https://serviceusage.googleapis.com/v1", operation!);
+  }
   ok(`APIs activées (${REQUIRED_APIS.length})`);
 }
 
