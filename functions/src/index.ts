@@ -1,6 +1,10 @@
 import "./setup";
 import { FieldValue } from "firebase-admin/firestore";
-import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
+import {
+  onDocumentCreated,
+  onDocumentUpdated,
+  onDocumentWritten,
+} from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import Stripe from "stripe";
@@ -22,6 +26,7 @@ import { publishAnnouncementInput } from "@shared/announcements";
 import { issueCertificateInput } from "@shared/certificates";
 import { submitQuizInput } from "@shared/quiz";
 import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
+import type { FeedbackDoc, SubmissionDoc } from "@shared/exercises";
 import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
 import { schoolLegalInput } from "@shared/legal";
@@ -105,6 +110,7 @@ import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
 import { publishAnnouncement as publishAnnouncementImpl } from "./announcements";
 import { CertificateError, issueCertificate as issueCertificateImpl } from "./certificates";
 import { issueMissingInvoices as issueMissingInvoicesImpl } from "./invoices";
+import { handleNewFeedback, handleNewSubmission, handleSubmissionReviewed } from "./exercises";
 import { QuizError, submitQuiz as submitQuizImpl } from "./quiz";
 import { resolveVimeo } from "./vimeo";
 import {
@@ -556,6 +562,50 @@ export const submitQuiz = onCall(async (request) => {
     throw error;
   }
 });
+
+/** Exercice rendu : l'équipe de l'école est prévenue (in-app). */
+export const onSubmissionCreated = onDocumentCreated(
+  "submissions/{submissionId}",
+  async (event) => {
+    const submission = event.data?.data() as SubmissionDoc | undefined;
+    if (!submission) return;
+    try {
+      await handleNewSubmission(event.params.submissionId, submission);
+    } catch (error) {
+      logger.error("onSubmissionCreated", error);
+    }
+  },
+);
+
+/** Exercice marqué corrigé : l'élève est prévenu. */
+export const onSubmissionUpdated = onDocumentUpdated(
+  "submissions/{submissionId}",
+  async (event) => {
+    try {
+      await handleSubmissionReviewed(
+        event.params.submissionId,
+        event.data?.before.data() as SubmissionDoc | undefined,
+        event.data?.after.data() as SubmissionDoc | undefined,
+      );
+    } catch (error) {
+      logger.error("onSubmissionUpdated", error);
+    }
+  },
+);
+
+/** Retour sur un exercice : l'élève (ou l'équipe, si c'est l'élève qui répond) est prévenu. */
+export const onSubmissionFeedbackCreated = onDocumentCreated(
+  "submissions/{submissionId}/feedback/{feedbackId}",
+  async (event) => {
+    const feedback = event.data?.data() as FeedbackDoc | undefined;
+    if (!feedback) return;
+    try {
+      await handleNewFeedback(event.params.submissionId, event.params.feedbackId, feedback);
+    } catch (error) {
+      logger.error("onSubmissionFeedbackCreated", error);
+    }
+  },
+);
 
 /** Nouvelle demande d'espace formateur : les administrateurs de la plateforme sont prévenus. */
 export const onCreatorRequestCreated = onDocumentCreated("creatorRequests/{uid}", async (event) => {

@@ -45,6 +45,15 @@ service firebase.storage {
         && (request.resource == null || request.resource.size < 100 * 1024 * 1024);
     }
 
+    // Exercices rendus : l'élève inscrit envoie (vidéo, image, PDF), l'équipe de l'école lit.
+    match /submissions/{courseId}/{userId}/{fileName} {
+      allow read: if signedIn() && (request.auth.uid == userId || isCourseOwner(courseId));
+      allow create: if signedIn() && request.auth.uid == userId && isEnrolled(courseId)
+        && request.resource.size < 500 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*|image/(png|jpeg|gif|webp)|application/pdf');
+      allow delete: if signedIn() && request.auth.uid == userId;
+    }
+
     match /users/{userId}/avatar/{fileName} {
       allow read: if true;
       allow write: if signedIn() && request.auth.uid == userId

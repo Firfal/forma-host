@@ -39,6 +39,8 @@ export const storagePaths = {
     `courses/${courseId}/lessons/${lessonId}/attachments/${fileName}`,
   avatar: (uid: string, fileName: string) => `users/${uid}/avatar/${fileName}`,
   creatorLogo: (uid: string, fileName: string) => `creators/${uid}/logo/${fileName}`,
+  submission: (courseId: string, uid: string, fileName: string) =>
+    `submissions/${courseId}/${uid}/${fileName}`,
 };
 
 /** Routes de l'application. */
@@ -67,6 +69,8 @@ export const routes = {
   adminComments: "/admin/commentaires",
   adminSettings: "/admin/parametres",
   adminStats: "/admin/statistiques",
+  adminExercises: "/admin/exercices",
+  adminSubmission: (submissionId: string) => `/admin/exercices/${submissionId}`,
   adminMessages: "/admin/messages",
   adminConversation: (conversationId: string) => `/admin/messages/${conversationId}`,
   messages: "/messages",

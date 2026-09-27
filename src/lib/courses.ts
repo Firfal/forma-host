@@ -209,7 +209,7 @@ export async function saveOutline(
 
 export type LessonContentPatch = Pick<
   LessonDoc,
-  "video" | "thumbnailUrl" | "body" | "links" | "attachments" | "quiz"
+  "video" | "thumbnailUrl" | "body" | "links" | "attachments" | "quiz" | "exercise"
 >;
 /** Corrigé du quiz : null le supprime, absent le laisse tel quel. */
 export type QuizKeyPatch = Pick<QuizKeyDoc, "answers" | "explanations"> | null;

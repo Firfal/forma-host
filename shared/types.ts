@@ -5,6 +5,7 @@
 
 import type { SchoolDomain } from "./domains";
 import type { DripSettings } from "./drip";
+import type { LessonExercise } from "./exercises";
 import type { CoursePrice } from "./payments";
 import type { LessonQuiz, QuizResult } from "./quiz";
 
@@ -126,6 +127,8 @@ export interface LessonDoc<T = TimestampLike> {
   attachments: LessonAttachment[];
   /** Quiz de fin de leçon (bonnes réponses dans quizKeys/{lessonId}). */
   quiz?: LessonQuiz | null;
+  /** Exercice à rendre (consignes), null si aucun. */
+  exercise?: LessonExercise | null;
   updatedAt: T;
 }
 
@@ -178,7 +181,9 @@ export type NotificationType =
   | "new_message"
   | "domain_active"
   | "payment_issue"
-  | "announcement";
+  | "announcement"
+  | "new_submission"
+  | "submission_feedback";
 
 export interface NotificationDoc<T = TimestampLike> {
   type: NotificationType;

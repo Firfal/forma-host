@@ -74,6 +74,7 @@ export async function duplicateCourse(course: CourseWithId): Promise<string> {
         links: data.links,
         attachments: data.attachments,
         ...(data.quiz ? { quiz: data.quiz } : {}),
+        ...(data.exercise ? { exercise: data.exercise } : {}),
         updatedAt: serverTimestamp(),
       });
       const key = keys.get(lesson.id);

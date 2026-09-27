@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ChevronsUpDown,
+  ClipboardCheck,
   GraduationCap,
   House,
   LayoutGrid,
@@ -37,6 +38,7 @@ import { useAuth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { useStudentConversations, useUnreadConversations } from "@/lib/chat";
 import { cn } from "@/lib/cn";
+import { usePendingSubmissions } from "@/lib/exercises";
 import { useCreator } from "@/lib/creator";
 import { useSchool, useSchoolDocs } from "@/lib/school";
 
@@ -45,6 +47,8 @@ interface NavItem {
   label: string;
   icon: ComponentType<{ className?: string }>;
   exact?: boolean;
+  /** Sens du nombre affiché (lecteurs d'écran), « non lus » par défaut. */
+  badgeLabel?: string;
 }
 
 const adminNav: NavItem[] = [
@@ -53,6 +57,12 @@ const adminNav: NavItem[] = [
   { href: routes.adminMembers, label: "Membres", icon: Users },
   { href: routes.adminMessages, label: "Messages", icon: MessagesSquare },
   { href: routes.adminComments, label: "Commentaires", icon: MessageSquare },
+  {
+    href: routes.adminExercises,
+    label: "Exercices",
+    icon: ClipboardCheck,
+    badgeLabel: "à corriger",
+  },
   { href: routes.adminStats, label: "Statistiques", icon: BarChart3 },
   { href: routes.adminSettings, label: "Paramètres", icon: Settings },
 ];
@@ -107,7 +117,7 @@ function NavLink({
       {badge ? (
         <span
           className="ml-auto grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[11px] font-semibold text-white"
-          aria-label={`${badge} non lu${badge > 1 ? "s" : ""}`}
+          aria-label={`${badge} ${item.badgeLabel ?? `non lu${badge > 1 ? "s" : ""}`}`}
         >
           {badge}
         </span>
@@ -182,6 +192,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
   const { schoolId, schools } = useSchool();
   const displayName = user?.displayName || user?.email || "";
   const schoolUnread = useUnreadConversations("school", isCreator ? schoolId : null);
+  const pendingSubmissions = usePendingSubmissions(isCreator ? schoolId : null);
   const studentUnread = useUnreadConversations("student", user?.uid);
   // Formateur : « Messages » côté élève seulement s'il écrit lui-même à une autre école.
   const { data: studentConversations } = useStudentConversations(isCreator ? user?.uid : undefined);
@@ -207,7 +218,13 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
                   key={item.href}
                   item={item}
                   onNavigate={onNavigate}
-                  badge={item.href === routes.adminMessages ? schoolUnread : undefined}
+                  badge={
+                    item.href === routes.adminMessages
+                      ? schoolUnread
+                      : item.href === routes.adminExercises
+                        ? pendingSubmissions
+                        : undefined
+                  }
                 />
               ))}
             </div>

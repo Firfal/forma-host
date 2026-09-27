@@ -9,7 +9,7 @@ export function validateImage(file: File, maxMb = 5): string | null {
   return null;
 }
 
-function safeFileName(name: string): string {
+export function safeFileName(name: string): string {
   const dot = name.lastIndexOf(".");
   const base = (dot > 0 ? name.slice(0, dot) : name)
     .normalize("NFD")

@@ -796,3 +796,124 @@ describe("quiz", () => {
     await assertFails(updateDoc(ref, { "quizResults.l2": { passed: true } }));
   });
 });
+
+describe("exercices rendus", () => {
+  const submission = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    courseId: "c1",
+    creatorId: THEO,
+    lessonId: "l2",
+    lessonTitle: "Interface",
+    uid,
+    studentName: "Anne",
+    file: {
+      path: `submissions/c1/${uid}/1-exo.mp4`,
+      name: "exo.mp4",
+      size: 1000,
+      contentType: "video/mp4",
+    },
+    link: null,
+    note: "",
+    status: "submitted",
+    createdAt: serverTimestamp(),
+    reviewedAt: null,
+    lastFeedbackAt: null,
+    ...overrides,
+  });
+  const feedback = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    authorUid: uid,
+    authorName: "Théo",
+    atSec: 12.5,
+    body: "Super !",
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+  const seed = () =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "submissions/s1"), {
+        ...submission(ANNE),
+        createdAt: Timestamp.now(),
+      });
+    });
+
+  it("l'élève inscrit rend un exercice pour lui-même (fichier à son nom ou lien)", async () => {
+    await assertSucceeds(setDoc(doc(db(ANNE), "submissions/a"), submission(ANNE)));
+    await assertSucceeds(
+      setDoc(
+        doc(db(ANNE), "submissions/b"),
+        submission(ANNE, { file: null, link: "https://x.fr" }),
+      ),
+    );
+    await assertFails(setDoc(doc(db(ANNE), "submissions/c"), submission(ANNE, { file: null })));
+    await assertFails(
+      setDoc(doc(db(ANNE), "submissions/d"), submission(ANNE, { status: "reviewed" })),
+    );
+    await assertFails(
+      setDoc(
+        doc(db(ANNE), "submissions/e"),
+        submission(ANNE, {
+          file: { ...submission(ANNE).file, path: "submissions/c1/autre/x.mp4" },
+        }),
+      ),
+    );
+    await assertFails(setDoc(doc(db(REVOKED), "submissions/f"), submission(REVOKED)));
+    await assertFails(setDoc(doc(db(STRANGER), "submissions/g"), submission(STRANGER)));
+    await assertFails(setDoc(doc(db(ANNE), "submissions/h"), submission(STRANGER)));
+    await assertFails(
+      setDoc(doc(db(ANNE), "submissions/i"), submission(ANNE, { creatorId: OTHER_CREATOR })),
+    );
+  });
+
+  it("lecture : l'élève et l'équipe de l'école ; correction par l'équipe seulement", async () => {
+    await seed();
+    await assertSucceeds(getDoc(doc(db(ANNE), "submissions/s1")));
+    await assertSucceeds(getDoc(doc(coAdminDb(), "submissions/s1")));
+    await assertFails(getDoc(doc(db(STRANGER), "submissions/s1")));
+    await assertSucceeds(
+      getDocs(query(collection(creatorDb(), "submissions"), where("creatorId", "==", THEO))),
+    );
+    await assertFails(
+      updateDoc(doc(db(ANNE), "submissions/s1"), {
+        status: "reviewed",
+        reviewedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(creatorDb(), "submissions/s1"), { status: "reviewed", reviewedAt: null }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(creatorDb(), "submissions/s1"), {
+        status: "reviewed",
+        reviewedAt: serverTimestamp(),
+      }),
+    );
+    // Corrigé : l'élève ne peut plus le retirer.
+    await assertFails(deleteDoc(doc(db(ANNE), "submissions/s1")));
+  });
+
+  it("retours : l'équipe et l'élève concerné, horodatage valide", async () => {
+    await seed();
+    await assertSucceeds(setDoc(doc(creatorDb(), "submissions/s1/feedback/f1"), feedback(THEO)));
+    await assertSucceeds(
+      setDoc(doc(db(ANNE), "submissions/s1/feedback/f2"), feedback(ANNE, { atSec: null })),
+    );
+    await assertFails(setDoc(doc(db(STRANGER), "submissions/s1/feedback/f3"), feedback(STRANGER)));
+    await assertFails(setDoc(doc(db(ANNE), "submissions/s1/feedback/f4"), feedback(THEO)));
+    await assertFails(
+      setDoc(doc(creatorDb(), "submissions/s1/feedback/f5"), feedback(THEO, { atSec: -1 })),
+    );
+    await assertSucceeds(getDoc(doc(db(ANNE), "submissions/s1/feedback/f1")));
+    await assertFails(getDoc(doc(db(STRANGER), "submissions/s1/feedback/f1")));
+    await assertFails(deleteDoc(doc(db(ANNE), "submissions/s1/feedback/f1")));
+    await assertSucceeds(deleteDoc(doc(db(ANNE), "submissions/s1/feedback/f2")));
+  });
+
+  it("consignes d'exercice sur une leçon", async () => {
+    const ref = doc(creatorDb(), "courses/c1/lessons/l2");
+    const save = (value: unknown) =>
+      updateDoc(ref, { exercise: value, updatedAt: serverTimestamp() });
+    await assertSucceeds(save({ instructions: "Anime ton logo en 5 secondes." }));
+    await assertSucceeds(save(null));
+    await assertFails(save({ instructions: "x".repeat(3001) }));
+    await assertFails(save({ instructions: "ok", deadline: 3 }));
+  });
+});

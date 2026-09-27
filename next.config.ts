@@ -7,6 +7,9 @@ const firebaseConfig =
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Mode dev (tests E2E) : les pages compilées restent en mémoire au lieu d'être recompilées
+  // après quelques secondes d'inactivité. Sans effet en production.
+  onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 100 },
   env: {
     NEXT_PUBLIC_FIREBASE_CONFIG: firebaseConfig,
   },

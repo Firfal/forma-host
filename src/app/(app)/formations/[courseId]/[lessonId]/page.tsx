@@ -24,6 +24,7 @@ import type { LessonDoc } from "@shared/types";
 import { LessonComments } from "@/components/comments/lesson-comments";
 import { RichText } from "@/components/editor/rich-text";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
+import { LessonExercise } from "@/components/learn/lesson-exercise";
 import { LessonQuiz } from "@/components/learn/lesson-quiz";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
@@ -289,6 +290,18 @@ export default function LessonPage() {
             lessonId={lessonId}
             quiz={lesson.quiz}
             result={enrollment?.quizResults?.[lessonId]}
+            mode={tracksProgress ? "student" : isOwner ? "preview" : "visitor"}
+          />
+        ) : null}
+
+        {lesson?.exercise && !lock ? (
+          <LessonExercise
+            key={`exercise-${lessonId}`}
+            courseId={courseId}
+            creatorId={course.creatorId}
+            lessonId={lessonId}
+            lessonTitle={item.title}
+            exercise={lesson.exercise}
             mode={tracksProgress ? "student" : isOwner ? "preview" : "visitor"}
           />
         ) : null}

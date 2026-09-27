@@ -26,7 +26,7 @@ test("le formateur crée une formation, un chapitre, une leçon, puis publie", a
   await page.getByRole("button", { name: "Ajouter un lien" }).click();
   await page.getByPlaceholder("Libellé (ex. Discord)").fill("Discord");
   await page.getByPlaceholder("https://…").fill("https://discord.gg/test");
-  await page.getByRole("switch").first().click();
+  await page.getByRole("switch", { name: /Aperçu gratuit/ }).click();
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Leçon enregistrée")).toBeVisible();
   await page.reload();

@@ -3,6 +3,7 @@
 import { doc, getDoc } from "firebase/firestore";
 import {
   AlertTriangle,
+  ClipboardCheck,
   ExternalLink,
   FileUp,
   Link2,
@@ -29,6 +30,7 @@ import {
   type QuizDraft,
   type QuizKeyDoc,
 } from "@shared/quiz";
+import { EXERCISE_LIMITS } from "@shared/exercises";
 import { lessonLinkSchema } from "@shared/schemas";
 import { parseVimeoUrl, vimeoPageUrl } from "@shared/vimeo";
 import type { LessonAttachment, LessonDoc, LessonLink, RichText, VimeoVideo } from "@shared/types";
@@ -42,7 +44,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { saveLesson, saveOutline } from "@/lib/courses";
@@ -84,6 +86,8 @@ interface Draft {
   links: LessonLink[];
   attachments: LessonAttachment[];
   quiz: QuizDraft | null;
+  /** Consignes de l'exercice à rendre (null : pas d'exercice). */
+  exercise: string | null;
 }
 
 export default function LessonEditorPage() {
@@ -125,6 +129,7 @@ export default function LessonEditorPage() {
           links: lesson?.links ?? [],
           attachments: lesson?.attachments ?? [],
           quiz: lesson?.quiz ? mergeQuizDraft(lesson.quiz, key ?? null) : null,
+          exercise: lesson?.exercise ? lesson.exercise.instructions : null,
         });
       })
       .catch((error) => toast.error(errorMessage(error)));
@@ -258,6 +263,7 @@ export default function LessonEditorPage() {
           links,
           attachments: draft.attachments,
           quiz: quiz?.quiz ?? null,
+          exercise: draft.exercise === null ? null : { instructions: draft.exercise.trim() },
         },
         {
           title: title.trim() || "Sans titre",
@@ -532,6 +538,35 @@ export default function LessonEditorPage() {
                 className="hidden"
                 onChange={onAttachment}
               />
+            </Section>
+
+            <Section title="Exercice à rendre" icon={<ClipboardCheck />}>
+              <label className="flex items-start justify-between gap-3">
+                <span>
+                  <span className="block font-medium">Exercice à rendre</span>
+                  <span className="block text-[13px] text-muted">
+                    L&apos;élève envoie une vidéo, une image, un PDF ou un lien. Tu le corriges
+                    depuis Exercices, avec des retours placés au bon moment de sa vidéo.
+                  </span>
+                </span>
+                <Switch
+                  aria-label="Exercice à rendre"
+                  checked={draft.exercise !== null}
+                  onCheckedChange={(enabled) => update({ exercise: enabled ? "" : null })}
+                />
+              </label>
+              {draft.exercise !== null ? (
+                <Field label="Consignes" htmlFor="exercise-instructions">
+                  <Textarea
+                    id="exercise-instructions"
+                    aria-label="Consignes de l'exercice"
+                    placeholder="Ex. Anime le logo de l'école en 5 secondes, exporte en MP4 et envoie ta vidéo."
+                    maxLength={EXERCISE_LIMITS.instructions}
+                    value={draft.exercise}
+                    onChange={(e) => update({ exercise: e.target.value })}
+                  />
+                </Field>
+              ) : null}
             </Section>
 
             <Section title="Quiz" icon={<ListChecks />}>

@@ -48,6 +48,35 @@ beforeEach(async () => {
 });
 
 describe("storage", () => {
+  it("exercices rendus : l'élève inscrit envoie les siens, l'équipe les lit", async () => {
+    const path = "submissions/c1/anne/1-exo.mp4";
+    const VIDEO = new Uint8Array([0, 0, 0, 24]);
+    await assertSucceeds(
+      uploadBytes(ref(storage("anne"), path), VIDEO, { contentType: "video/mp4" }),
+    );
+    await assertSucceeds(getBytes(ref(storage("anne"), path)));
+    await assertSucceeds(getBytes(ref(storage("theo"), path)));
+    await assertSucceeds(
+      getBytes(ref(storage("quentin", { creator: true, schools: ["theo"] }), path)),
+    );
+    await assertFails(getBytes(ref(storage("inconnu"), path)));
+    await assertFails(
+      uploadBytes(ref(storage("anne"), "submissions/c1/autre/x.mp4"), VIDEO, {
+        contentType: "video/mp4",
+      }),
+    );
+    await assertFails(
+      uploadBytes(ref(storage("revoque"), "submissions/c1/revoque/x.mp4"), VIDEO, {
+        contentType: "video/mp4",
+      }),
+    );
+    await assertFails(
+      uploadBytes(ref(storage("anne"), "submissions/c1/anne/x.zip"), PDF, {
+        contentType: "application/zip",
+      }),
+    );
+  });
+
   it("le formateur téléverse la miniature, pas un élève", async () => {
     const path = "courses/c1/thumbnail/cover.png";
     await assertSucceeds(

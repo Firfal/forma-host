@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   Bell,
   BookOpen,
+  ClipboardCheck,
   Globe,
   GraduationCap,
   Megaphone,
@@ -40,6 +41,8 @@ const icons: Record<NotificationType, typeof Bell> = {
   domain_active: Globe,
   payment_issue: AlertTriangle,
   announcement: Megaphone,
+  new_submission: ClipboardCheck,
+  submission_feedback: ClipboardCheck,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

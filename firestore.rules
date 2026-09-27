@@ -299,7 +299,7 @@ service cloud.firestore {
     function isValidLesson(data) {
       return data.keys().hasOnly([
           'creatorId', 'courseId', 'courseStatus', 'isPreview', 'title', 'video', 'thumbnailUrl',
-          'body', 'links', 'attachments', 'quiz', 'updatedAt'])
+          'body', 'links', 'attachments', 'quiz', 'exercise', 'updatedAt'])
         && data.courseStatus in ['draft', 'published']
         && data.isPreview is bool
         && isShortString(data.title, 1, 200)
@@ -307,7 +307,16 @@ service cloud.firestore {
         && data.links is list && data.links.size() <= 50
         && data.attachments is list && data.attachments.size() <= 50
         && isValidQuiz(data.get('quiz', null))
+        && isValidExercise(data.get('exercise', null))
         && data.updatedAt == request.time;
+    }
+
+    // Exercice à rendre : consignes de la leçon.
+    function isValidExercise(exercise) {
+      return exercise == null
+        || (exercise is map
+          && exercise.keys().hasOnly(['instructions'])
+          && isShortString(exercise.instructions, 0, 3000));
     }
 
     // Quiz de fin de leçon (sans les bonnes réponses, rangées dans quizKeys).
@@ -369,6 +378,70 @@ service cloud.firestore {
         && progress.completedLessonIds.size() <= 1000
         && isNullableString(progress.lastLessonId, 64)
         && progress.lastActivityAt == request.time;
+    }
+
+    // Exercices rendus : l'élève inscrit envoie, l'équipe de l'école corrige.
+    match /submissions/{submissionId} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || isSchoolAdmin(resource.data.creatorId));
+      allow create: if signedIn() && isValidSubmission(request.resource.data);
+      allow update: if isSchoolAdmin(resource.data.creatorId)
+        && changedOnly(['status', 'reviewedAt'])
+        && request.resource.data.status in ['submitted', 'reviewed']
+        && request.resource.data.reviewedAt == (
+          request.resource.data.status == 'reviewed' ? request.time : null);
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && resource.data.status == 'submitted';
+
+      function submission() {
+        return get(/databases/$(database)/documents/submissions/$(submissionId)).data;
+      }
+
+      // Retours du formateur et réponses de l'élève.
+      match /feedback/{feedbackId} {
+        allow read: if signedIn()
+          && (submission().uid == request.auth.uid || isSchoolAdmin(submission().creatorId));
+        allow create: if signedIn()
+          && (submission().uid == request.auth.uid || isSchoolAdmin(submission().creatorId))
+          && request.resource.data.keys().hasOnly(
+              ['authorUid', 'authorName', 'atSec', 'body', 'createdAt'])
+          && request.resource.data.authorUid == request.auth.uid
+          && isShortString(request.resource.data.authorName, 1, 80)
+          && isShortString(request.resource.data.body, 1, 3000)
+          && (request.resource.data.atSec == null
+              || (request.resource.data.atSec is number
+                && request.resource.data.atSec >= 0
+                && request.resource.data.atSec <= 86400))
+          && request.resource.data.createdAt == request.time;
+        allow delete: if signedIn() && resource.data.authorUid == request.auth.uid;
+      }
+    }
+
+    function isValidSubmission(data) {
+      return data.keys().hasOnly([
+          'courseId', 'creatorId', 'lessonId', 'lessonTitle', 'uid', 'studentName', 'file',
+          'link', 'note', 'status', 'createdAt', 'reviewedAt', 'lastFeedbackAt'])
+        && data.uid == request.auth.uid
+        && isShortString(data.courseId, 1, 128)
+        && isEnrolled(data.courseId)
+        && data.creatorId == course(data.courseId).creatorId
+        && isShortString(data.lessonId, 1, 64)
+        && isShortString(data.lessonTitle, 1, 200)
+        && isShortString(data.studentName, 1, 80)
+        && isShortString(data.note, 0, 2000)
+        && data.status == 'submitted'
+        && data.createdAt == request.time
+        && data.reviewedAt == null
+        && data.lastFeedbackAt == null
+        && (data.link == null || isShortString(data.link, 1, 2000))
+        && (data.file == null
+            || (data.file is map
+              && data.file.keys().hasOnly(['path', 'name', 'size', 'contentType'])
+              && data.file.path is string
+              && data.file.path.matches(
+                  'submissions/' + data.courseId + '/' + request.auth.uid + '/[^/]+')))
+        && (data.file != null || data.link != null);
     }
 
     // Certificats de réussite : délivrés par la callable issueCertificate, vérifiables par tous.
