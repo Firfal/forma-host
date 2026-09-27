@@ -22,6 +22,7 @@ export const RESERVED_SLUGS = new Set([
   "api",
   "bienvenue",
   "c",
+  "certificats",
   "compte",
   "connexion",
   "devenir-formateur",

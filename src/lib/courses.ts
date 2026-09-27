@@ -121,6 +121,7 @@ type CourseEditableFields = Pick<
   | "commentsMode"
   | "salesPage"
   | "price"
+  | "certificate"
 >;
 
 export async function updateCourse(courseId: string, patch: Partial<CourseEditableFields>) {

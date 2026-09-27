@@ -709,3 +709,24 @@ describe("utilisateurs et zones serveur", () => {
     );
   });
 });
+
+describe("certificats", () => {
+  it("vérifiables par tous, délivrés par le serveur", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "certificates/abc123def456"), { studentName: "Anne" });
+    });
+    await assertSucceeds(getDoc(doc(db(null), "certificates/abc123def456")));
+    await assertFails(setDoc(doc(db(ANNE), "certificates/faux"), { studentName: "Anne" }));
+  });
+
+  it("le formateur active ou désactive le certificat d'une formation (booléen)", async () => {
+    const ref = doc(creatorDb(), "courses/c1");
+    await assertSucceeds(updateDoc(ref, { certificate: false, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { certificate: "non", updatedAt: serverTimestamp() }));
+  });
+
+  it("l'élève ne se délivre pas de certificat via son inscription", async () => {
+    const ref = doc(db(ANNE), `enrollments/c1_${ANNE}`);
+    await assertFails(updateDoc(ref, { certificateId: "faux" }));
+  });
+});

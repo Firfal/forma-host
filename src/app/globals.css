@@ -72,3 +72,15 @@
     @apply mb-0;
   }
 }
+
+/* Certificat : imprimé en A4 paysage, sans marges (page CSS nommée). */
+@page certificate {
+  size: A4 landscape;
+  margin: 0;
+}
+
+@media print {
+  .print-certificate {
+    page: certificate;
+  }
+}

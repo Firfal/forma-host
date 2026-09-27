@@ -117,3 +117,63 @@ export async function publishLegalInfo(slug: string) {
     }),
   });
 }
+
+/** Marque toutes les leçons visibles d'une formation comme terminées pour un élève. */
+export async function completeCourseFor(email: string, courseId: string) {
+  const course = (await (
+    await fetch(`${FIRESTORE}/courses/${courseId}`, { headers: OWNER })
+  ).json()) as {
+    fields: {
+      items: {
+        arrayValue: {
+          values: {
+            mapValue: { fields: Record<string, { stringValue?: string; booleanValue?: boolean }> };
+          }[];
+        };
+      };
+    };
+  };
+  const lessonIds = course.fields.items.arrayValue.values
+    .map((item) => item.mapValue.fields)
+    .filter((item) => item.kind?.stringValue === "lesson" && !item.hidden?.booleanValue)
+    .map((item) => item.id.stringValue!);
+  const response = await fetch(`${FIRESTORE}:runQuery`, {
+    method: "POST",
+    headers: OWNER,
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "enrollments" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "email" },
+            op: "EQUAL",
+            value: { stringValue: email },
+          },
+        },
+      },
+    }),
+  });
+  const rows = (await response.json()) as {
+    document?: { name: string; fields: { courseId: { stringValue: string } } };
+  }[];
+  const enrollment = rows.find((row) => row.document?.fields.courseId.stringValue === courseId);
+  if (!enrollment?.document) throw new Error(`${email} n'est pas inscrit à ${courseId}`);
+  const path = enrollment.document.name.split("/documents/")[1];
+  await fetch(`${FIRESTORE}/${path}?updateMask.fieldPaths=progress.completedLessonIds`, {
+    method: "PATCH",
+    headers: OWNER,
+    body: JSON.stringify({
+      fields: {
+        progress: {
+          mapValue: {
+            fields: {
+              completedLessonIds: {
+                arrayValue: { values: lessonIds.map((id) => ({ stringValue: id })) },
+              },
+            },
+          },
+        },
+      },
+    }),
+  });
+}

@@ -18,6 +18,7 @@ import {
   rejectCreatorRequestInput,
   type CreatorRequestDoc,
 } from "@shared/creator-requests";
+import { issueCertificateInput } from "@shared/certificates";
 import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
 import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
@@ -99,6 +100,7 @@ import {
   updateSchoolProfile as updateSchoolProfileImpl,
 } from "./schools";
 import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
+import { CertificateError, issueCertificate as issueCertificateImpl } from "./certificates";
 import { issueMissingInvoices as issueMissingInvoicesImpl } from "./invoices";
 import { resolveVimeo } from "./vimeo";
 import {
@@ -509,6 +511,20 @@ export const removeSchoolDomain = onCall(async (request) => {
     domainError(error);
   }
   return { ok: true };
+});
+
+/** Certificat de réussite (élève ayant terminé toutes les leçons) : retourne son identifiant. */
+export const issueCertificate = onCall(async (request) => {
+  const caller = requireAuth(request);
+  const input = parseInput(issueCertificateInput, request.data);
+  try {
+    return { id: await issueCertificateImpl({ ...input, uid: caller.uid }) };
+  } catch (error) {
+    if (error instanceof CertificateError) {
+      throw new HttpsError("failed-precondition", error.message);
+    }
+    throw error;
+  }
 });
 
 /** Nouvelle demande d'espace formateur : les administrateurs de la plateforme sont prévenus. */

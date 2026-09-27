@@ -73,6 +73,8 @@ export interface CourseDoc<T = TimestampLike> {
   salesPage: SalesPage | null;
   /** Prix de vente (paiement Stripe) ; null : pas de vente directe. */
   price?: CoursePrice | null;
+  /** Certificat de réussite (absent : délivré ; false : désactivé par le formateur). */
+  certificate?: boolean;
   createdAt: T;
   updatedAt: T;
 }
@@ -141,6 +143,8 @@ export interface EnrollmentDoc<T = TimestampLike> {
   status: EnrollmentStatus;
   joinedAt: T;
   progress: EnrollmentProgress<T>;
+  /** Certificat de réussite délivré (certificates/{id}). */
+  certificateId?: string | null;
 }
 
 export interface CommentDoc<T = TimestampLike> {

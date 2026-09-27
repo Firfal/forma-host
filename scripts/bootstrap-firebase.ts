@@ -186,6 +186,24 @@ interface AuthConfig {
   notification?: { defaultLocale?: string };
 }
 
+/**
+ * Sauvegarde quotidienne de Firestore (planning géré par Google, conservée 14 jours) :
+ * restaurable dans une nouvelle base en cas d'erreur ou de suppression accidentelle.
+ */
+async function ensureFirestoreBackups() {
+  const base = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/backupSchedules`;
+  const existing = await api<{ backupSchedules?: { name: string; dailyRecurrence?: object }[] }>(
+    "GET",
+    base,
+  );
+  if (existing?.backupSchedules?.some((schedule) => schedule.dailyRecurrence)) {
+    ok("Firestore : sauvegarde quotidienne en place");
+    return;
+  }
+  await api("POST", base, { retention: `${14 * 24 * 3600}s`, dailyRecurrence: {} });
+  ok("Firestore : sauvegarde quotidienne créée (conservée 14 jours)");
+}
+
 async function ensureAuth() {
   const base = `https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT}/config`;
   const config = await api<AuthConfig>("GET", base, undefined, { allow404: true }).catch(
@@ -528,6 +546,7 @@ async function main() {
   await enableApis();
   await checkBilling();
   await ensureFirestore();
+  await ensureFirestoreBackups();
   await ensureAuth();
   await ensureStorage();
   await ensureVimeoSecret();

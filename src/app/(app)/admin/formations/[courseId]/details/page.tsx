@@ -78,6 +78,9 @@ export default function CourseDetailsPage() {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(course.thumbnailUrl);
   const [visibility, setVisibility] = useState<CourseVisibility>(course.visibility);
   const [commentsMode, setCommentsMode] = useState<CommentsMode>(course.commentsMode);
+  const [certificate, setCertificate] = useState<"on" | "off">(
+    course.certificate === false ? "off" : "on",
+  );
   const [slugError, setSlugError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -108,6 +111,7 @@ export default function CourseDetailsPage() {
         thumbnailUrl,
         visibility,
         commentsMode,
+        certificate: certificate === "on",
       });
       toast.success("Détails enregistrés");
     } catch (error) {
@@ -225,6 +229,26 @@ export default function CourseDetailsPage() {
                 value: "hidden",
                 label: "Masqués",
                 description: "Seul toi vois les commentaires existants.",
+              },
+            ]}
+          />
+        </Field>
+        <Field label="Certificat de réussite">
+          <Choice
+            name="certificate"
+            value={certificate}
+            onChange={setCertificate}
+            options={[
+              {
+                value: "on",
+                label: "Délivré",
+                description:
+                  "L'élève qui termine toutes les leçons obtient un certificat à ton nom, vérifiable en ligne.",
+              },
+              {
+                value: "off",
+                label: "Aucun",
+                description: "Pas de certificat pour cette formation.",
               },
             ]}
           />

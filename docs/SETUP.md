@@ -143,6 +143,19 @@ Rien à configurer : le déploiement active Firebase Cloud Messaging et donne au
    - Pour annoncer la nouvelle plateforme, adapte le modèle d'email de bienvenue, puis renvoie les accès.
 4. Teste avec 2-3 élèves pilotes avant de basculer.
 
+## 8. Sauvegardes
+
+Le déploiement crée une sauvegarde quotidienne de Firestore, conservée 14 jours (planning géré par Google).
+
+- **Voir les sauvegardes** : console Google Cloud > Firestore > *Disaster recovery*.
+- **Restaurer** : une sauvegarde se restaure dans une **nouvelle** base, jamais par-dessus la base en service. Cloud Shell :
+  ```bash
+  gcloud firestore backups list --project forma-host --location europe-west4
+  gcloud firestore databases restore --project forma-host \
+    --source-backup=projects/forma-host/locations/europe-west4/backups/ID --destination-database=restauration
+  ```
+  On y récupère ensuite les documents voulus.
+
 ## Déployer à la main (alternative)
 
 ```bash

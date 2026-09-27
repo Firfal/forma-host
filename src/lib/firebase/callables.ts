@@ -9,6 +9,7 @@ import type {
   InviteTokenInput,
   ResolveVimeoInput,
 } from "@shared/schemas";
+import type { IssueCertificateInput } from "@shared/certificates";
 import type { OpenConversationInput, UpdateConversationInput } from "@shared/chat";
 import type {
   ApproveCreatorRequestInput,
@@ -83,6 +84,9 @@ export const callUpdateSchoolProfile = callable<SchoolProfileInput, { ok: true }
   "updateSchoolProfile",
 );
 export const callSaveSchoolLegal = callable<SchoolLegalInput, { ok: true }>("saveSchoolLegal");
+export const callIssueCertificate = callable<IssueCertificateInput, { id: string }>(
+  "issueCertificate",
+);
 export const callIssueMissingInvoices = callable<{ schoolId?: string | null }, { issued: number }>(
   "issueMissingInvoices",
 );

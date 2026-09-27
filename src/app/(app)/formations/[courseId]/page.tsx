@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { certificateEnabled, isCourseCompleted } from "@shared/certificates";
 import { completedCount, resumeLesson, visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
 import { RichText } from "@/components/editor/rich-text";
 import { PageContainer } from "@/components/layout/page";
+import { CertificateButton } from "@/components/learn/certificate-button";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
@@ -112,6 +114,11 @@ export default function StudentCoursePage() {
                   {done === 0 ? "Commencer" : done === total ? "Revoir" : "Continuer"}
                 </Link>
               </Button>
+            ) : null}
+            {enrollment?.status === "active" &&
+            certificateEnabled(course) &&
+            isCourseCompleted(course.items, completed) ? (
+              <CertificateButton courseId={course.id} certificateId={enrollment.certificateId} />
             ) : null}
             {!isOwner && enrollment?.status === "active" ? (
               <WriteToSchoolButton schoolId={course.creatorId} />

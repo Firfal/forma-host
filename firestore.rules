@@ -163,8 +163,9 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'creatorId', 'title', 'slug', 'description', 'summary', 'thumbnailUrl', 'status',
           'visibility', 'commentsMode', 'items', 'outlineVersion', 'salesPage', 'price',
-          'createdAt', 'updatedAt'])
+          'certificate', 'createdAt', 'updatedAt'])
         && isValidPrice(data.get('price', null))
+        && data.get('certificate', true) is bool
         && isShortString(data.title, 1, 200)
         && data.slug is string && data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
         && data.summary is string && data.summary.size() <= 500
@@ -325,6 +326,12 @@ service cloud.firestore {
         && progress.completedLessonIds.size() <= 1000
         && isNullableString(progress.lastLessonId, 64)
         && progress.lastActivityAt == request.time;
+    }
+
+    // Certificats de réussite : délivrés par la callable issueCertificate, vérifiables par tous.
+    match /certificates/{certificateId} {
+      allow read: if true;
+      allow write: if false;
     }
 
     // ---------- Réservé au serveur ----------
