@@ -3,15 +3,18 @@ import { FieldValue } from "firebase-admin/firestore";
 import { certificateEnabled, isCourseCompleted } from "@shared/certificates";
 import { visibleLessons } from "@shared/outline";
 import { enrollmentId } from "@shared/paths";
+import { missingRequiredQuizzes } from "@shared/quiz";
 import type { CourseDoc, CreatorDoc, EnrollmentDoc } from "@shared/types";
 import { db } from "./db";
+import { requiredQuizLessonIds } from "./quiz";
 
 /** Erreur au message déjà lisible par l'élève. */
 export class CertificateError extends Error {}
 
 /**
  * Certificat de réussite de l'élève (idempotent : un seul par formation, le nom imprimé peut
- * être corrigé). Vérifie côté serveur que toutes les leçons visibles sont terminées.
+ * être corrigé). Vérifie côté serveur que toutes les leçons visibles sont terminées et les quiz
+ * obligatoires réussis.
  */
 export async function issueCertificate(params: {
   courseId: string;
@@ -34,6 +37,16 @@ export async function issueCertificate(params: {
   }
   if (!isCourseCompleted(course.items, enrollment.progress.completedLessonIds)) {
     throw new CertificateError("Termine toutes les leçons pour obtenir ton certificat.");
+  }
+  const missing = missingRequiredQuizzes(
+    await requiredQuizLessonIds(params.courseId, course),
+    enrollment.quizResults,
+  );
+  if (missing.length) {
+    const titles = missing.map((id) => course.items.find((i) => i.id === id)?.title ?? id);
+    throw new CertificateError(
+      `Réussis le quiz ${titles.map((title) => `« ${title} »`).join(", ")} pour obtenir ton certificat.`,
+    );
   }
   if (enrollment.certificateId) {
     await db().doc(`certificates/${enrollment.certificateId}`).update({ studentName: params.name });

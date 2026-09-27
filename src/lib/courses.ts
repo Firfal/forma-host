@@ -13,6 +13,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { DEFAULT_WELCOME_EMAIL } from "@shared/constants";
+import type { QuizKeyDoc } from "@shared/quiz";
 import { isReservedSlug, slugify } from "@shared/slug";
 import type {
   CourseDoc,
@@ -190,7 +191,10 @@ export async function saveOutline(
         });
       }
     }
-    removed.forEach((id) => tx.delete(doc(db, "courses", courseId, "lessons", id)));
+    removed.forEach((id) => {
+      tx.delete(doc(db, "courses", courseId, "lessons", id));
+      tx.delete(doc(db, "courses", courseId, "quizKeys", id));
+    });
     tx.update(courseRef, {
       items,
       outlineVersion: expectedVersion + 1,
@@ -205,8 +209,10 @@ export async function saveOutline(
 
 export type LessonContentPatch = Pick<
   LessonDoc,
-  "video" | "thumbnailUrl" | "body" | "links" | "attachments"
+  "video" | "thumbnailUrl" | "body" | "links" | "attachments" | "quiz"
 >;
+/** Corrigé du quiz : null le supprime, absent le laisse tel quel. */
+export type QuizKeyPatch = Pick<QuizKeyDoc, "answers" | "explanations"> | null;
 export type LessonItemPatch = Pick<OutlineItem, "title" | "isPreview" | "hidden" | "durationSec">;
 
 /** Enregistre une leçon : contenu protégé + élément du plan (titre, aperçu, masquage, durée). */
@@ -215,9 +221,11 @@ export async function saveLesson(
   lessonId: string,
   content: LessonContentPatch,
   itemPatch: LessonItemPatch,
+  quizKey?: QuizKeyPatch,
 ): Promise<void> {
   const courseRef = doc(db, "courses", courseId);
   const lessonRef = doc(db, "courses", courseId, "lessons", lessonId);
+  const keyRef = doc(db, "courses", courseId, "quizKeys", lessonId);
   await runTransaction(db, async (tx) => {
     const course = (await tx.get(courseRef)).data() as CourseDoc | undefined;
     if (!course) throw new Error("Formation introuvable");
@@ -232,6 +240,17 @@ export async function saveLesson(
       isPreview: Boolean(itemPatch.isPreview),
       updatedAt: serverTimestamp(),
     });
+    if (quizKey) {
+      tx.set(keyRef, {
+        creatorId: course.creatorId,
+        courseId,
+        answers: quizKey.answers,
+        explanations: quizKey.explanations,
+        updatedAt: serverTimestamp(),
+      });
+    } else if (quizKey === null) {
+      tx.delete(keyRef);
+    }
     tx.update(courseRef, {
       items,
       outlineVersion: course.outlineVersion + 1,
@@ -265,8 +284,10 @@ export async function deleteDraftCourse(course: CourseWithId): Promise<void> {
       where("creatorId", "==", course.creatorId),
     ),
   );
+  const quizKeys = await getDocs(collection(db, "courses", course.id, "quizKeys"));
   const batch = writeBatch(db);
   lessons.docs.forEach((lesson) => batch.delete(lesson.ref));
+  quizKeys.docs.forEach((key) => batch.delete(key.ref));
   batch.delete(doc(db, "courses", course.id, "private", "settings"));
   batch.delete(doc(db, "courses", course.id));
   await batch.commit();

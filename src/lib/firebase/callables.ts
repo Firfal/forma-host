@@ -11,6 +11,7 @@ import type {
 } from "@shared/schemas";
 import type { PublishAnnouncementInput } from "@shared/announcements";
 import type { IssueCertificateInput } from "@shared/certificates";
+import type { QuizGrade, SubmitQuizInput } from "@shared/quiz";
 import type { OpenConversationInput, UpdateConversationInput } from "@shared/chat";
 import type {
   ApproveCreatorRequestInput,
@@ -88,6 +89,7 @@ export const callSaveSchoolLegal = callable<SchoolLegalInput, { ok: true }>("sav
 export const callIssueCertificate = callable<IssueCertificateInput, { id: string }>(
   "issueCertificate",
 );
+export const callSubmitQuiz = callable<SubmitQuizInput, QuizGrade>("submitQuiz");
 export const callPublishAnnouncement = callable<
   PublishAnnouncementInput,
   { id: string; recipients: number }

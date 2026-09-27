@@ -7,6 +7,7 @@ import {
   Check,
   Download,
   ExternalLink,
+  ListChecks,
   ListTree,
   Lock,
   Paperclip,
@@ -23,6 +24,7 @@ import type { LessonDoc } from "@shared/types";
 import { LessonComments } from "@/components/comments/lesson-comments";
 import { RichText } from "@/components/editor/rich-text";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
+import { LessonQuiz } from "@/components/learn/lesson-quiz";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
 import { useStudentCourse } from "@/components/learn/student-course-context";
@@ -105,6 +107,8 @@ export default function LessonPage() {
   const done = completedCount(course.items, completed);
   const { prev, next } = adjacentLessons(course.items, lessonId);
   const tracksProgress = isEnrolled && Boolean(user);
+  // Quiz obligatoire : la leçon se termine en le réussissant (ni bouton, ni fin de vidéo).
+  const quizRequired = Boolean(lesson?.quiz?.required);
 
   async function toggleDone() {
     if (!user || !tracksProgress) return;
@@ -125,6 +129,7 @@ export default function LessonPage() {
       tracksProgress &&
       user &&
       !isDone &&
+      !quizRequired &&
       !autoCompleted.current &&
       progress.percent >= AUTO_COMPLETE_RATIO
     ) {
@@ -277,6 +282,17 @@ export default function LessonPage() {
           </div>
         ) : null}
 
+        {lesson?.quiz && !lock ? (
+          <LessonQuiz
+            key={lessonId}
+            courseId={courseId}
+            lessonId={lessonId}
+            quiz={lesson.quiz}
+            result={enrollment?.quizResults?.[lessonId]}
+            mode={tracksProgress ? "student" : isOwner ? "preview" : "visitor"}
+          />
+        ) : null}
+
         <div className="mt-6 flex items-center justify-end gap-2 border-b border-line-soft pb-6">
           <Button
             asChild
@@ -300,7 +316,13 @@ export default function LessonPage() {
               <ArrowRight />
             </Link>
           </Button>
-          {tracksProgress && !lock ? (
+          {tracksProgress && !lock && quizRequired && !isDone ? (
+            <Button asChild>
+              <a href="#quiz">
+                <ListChecks /> Réussir le quiz pour terminer
+              </a>
+            </Button>
+          ) : tracksProgress && !lock ? (
             <Button variant={isDone ? "secondary" : "primary"} onClick={toggleDone}>
               {isDone ? <Check className="text-success" /> : <Square />}
               {isDone ? "Terminée" : "Terminer"}

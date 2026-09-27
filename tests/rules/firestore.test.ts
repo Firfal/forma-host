@@ -753,3 +753,46 @@ describe("annonces", () => {
     await assertFails(setDoc(doc(creatorDb(), "courses/c1/announcements/a2"), { title: "x" }));
   });
 });
+
+describe("quiz", () => {
+  const quiz = {
+    passPercent: 70,
+    required: false,
+    questions: [{ id: "q1", text: "Question ?", multiple: false, choices: [] }],
+  };
+  const key = (overrides: Record<string, unknown> = {}) => ({
+    creatorId: THEO,
+    courseId: "c1",
+    answers: { q1: ["a"] },
+    explanations: {},
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  it("le formateur ajoute un quiz valide à une leçon", async () => {
+    const ref = doc(creatorDb(), "courses/c1/lessons/l2");
+    const save = (value: unknown) => updateDoc(ref, { quiz: value, updatedAt: serverTimestamp() });
+    await assertSucceeds(save(quiz));
+    await assertSucceeds(save(null));
+    await assertFails(save({ ...quiz, questions: [] }));
+    await assertFails(save({ ...quiz, passPercent: 150 }));
+    await assertFails(save({ ...quiz, answers: { q1: ["a"] } }));
+  });
+
+  it("les bonnes réponses : formateurs seulement", async () => {
+    await assertSucceeds(setDoc(doc(creatorDb(), "courses/c1/quizKeys/l2"), key()));
+    await assertSucceeds(getDoc(doc(coAdminDb(), "courses/c1/quizKeys/l2")));
+    await assertFails(getDoc(doc(db(ANNE), "courses/c1/quizKeys/l2")));
+    await assertFails(setDoc(doc(db(ANNE), "courses/c1/quizKeys/l1"), key()));
+    await assertFails(
+      setDoc(doc(creatorDb(), "courses/c1/quizKeys/l1"), key({ creatorId: OTHER_CREATOR })),
+    );
+    await assertFails(setDoc(doc(creatorDb(), "courses/c1/quizKeys/l1"), key({ extra: true })));
+    await assertSucceeds(deleteDoc(doc(creatorDb(), "courses/c1/quizKeys/l2")));
+  });
+
+  it("l'élève ne s'attribue pas de résultat de quiz", async () => {
+    const ref = doc(db(ANNE), "enrollments/c1_anne");
+    await assertFails(updateDoc(ref, { "quizResults.l2": { passed: true } }));
+  });
+});

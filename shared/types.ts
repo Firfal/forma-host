@@ -6,6 +6,7 @@
 import type { SchoolDomain } from "./domains";
 import type { DripSettings } from "./drip";
 import type { CoursePrice } from "./payments";
+import type { LessonQuiz, QuizResult } from "./quiz";
 
 export interface TimestampLike {
   toMillis(): number;
@@ -123,6 +124,8 @@ export interface LessonDoc<T = TimestampLike> {
   body: RichText | null;
   links: LessonLink[];
   attachments: LessonAttachment[];
+  /** Quiz de fin de leçon (bonnes réponses dans quizKeys/{lessonId}). */
+  quiz?: LessonQuiz | null;
   updatedAt: T;
 }
 
@@ -148,6 +151,8 @@ export interface EnrollmentDoc<T = TimestampLike> {
   progress: EnrollmentProgress<T>;
   /** Certificat de réussite délivré (certificates/{id}). */
   certificateId?: string | null;
+  /** Résultats des quiz, par leçon (écrits par le serveur). */
+  quizResults?: Record<string, QuizResult<T>>;
 }
 
 export interface CommentDoc<T = TimestampLike> {

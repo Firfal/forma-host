@@ -20,6 +20,7 @@ import {
 } from "@shared/creator-requests";
 import { publishAnnouncementInput } from "@shared/announcements";
 import { issueCertificateInput } from "@shared/certificates";
+import { submitQuizInput } from "@shared/quiz";
 import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
 import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
@@ -104,6 +105,7 @@ import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
 import { publishAnnouncement as publishAnnouncementImpl } from "./announcements";
 import { CertificateError, issueCertificate as issueCertificateImpl } from "./certificates";
 import { issueMissingInvoices as issueMissingInvoicesImpl } from "./invoices";
+import { QuizError, submitQuiz as submitQuizImpl } from "./quiz";
 import { resolveVimeo } from "./vimeo";
 import {
   deleteVimeoSettings as deleteVimeoSettingsImpl,
@@ -539,6 +541,18 @@ export const issueCertificate = onCall(async (request) => {
     if (error instanceof CertificateError) {
       throw new HttpsError("failed-precondition", error.message);
     }
+    throw error;
+  }
+});
+
+/** Tentative de quiz : correction côté serveur (les bonnes réponses restent cachées). */
+export const submitQuiz = onCall(async (request) => {
+  const caller = requireAuth(request);
+  const input = parseInput(submitQuizInput, request.data);
+  try {
+    return await submitQuizImpl({ ...input, uid: caller.uid });
+  } catch (error) {
+    if (error instanceof QuizError) throw new HttpsError("failed-precondition", error.message);
     throw error;
   }
 });

@@ -234,6 +234,21 @@ service cloud.firestore {
         allow write: if docId == 'settings' && isCourseAdmin(courseId);
       }
 
+      // Bonnes réponses des quiz : formateurs uniquement (correction par la callable submitQuiz).
+      match /quizKeys/{lessonId} {
+        allow read, delete: if isCourseAdmin(courseId);
+        allow create, update: if isCourseAdmin(courseId)
+          && request.resource.data.keys().hasOnly([
+              'creatorId', 'courseId', 'answers', 'explanations', 'updatedAt'])
+          && request.resource.data.creatorId == course(courseId).creatorId
+          && request.resource.data.courseId == courseId
+          && request.resource.data.answers is map
+          && request.resource.data.answers.size() <= 30
+          && request.resource.data.explanations is map
+          && request.resource.data.explanations.size() <= 30
+          && request.resource.data.updatedAt == request.time;
+      }
+
       // Annonces aux élèves, publiées par la callable publishAnnouncement.
       match /announcements/{announcementId} {
         allow read: if isCourseAdmin(courseId) || isEnrolled(courseId);
@@ -284,14 +299,26 @@ service cloud.firestore {
     function isValidLesson(data) {
       return data.keys().hasOnly([
           'creatorId', 'courseId', 'courseStatus', 'isPreview', 'title', 'video', 'thumbnailUrl',
-          'body', 'links', 'attachments', 'updatedAt'])
+          'body', 'links', 'attachments', 'quiz', 'updatedAt'])
         && data.courseStatus in ['draft', 'published']
         && data.isPreview is bool
         && isShortString(data.title, 1, 200)
         && isNullableString(data.thumbnailUrl, 2000)
         && data.links is list && data.links.size() <= 50
         && data.attachments is list && data.attachments.size() <= 50
+        && isValidQuiz(data.get('quiz', null))
         && data.updatedAt == request.time;
+    }
+
+    // Quiz de fin de leçon (sans les bonnes réponses, rangées dans quizKeys).
+    function isValidQuiz(quiz) {
+      return quiz == null
+        || (quiz is map
+          && quiz.keys().hasOnly(['questions', 'passPercent', 'required'])
+          && quiz.questions is list
+          && quiz.questions.size() >= 1 && quiz.questions.size() <= 30
+          && quiz.passPercent is int && quiz.passPercent >= 0 && quiz.passPercent <= 100
+          && quiz.required is bool);
     }
 
     function isValidNewComment(courseId, data) {

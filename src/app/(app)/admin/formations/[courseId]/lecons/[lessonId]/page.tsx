@@ -6,6 +6,7 @@ import {
   ExternalLink,
   FileUp,
   Link2,
+  ListChecks,
   Loader2,
   Paperclip,
   Plus,
@@ -20,11 +21,20 @@ import { toast } from "sonner";
 import { formatDuration } from "@shared/outline";
 import { removeItem } from "@shared/outline-edit";
 import { routes, storagePaths } from "@shared/paths";
+import {
+  mergeQuizDraft,
+  newQuizDraft,
+  quizDraftError,
+  splitQuizDraft,
+  type QuizDraft,
+  type QuizKeyDoc,
+} from "@shared/quiz";
 import { lessonLinkSchema } from "@shared/schemas";
 import { parseVimeoUrl, vimeoPageUrl } from "@shared/vimeo";
 import type { LessonAttachment, LessonDoc, LessonLink, RichText, VimeoVideo } from "@shared/types";
 import { useLoadedCourse } from "@/components/course/admin-course-context";
 import { ImageUpload } from "@/components/course/image-upload";
+import { QuizEditor, QuizResultsSummary } from "@/components/course/quiz-editor";
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
 import { PageContainer } from "@/components/layout/page";
 import { VimeoPlayer } from "@/components/video/vimeo-player";
@@ -73,6 +83,7 @@ interface Draft {
   body: RichText | null;
   links: LessonLink[];
   attachments: LessonAttachment[];
+  quiz: QuizDraft | null;
 }
 
 export default function LessonEditorPage() {
@@ -89,14 +100,21 @@ export default function LessonEditorPage() {
   const [resolving, setResolving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const removedPaths = useRef<string[]>([]);
+  /** Quiz déjà enregistré : le retirer supprime aussi son corrigé. */
+  const savedQuiz = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Chargement unique : l'édition locale ne doit pas être écrasée par le temps réel.
   useEffect(() => {
     if (!item || draft) return;
-    getDoc(doc(db, "courses", course.id, "lessons", lessonId))
-      .then((snap) => {
+    Promise.all([
+      getDoc(doc(db, "courses", course.id, "lessons", lessonId)),
+      getDoc(doc(db, "courses", course.id, "quizKeys", lessonId)),
+    ])
+      .then(([snap, keySnap]) => {
         const lesson = snap.data() as LessonDoc | undefined;
+        const key = keySnap.data() as QuizKeyDoc | undefined;
+        savedQuiz.current = Boolean(lesson?.quiz);
         setDraft({
           title: item.title,
           isPreview: Boolean(item.isPreview),
@@ -106,6 +124,7 @@ export default function LessonEditorPage() {
           body: lesson?.body ?? null,
           links: lesson?.links ?? [],
           attachments: lesson?.attachments ?? [],
+          quiz: lesson?.quiz ? mergeQuizDraft(lesson.quiz, key ?? null) : null,
         });
       })
       .catch((error) => toast.error(errorMessage(error)));
@@ -221,6 +240,12 @@ export default function LessonEditorPage() {
         return;
       }
     }
+    const quizError = draft.quiz ? quizDraftError(draft.quiz) : null;
+    if (quizError) {
+      toast.error(`Quiz : ${quizError}`);
+      return;
+    }
+    const quiz = draft.quiz ? splitQuizDraft(draft.quiz) : null;
     setSaving(true);
     try {
       await saveLesson(
@@ -232,6 +257,7 @@ export default function LessonEditorPage() {
           body: draft.body,
           links,
           attachments: draft.attachments,
+          quiz: quiz?.quiz ?? null,
         },
         {
           title: title.trim() || "Sans titre",
@@ -239,7 +265,9 @@ export default function LessonEditorPage() {
           hidden: draft.hidden,
           durationSec: video?.durationSec ?? null,
         },
+        quiz ? quiz.key : savedQuiz.current ? null : undefined,
       );
+      savedQuiz.current = Boolean(quiz);
       await Promise.allSettled(removedPaths.current.map(deleteFile));
       removedPaths.current = [];
       setDirty(false);
@@ -504,6 +532,42 @@ export default function LessonEditorPage() {
                 className="hidden"
                 onChange={onAttachment}
               />
+            </Section>
+
+            <Section title="Quiz" icon={<ListChecks />}>
+              {draft.quiz ? (
+                <>
+                  {savedQuiz.current ? (
+                    <QuizResultsSummary
+                      courseId={course.id}
+                      creatorId={course.creatorId}
+                      lessonId={lessonId}
+                    />
+                  ) : null}
+                  <QuizEditor
+                    value={draft.quiz}
+                    onChange={(quiz) => update({ quiz })}
+                    onRemove={() => {
+                      if (window.confirm("Supprimer le quiz de cette leçon ?"))
+                        update({ quiz: null });
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <p className="text-[13px] text-muted">
+                    Vérifie les acquis avec quelques questions à choix. Les bonnes réponses restent
+                    cachées jusqu&apos;à ce que l&apos;élève réussisse.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => update({ quiz: newQuizDraft() })}
+                  >
+                    <Plus /> Ajouter un quiz
+                  </Button>
+                </>
+              )}
             </Section>
           </div>
 
