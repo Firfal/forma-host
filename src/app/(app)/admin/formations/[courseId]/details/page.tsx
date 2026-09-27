@@ -81,6 +81,12 @@ export default function CourseDetailsPage() {
   const [certificate, setCertificate] = useState<"on" | "off">(
     course.certificate === false ? "off" : "on",
   );
+  const [dripMode, setDripMode] = useState<"none" | "sequential" | "schedule">(
+    course.drip?.mode ?? "none",
+  );
+  const [dripDays, setDripDays] = useState(
+    course.drip?.mode === "schedule" ? course.drip.intervalDays : 7,
+  );
   const [slugError, setSlugError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -112,6 +118,12 @@ export default function CourseDetailsPage() {
         visibility,
         commentsMode,
         certificate: certificate === "on",
+        drip:
+          dripMode === "none"
+            ? null
+            : dripMode === "sequential"
+              ? { mode: "sequential" }
+              : { mode: "schedule", intervalDays: Math.min(90, Math.max(1, dripDays || 7)) },
       });
       toast.success("Détails enregistrés");
     } catch (error) {
@@ -232,6 +244,46 @@ export default function CourseDetailsPage() {
               },
             ]}
           />
+        </Field>
+        <Field label="Ouverture des leçons">
+          <Choice
+            name="drip"
+            value={dripMode}
+            onChange={setDripMode}
+            options={[
+              {
+                value: "none",
+                label: "Tout de suite",
+                description: "Toutes les leçons sont ouvertes dès l'inscription.",
+              },
+              {
+                value: "sequential",
+                label: "Dans l'ordre",
+                description: "Chaque leçon s'ouvre quand l'élève a terminé la précédente.",
+              },
+              {
+                value: "schedule",
+                label: "Au fil des semaines",
+                description:
+                  "Un nouveau chapitre s'ouvre à intervalle régulier après l'inscription.",
+              },
+            ]}
+          />
+          {dripMode === "schedule" ? (
+            <div className="mt-2 flex items-center gap-2 text-[13px]">
+              <span>Un chapitre tous les</span>
+              <Input
+                type="number"
+                min={1}
+                max={90}
+                value={dripDays}
+                onChange={(e) => setDripDays(Number(e.target.value))}
+                className="w-20"
+                aria-label="Nombre de jours entre deux chapitres"
+              />
+              <span>jours</span>
+            </div>
+          ) : null}
         </Field>
         <Field label="Certificat de réussite">
           <Choice

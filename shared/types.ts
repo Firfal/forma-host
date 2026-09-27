@@ -4,6 +4,7 @@
  */
 
 import type { SchoolDomain } from "./domains";
+import type { DripSettings } from "./drip";
 import type { CoursePrice } from "./payments";
 
 export interface TimestampLike {
@@ -75,6 +76,8 @@ export interface CourseDoc<T = TimestampLike> {
   price?: CoursePrice | null;
   /** Certificat de réussite (absent : délivré ; false : désactivé par le formateur). */
   certificate?: boolean;
+  /** Ouverture progressive des leçons (absent ou null : tout est ouvert). */
+  drip?: DripSettings | null;
   createdAt: T;
   updatedAt: T;
 }

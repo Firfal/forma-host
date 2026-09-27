@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { certificateEnabled, isCourseCompleted } from "@shared/certificates";
+import { lockLabel } from "@shared/drip";
 import { completedCount, resumeLesson, visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
@@ -46,7 +47,7 @@ function WriteToSchoolButton({ schoolId }: { schoolId: string }) {
 }
 
 export default function StudentCoursePage() {
-  const { course, enrollment, hasAccess, isOwner, loading } = useStudentCourse();
+  const { course, enrollment, hasAccess, isOwner, locks, loading } = useStudentCourse();
   const { data: creator } = useCreator(course?.creatorId);
   const completed = useMemo(() => enrollment?.progress.completedLessonIds ?? [], [enrollment]);
   const completedSet = useMemo(() => new Set(completed), [completed]);
@@ -90,6 +91,7 @@ export default function StudentCoursePage() {
             items={course.items}
             completedIds={completedSet}
             hasAccess={hasAccess}
+            locks={locks}
             variant="cards"
           />
         </div>
@@ -109,7 +111,11 @@ export default function StudentCoursePage() {
                 <p className="text-[12px] text-muted">{progressLabel(done, total)}</p>
               </div>
             )}
-            {next ? (
+            {next && locks.get(next.id)?.reason === "date" ? (
+              <p className="rounded-md bg-surface px-3 py-2 text-center text-[13px] text-muted">
+                {lockLabel(locks.get(next.id)!)} : « {next.title} »
+              </p>
+            ) : next ? (
               <Button asChild className="w-full">
                 <Link href={routes.lesson(course.id, next.id)}>
                   <PlayCircle />{" "}

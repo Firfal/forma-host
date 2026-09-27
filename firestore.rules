@@ -163,9 +163,10 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'creatorId', 'title', 'slug', 'description', 'summary', 'thumbnailUrl', 'status',
           'visibility', 'commentsMode', 'items', 'outlineVersion', 'salesPage', 'price',
-          'certificate', 'createdAt', 'updatedAt'])
+          'certificate', 'drip', 'createdAt', 'updatedAt'])
         && isValidPrice(data.get('price', null))
         && data.get('certificate', true) is bool
+        && isValidDrip(data.get('drip', null))
         && isShortString(data.title, 1, 200)
         && data.slug is string && data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
         && data.summary is string && data.summary.size() <= 500
@@ -176,6 +177,15 @@ service cloud.firestore {
         && data.items is list && data.items.size() <= 500
         && data.outlineVersion is int
         && data.updatedAt == request.time;
+    }
+
+    // Ouverture progressive : dans l'ordre, ou un chapitre tous les 1 à 90 jours.
+    function isValidDrip(drip) {
+      return drip == null
+        || (drip is map && drip.keys().hasOnly(['mode', 'intervalDays'])
+            && (drip.mode == 'sequential'
+              || (drip.mode == 'schedule' && drip.intervalDays is int
+                  && drip.intervalDays >= 1 && drip.intervalDays <= 90)));
     }
 
     // Prix en centimes (1 € à 10 000 €), paiement Stripe ; paiement en 2, 3 ou 4 fois à partir de 50 €.

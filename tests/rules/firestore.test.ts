@@ -719,6 +719,16 @@ describe("certificats", () => {
     await assertFails(setDoc(doc(db(ANNE), "certificates/faux"), { studentName: "Anne" }));
   });
 
+  it("ouverture progressive : dans l'ordre ou un chapitre tous les 1 à 90 jours", async () => {
+    const ref = doc(creatorDb(), "courses/c1");
+    const drip = (value: unknown) => updateDoc(ref, { drip: value, updatedAt: serverTimestamp() });
+    await assertSucceeds(drip({ mode: "sequential" }));
+    await assertSucceeds(drip({ mode: "schedule", intervalDays: 7 }));
+    await assertSucceeds(drip(null));
+    await assertFails(drip({ mode: "schedule", intervalDays: 0 }));
+    await assertFails(drip({ mode: "hasard" }));
+  });
+
   it("le formateur active ou désactive le certificat d'une formation (booléen)", async () => {
     const ref = doc(creatorDb(), "courses/c1");
     await assertSucceeds(updateDoc(ref, { certificate: false, updatedAt: serverTimestamp() }));

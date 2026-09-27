@@ -3,6 +3,7 @@
 import { CheckCircle2, ChevronDown, Lock, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { lockLabel, type LessonLock } from "@shared/drip";
 import { formatDuration, groupByChapter } from "@shared/outline";
 import { routes } from "@shared/paths";
 import type { OutlineItem } from "@shared/types";
@@ -15,6 +16,7 @@ export function CourseOutlineNav({
   completedIds,
   activeLessonId,
   hasAccess,
+  locks,
   variant = "sidebar",
 }: {
   courseId: string;
@@ -22,6 +24,8 @@ export function CourseOutlineNav({
   completedIds: Set<string>;
   activeLessonId?: string;
   hasAccess: boolean;
+  /** Ouverture progressive : leçons pas encore ouvertes. */
+  locks?: Map<string, LessonLock>;
   variant?: "sidebar" | "cards";
 }) {
   const groups = groupByChapter(items);
@@ -91,6 +95,7 @@ export function CourseOutlineNav({
                         done={completedIds.has(item.id)}
                         active={item.id === activeLessonId}
                         locked={!hasAccess && !item.isPreview}
+                        lock={locks?.get(item.id)}
                       />
                     </li>
                   ),
@@ -110,14 +115,16 @@ function LessonLink({
   done,
   active,
   locked,
+  lock,
 }: {
   courseId: string;
   item: OutlineItem;
   done: boolean;
   active: boolean;
   locked: boolean;
+  lock?: LessonLock;
 }) {
-  const Icon = locked ? Lock : done ? CheckCircle2 : PlayCircle;
+  const Icon = locked || lock ? Lock : done ? CheckCircle2 : PlayCircle;
   const content = (
     <>
       <Icon className={cn("size-4 shrink-0", done ? "text-success" : "text-muted")} />
@@ -137,6 +144,19 @@ function LessonLink({
       <span className={className} title="Réservé aux élèves inscrits">
         {content}
       </span>
+    );
+  }
+  if (lock) {
+    // Ouverture progressive : la leçon reste visible (et sa page explique quand elle s'ouvre).
+    return (
+      <Link
+        href={routes.lesson(courseId, item.id)}
+        className={cn(className, "text-muted")}
+        title={lockLabel(lock)}
+        aria-current={active ? "page" : undefined}
+      >
+        {content}
+      </Link>
     );
   }
   return (

@@ -8,6 +8,7 @@ import {
   Download,
   ExternalLink,
   ListTree,
+  Lock,
   Paperclip,
   Square,
 } from "lucide-react";
@@ -42,19 +43,28 @@ import {
 } from "@/lib/progress";
 import { downloadProtectedFile, formatFileSize } from "@/lib/storage";
 
+const longDate = new Intl.DateTimeFormat("fr-FR", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
+const formatLongDate = (date: Date) => longDate.format(date);
+
 export default function LessonPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const router = useRouter();
   const { user } = useAuth();
-  const { course, enrollment, hasAccess, isEnrolled, isOwner, loading } = useStudentCourse();
+  const { course, enrollment, hasAccess, isEnrolled, isOwner, locks, loading } = useStudentCourse();
   const { data: creator } = useCreator(course?.creatorId);
   const [showOutline, setShowOutline] = useState(false);
 
   const item = course?.items.find((i) => i.id === lessonId && i.kind === "lesson");
   const canView = Boolean(item && (hasAccess || item.isPreview) && (!item.hidden || isOwner));
+  // Ouverture progressive : la leçon n'est pas encore ouverte pour cet élève.
+  const lock = locks.get(lessonId);
   const lessonRef = useMemo(
-    () => (canView ? doc(db, "courses", courseId, "lessons", lessonId) : null),
-    [canView, courseId, lessonId],
+    () => (canView && !lock ? doc(db, "courses", courseId, "lessons", lessonId) : null),
+    [canView, lock, courseId, lessonId],
   );
   const { data: lesson, loading: lessonLoading } = useDocData<LessonDoc>(lessonRef);
 
@@ -148,6 +158,7 @@ export default function LessonPage() {
         completedIds={completedSet}
         activeLessonId={lessonId}
         hasAccess={hasAccess}
+        locks={locks}
       />
     </div>
   );
@@ -183,7 +194,27 @@ export default function LessonPage() {
           </p>
         ) : null}
 
-        {lessonLoading ? (
+        {lock ? (
+          <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-md border border-line bg-surface px-6 text-center">
+            <Lock className="size-6 text-muted" />
+            <p className="font-medium">
+              {lock.reason === "date"
+                ? `Cette leçon s'ouvre le ${formatLongDate(lock.availableAt)}.`
+                : "Cette leçon s'ouvre quand la précédente est terminée."}
+            </p>
+            {lock.reason === "sequential" ? (
+              <Button asChild size="sm">
+                <Link href={routes.lesson(courseId, lock.previousLessonId)}>
+                  <ArrowLeft /> Reprendre « {lock.previousTitle} »
+                </Link>
+              </Button>
+            ) : (
+              <p className="text-[13px] text-muted">
+                Ta formation s&apos;ouvre au fil des semaines, à ton rythme.
+              </p>
+            )}
+          </div>
+        ) : lessonLoading ? (
           <Skeleton className="aspect-video w-full" />
         ) : lesson?.video ? (
           <VimeoPlayer
@@ -269,7 +300,7 @@ export default function LessonPage() {
               <ArrowRight />
             </Link>
           </Button>
-          {tracksProgress ? (
+          {tracksProgress && !lock ? (
             <Button variant={isDone ? "secondary" : "primary"} onClick={toggleDone}>
               {isDone ? <Check className="text-success" /> : <Square />}
               {isDone ? "Terminée" : "Terminer"}
