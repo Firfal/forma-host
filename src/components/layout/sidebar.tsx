@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BarChart3,
   BookOpen,
   Check,
   ChevronDown,
@@ -52,6 +53,7 @@ const adminNav: NavItem[] = [
   { href: routes.adminMembers, label: "Membres", icon: Users },
   { href: routes.adminMessages, label: "Messages", icon: MessagesSquare },
   { href: routes.adminComments, label: "Commentaires", icon: MessageSquare },
+  { href: routes.adminStats, label: "Statistiques", icon: BarChart3 },
   { href: routes.adminSettings, label: "Paramètres", icon: Settings },
 ];
 

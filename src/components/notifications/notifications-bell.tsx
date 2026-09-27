@@ -8,6 +8,7 @@ import {
   BookOpen,
   Globe,
   GraduationCap,
+  Megaphone,
   MessageSquare,
   MessagesSquare,
   UserPlus,
@@ -38,6 +39,7 @@ const icons: Record<NotificationType, typeof Bell> = {
   new_message: MessagesSquare,
   domain_active: Globe,
   payment_issue: AlertTriangle,
+  announcement: Megaphone,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

@@ -224,6 +224,12 @@ service cloud.firestore {
         allow write: if docId == 'settings' && isCourseAdmin(courseId);
       }
 
+      // Annonces aux élèves, publiées par la callable publishAnnouncement.
+      match /announcements/{announcementId} {
+        allow read: if isCourseAdmin(courseId) || isEnrolled(courseId);
+        allow write: if false;
+      }
+
       // Codes promo (miroir de Stripe), gérés par les Functions.
       match /promoCodes/{promoId} {
         allow read: if isCourseAdmin(courseId);

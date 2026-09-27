@@ -9,6 +9,7 @@ import type {
   InviteTokenInput,
   ResolveVimeoInput,
 } from "@shared/schemas";
+import type { PublishAnnouncementInput } from "@shared/announcements";
 import type { IssueCertificateInput } from "@shared/certificates";
 import type { OpenConversationInput, UpdateConversationInput } from "@shared/chat";
 import type {
@@ -87,6 +88,10 @@ export const callSaveSchoolLegal = callable<SchoolLegalInput, { ok: true }>("sav
 export const callIssueCertificate = callable<IssueCertificateInput, { id: string }>(
   "issueCertificate",
 );
+export const callPublishAnnouncement = callable<
+  PublishAnnouncementInput,
+  { id: string; recipients: number }
+>("publishAnnouncement");
 export const callIssueMissingInvoices = callable<{ schoolId?: string | null }, { issued: number }>(
   "issueMissingInvoices",
 );

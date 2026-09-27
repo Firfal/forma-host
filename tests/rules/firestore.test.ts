@@ -730,3 +730,16 @@ describe("certificats", () => {
     await assertFails(updateDoc(ref, { certificateId: "faux" }));
   });
 });
+
+describe("annonces", () => {
+  it("lues par les inscrits et l'équipe, publiées par le serveur", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "courses/c1/announcements/a1"), { title: "Nouveau" });
+    });
+    await assertSucceeds(getDoc(doc(db(ANNE), "courses/c1/announcements/a1")));
+    await assertSucceeds(getDoc(doc(creatorDb(), "courses/c1/announcements/a1")));
+    await assertFails(getDoc(doc(db(STRANGER), "courses/c1/announcements/a1")));
+    await assertFails(getDoc(doc(db(REVOKED), "courses/c1/announcements/a1")));
+    await assertFails(setDoc(doc(creatorDb(), "courses/c1/announcements/a2"), { title: "x" }));
+  });
+});

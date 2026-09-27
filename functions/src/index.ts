@@ -18,6 +18,7 @@ import {
   rejectCreatorRequestInput,
   type CreatorRequestDoc,
 } from "@shared/creator-requests";
+import { publishAnnouncementInput } from "@shared/announcements";
 import { issueCertificateInput } from "@shared/certificates";
 import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
 import { schoolDomainInput } from "@shared/domains";
@@ -100,6 +101,7 @@ import {
   updateSchoolProfile as updateSchoolProfileImpl,
 } from "./schools";
 import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
+import { publishAnnouncement as publishAnnouncementImpl } from "./announcements";
 import { CertificateError, issueCertificate as issueCertificateImpl } from "./certificates";
 import { issueMissingInvoices as issueMissingInvoicesImpl } from "./invoices";
 import { resolveVimeo } from "./vimeo";
@@ -511,6 +513,20 @@ export const removeSchoolDomain = onCall(async (request) => {
     domainError(error);
   }
   return { ok: true };
+});
+
+/** Annonce aux élèves inscrits d'une formation (notification, email si demandé). */
+export const publishAnnouncement = onCall({ timeoutSeconds: 300 }, async (request) => {
+  const input = parseInput(publishAnnouncementInput, request.data);
+  const { caller, course } = await requireCourseAdmin(request, input.courseId);
+  const authorName =
+    (request.auth?.token.name as string | undefined) ?? caller.email?.split("@")[0] ?? "L'équipe";
+  return publishAnnouncementImpl({
+    input,
+    course,
+    authorName,
+    appUrl: await schoolBaseUrl(course.creatorId, APP_URL.value()),
+  });
 });
 
 /** Certificat de réussite (élève ayant terminé toutes les leçons) : retourne son identifiant. */

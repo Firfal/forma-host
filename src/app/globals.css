@@ -15,6 +15,8 @@
   --color-brand: #5a0eb5;
   --color-brand-soft: #f2ebfa;
   --color-brand-logo: #9d72f9;
+  /* Graphiques : teinte unique validée (luminosité, contraste sur fond clair). */
+  --color-chart: #8a5cf0;
 
   --color-info: #186b91;
   --color-info-soft: #eaf3f7;
