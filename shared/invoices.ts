@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { vatMention, vatRate, type SchoolLegalInfo } from "./legal";
+import { formatPrice } from "./payments";
 
 /**
  * Factures des ventes : numérotées sans trou par école et par année (F-2026-0001), émises au
@@ -32,6 +33,8 @@ export interface OrderInvoice<T = unknown> {
   vatAmount: number;
   amountInclTax: number;
   vatMention: string;
+  /** Modalités de paiement particulières (paiement en plusieurs fois). */
+  paymentTerms?: string | null;
   /** Avoir émis au remboursement. */
   creditNote?: { number: string; issuedAt: T } | null;
 }
@@ -78,6 +81,7 @@ export function buildInvoice<T>(params: {
   buyer: InvoiceBuyer;
   description: string;
   amountInclTax: number;
+  paymentTerms?: string | null;
 }): OrderInvoice<T> {
   const rate = vatRate(params.legal);
   return {
@@ -97,6 +101,7 @@ export function buildInvoice<T>(params: {
     vatRate: rate,
     ...invoiceAmounts(params.amountInclTax, rate),
     vatMention: vatMention(params.legal),
+    paymentTerms: params.paymentTerms ?? null,
     creditNote: null,
   };
 }
@@ -129,3 +134,9 @@ export function formatPostalAddress(
 
 export const orderIdInput = z.object({ orderId: z.string().min(1).max(256) });
 export type OrderIdInput = z.infer<typeof orderIdInput>;
+
+/** Modalités d'un paiement en plusieurs fois, sur la facture. */
+export function installmentTerms(plan: { count: number; first: number; monthly: number }): string {
+  const rest = plan.count - 1;
+  return `Paiement en ${plan.count} fois sans frais par carte bancaire : ${formatPrice(plan.first)} à la commande, puis ${rest} mensualité${rest > 1 ? "s" : ""} de ${formatPrice(plan.monthly)}.`;
+}

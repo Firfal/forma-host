@@ -344,6 +344,17 @@ async function stripeApi<T>(key: string, method: string, path: string, form?: UR
   return body;
 }
 
+/** Événements Stripe (comptes connectés) traités par la fonction stripeWebhook. */
+const STRIPE_WEBHOOK_EVENTS = [
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "account.updated",
+  "charge.refunded",
+  "invoice.paid",
+  "invoice.payment_failed",
+  "customer.subscription.deleted",
+];
+
 /**
  * Paiements (Stripe Connect) : clé secrète de la plateforme (secret GitHub STRIPE_SECRET_KEY)
  * et webhook Connect vers la fonction stripeWebhook, dont le secret de signature est stocké
@@ -358,26 +369,28 @@ async function ensureStripe() {
     return;
   }
   const url = `https://${REGION}-${PROJECT}.cloudfunctions.net/stripeWebhook`;
-  const endpoints = await stripeApi<{ data: { id: string; url: string }[] }>(
-    key,
-    "GET",
-    "webhook_endpoints?limit=100",
-  );
+  const endpoints = await stripeApi<{
+    data: { id: string; url: string; enabled_events: string[] }[];
+  }>(key, "GET", "webhook_endpoints?limit=100");
   const found = endpoints.data.find((endpoint) => endpoint.url === url);
   const current = await readSecret("STRIPE_WEBHOOK_SECRET");
   if (found && current && current !== "unset") {
+    const missing = STRIPE_WEBHOOK_EVENTS.filter((event) => !found.enabled_events.includes(event));
+    if (missing.length) {
+      // Nouveaux événements (paiement en plusieurs fois…) : le webhook et son secret sont gardés.
+      const update = new URLSearchParams();
+      for (const event of STRIPE_WEBHOOK_EVENTS) update.append("enabled_events[]", event);
+      await stripeApi(key, "POST", `webhook_endpoints/${found.id}`, update);
+      ok(`Paiements : webhook Connect abonné à ${missing.join(", ")}`);
+      return;
+    }
     ok("Paiements : clé Stripe et webhook Connect en place");
     return;
   }
   // Le secret de signature n'est lisible qu'à la création : on recrée le webhook.
   if (found) await stripeApi(key, "DELETE", `webhook_endpoints/${found.id}`);
   const form = new URLSearchParams({ url, connect: "true", description: "Forma Host (Connect)" });
-  for (const event of [
-    "checkout.session.completed",
-    "checkout.session.async_payment_succeeded",
-    "account.updated",
-    "charge.refunded",
-  ]) {
+  for (const event of STRIPE_WEBHOOK_EVENTS) {
     form.append("enabled_events[]", event);
   }
   const endpoint = await stripeApi<{ secret: string }>(key, "POST", "webhook_endpoints", form);

@@ -20,6 +20,9 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
   // Prix et code promo de la formation.
   await page.goto("/admin/formations/after-effects/vente");
   await page.fill("#course-price", "197");
+  // Paiement en 3 fois : échéancier affiché avant l'enregistrement.
+  await page.getByRole("checkbox", { name: /En 3 fois/ }).check();
+  await expect(page.getByText(/65,68\s€ aujourd'hui, puis 2 × 65,66\s€ par mois/)).toBeVisible();
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Prix enregistré")).toBeVisible();
   await page.fill("#promo-code", "bienvenue");
@@ -47,6 +50,8 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
     "href",
     "/ecole-motion/legal/cgv",
   );
+  await expect(buyer.getByText("ou en 3 fois sans frais").first()).toBeVisible();
+  await order.getByRole("radio", { name: /En 3 fois sans frais/ }).check();
   await order.getByRole("checkbox").check();
   await pay.click();
   await expect(buyer.getByText("Merci pour ton achat !")).toBeVisible();
@@ -63,12 +68,14 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
   await expect(buyer.getByText(/N° TEST-F-\d{4}-0001/)).toBeVisible();
   await expect(buyer.getByText("Facture de test : aucun paiement réel.")).toBeVisible();
   await expect(buyer.getByText(/293 B du Code général des impôts/)).toBeVisible();
+  await expect(buyer.getByText(/Paiement en 3 fois sans frais par carte bancaire/)).toBeVisible();
 
   // La vente apparaît côté formateur, avec sa facture, puis la vente directe est désactivée.
   await page.reload();
   await expect(page.getByText(/^1 vente · /)).toBeVisible();
   await expect(page.getByText("Test", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Facture" })).toBeVisible();
+  await expect(page.getByText("3× · 1/3")).toBeVisible();
   await page.fill("#course-price", "");
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Vente directe désactivée")).toBeVisible();

@@ -3,8 +3,9 @@
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { toast } from "sonner";
-import { formatPrice, type CoursePrice } from "@shared/payments";
+import { formatPrice, installmentLabel, type CoursePrice } from "@shared/payments";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { cn } from "@/lib/cn";
 import { callCreateCheckoutSession, errorMessage } from "@/lib/firebase/callables";
 
 /**
@@ -32,11 +33,18 @@ export function BuyButton({
   const [open, setOpen] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** Nombre d'échéances choisi (null : paiement en une fois). */
+  const [installments, setInstallments] = useState<number | null>(null);
+  const options = price.installments ?? [];
 
   async function pay() {
     setBusy(true);
     try {
-      const { url } = await callCreateCheckoutSession({ courseId, acceptTerms: true });
+      const { url } = await callCreateCheckoutSession({
+        courseId,
+        acceptTerms: true,
+        installments,
+      });
       window.location.assign(url);
     } catch (error) {
       toast.error(errorMessage(error));
@@ -65,6 +73,39 @@ export function BuyButton({
             <p className="shrink-0 text-base font-semibold">{formatPrice(price.amount)}</p>
           </div>
 
+          {options.length ? (
+            <fieldset className="space-y-2">
+              <legend className="mb-2 text-[13px] font-medium">Paiement</legend>
+              {[null, ...options].map((count) => (
+                <label
+                  key={count ?? 1}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5 text-[13px]",
+                    installments === count
+                      ? "border-[var(--brand)] bg-[var(--brand)]/5"
+                      : "border-line",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="installments"
+                    checked={installments === count}
+                    onChange={() => setInstallments(count)}
+                    className="mt-0.5 size-4 accent-[var(--brand)]"
+                  />
+                  <span>
+                    <span className="block font-medium">
+                      {count ? `En ${count} fois sans frais` : "En une fois"}
+                    </span>
+                    <span className="block text-muted">
+                      {count ? installmentLabel(price.amount, count) : formatPrice(price.amount)}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
+
           <label className="flex cursor-pointer gap-2.5 text-[13px] leading-5">
             <input
               type="checkbox"
@@ -91,6 +132,7 @@ export function BuyButton({
               )}{" "}
               demande l&apos;accès immédiat à la formation et renonce ainsi à mon droit de
               rétractation.
+              {installments ? " J'autorise le prélèvement des mensualités sur ma carte." : null}
             </span>
           </label>
 
@@ -111,8 +153,8 @@ export function BuyButton({
             )}
           </button>
           <p className="flex items-center justify-center gap-1.5 text-center text-[12px] text-muted">
-            <Lock className="size-3.5" /> Paiement sécurisé par Stripe. Code promo à l&apos;étape
-            suivante.
+            <Lock className="size-3.5" /> Paiement sécurisé par Stripe.
+            {installments ? null : " Code promo à l'étape suivante."}
           </p>
         </div>
       </DialogContent>

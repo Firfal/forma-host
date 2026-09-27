@@ -1,15 +1,19 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import Stripe from "stripe";
 import {
+  installmentPlan,
   isLiveKey,
+  MIN_INSTALLMENTS_PRICE_CENTS,
   sameStripeMode,
   type CoursePrice,
   type OrderDoc,
+  type OrderInstallments,
   type PromoCodeDoc,
   type PromoCodeInput,
   type SchoolStripeDoc,
 } from "@shared/payments";
 import { routes } from "@shared/paths";
+import { schoolAdminSet } from "@shared/school";
 import type { CourseDoc, CreatorDoc } from "@shared/types";
 import { grantAccessToStudents } from "./access";
 import { db } from "./db";
@@ -38,6 +42,8 @@ export interface CheckoutRequest {
   cancelUrl: string;
   /** Acceptation des CGV et renonciation à la rétractation (ISO 8601). */
   termsAcceptedAt: string;
+  /** Paiement en plusieurs fois : abonnement mensuel arrêté après la dernière échéance. */
+  installments: { count: number; first: number; monthly: number } | null;
 }
 
 /** Rappel affiché sous le bouton de paiement Stripe. */
@@ -58,6 +64,8 @@ export interface PaymentsClient {
   ): Promise<{ promotionCodeId: string; couponId: string }>;
   promoRedemptions(accountId: string, promotionCodeId: string): Promise<number>;
   deactivatePromo(accountId: string, promotionCodeId: string): Promise<void>;
+  /** Arrête l'abonnement d'un paiement en plusieurs fois (sans prorata ni nouvelle facture). */
+  cancelSubscription(accountId: string, subscriptionId: string): Promise<void>;
 }
 
 /** Client Stripe réel (clé secrète de la plateforme, requêtes sur le compte de l'école). */
@@ -103,33 +111,73 @@ export function stripeClient(secretKey: string): PaymentsClient {
       return product.id;
     },
     async createCheckout(request) {
-      const session = await stripe.checkout.sessions.create(
-        {
-          mode: "payment",
-          line_items: [
-            {
-              quantity: 1,
-              price_data: {
-                currency: request.price.currency,
-                unit_amount: request.price.amount,
-                product: request.productId,
+      const metadata = {
+        courseId: request.courseId,
+        schoolId: request.schoolId,
+        termsAcceptedAt: request.termsAcceptedAt,
+        totalAmount: String(request.price.amount),
+        installments: request.installments ? String(request.installments.count) : "",
+      };
+      const common = {
+        ...(request.email ? { customer_email: request.email } : {}),
+        success_url: request.successUrl,
+        cancel_url: request.cancelUrl,
+        metadata,
+        custom_text: { submit: { message: CHECKOUT_TERMS_MESSAGE } },
+        locale: "fr" as const,
+      };
+      const plan = request.installments;
+      const params: Stripe.Checkout.SessionCreateParams = plan
+        ? {
+            ...common,
+            // Mensualités : abonnement arrêté par le webhook après la dernière échéance.
+            mode: "subscription",
+            line_items: [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: request.price.currency,
+                  unit_amount: plan.monthly,
+                  product: request.productId,
+                  recurring: { interval: "month" },
+                },
               },
+              ...(plan.first > plan.monthly
+                ? [
+                    {
+                      quantity: 1,
+                      price_data: {
+                        currency: request.price.currency,
+                        unit_amount: plan.first - plan.monthly,
+                        product_data: { name: "Arrondi du premier paiement" },
+                      },
+                    },
+                  ]
+                : []),
+            ],
+            subscription_data: {
+              description: `Paiement en ${plan.count} fois sans frais`,
+              metadata,
             },
-          ],
-          allow_promotion_codes: true,
-          ...(request.email ? { customer_email: request.email } : {}),
-          success_url: request.successUrl,
-          cancel_url: request.cancelUrl,
-          metadata: {
-            courseId: request.courseId,
-            schoolId: request.schoolId,
-            termsAcceptedAt: request.termsAcceptedAt,
-          },
-          custom_text: { submit: { message: CHECKOUT_TERMS_MESSAGE } },
-          locale: "fr",
-        },
-        { stripeAccount: request.accountId },
-      );
+          }
+        : {
+            ...common,
+            mode: "payment",
+            line_items: [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: request.price.currency,
+                  unit_amount: request.price.amount,
+                  product: request.productId,
+                },
+              },
+            ],
+            allow_promotion_codes: true,
+          };
+      const session = await stripe.checkout.sessions.create(params, {
+        stripeAccount: request.accountId,
+      });
       if (!session.url) throw new PaymentError("Paiement indisponible pour le moment.");
       return { id: session.id, url: session.url };
     },
@@ -170,6 +218,9 @@ export function stripeClient(secretKey: string): PaymentsClient {
         { active: false },
         { stripeAccount: accountId },
       );
+    },
+    async cancelSubscription(accountId, subscriptionId) {
+      await stripe.subscriptions.cancel(subscriptionId, {}, { stripeAccount: accountId });
     },
   };
 }
@@ -279,11 +330,21 @@ export async function createCheckout(params: {
   appUrl: string;
   client: PaymentsClient;
   termsAcceptedAt?: string;
+  /** Nombre d'échéances (paiement en plusieurs fois) ; absent : paiement unique. */
+  installments?: number | null;
 }): Promise<{ id: string; url: string }> {
   const course = (await db().doc(`courses/${params.courseId}`).get()).data() as
     CourseDoc | undefined;
   if (!course || course.status !== "published") throw new PaymentError("Formation introuvable.");
   if (!course.price) throw new PaymentError("Cette formation n'est pas en vente.");
+  const count = params.installments ?? null;
+  if (
+    count &&
+    (!course.price.installments?.includes(count) ||
+      course.price.amount < MIN_INSTALLMENTS_PRICE_CENTS)
+  ) {
+    throw new PaymentError(`Le paiement en ${count} fois n'est pas proposé pour cette formation.`);
+  }
   const stripe = await schoolStripe(course.creatorId, params.client.livemode);
   if (!stripe?.chargesEnabled) {
     throw new PaymentError("Le paiement en ligne n'est pas encore activé pour cette formation.");
@@ -300,6 +361,7 @@ export async function createCheckout(params: {
     successUrl: `${params.appUrl}/merci?session={CHECKOUT_SESSION_ID}&formation=${params.courseId}`,
     cancelUrl: `${params.appUrl}${routes.salesPage(creator.slug, course.slug)}`,
     termsAcceptedAt: params.termsAcceptedAt ?? new Date().toISOString(),
+    installments: count ? installmentPlan(course.price.amount, count) : null,
   });
 }
 
@@ -316,6 +378,13 @@ export interface CompletedCheckout {
   livemode: boolean;
   termsAcceptedAt?: string | null;
   billingAddress?: string | null;
+  /** Paiement en plusieurs fois : abonnement créé par Checkout, première facture réglée. */
+  installments?: {
+    count: number;
+    subscriptionId: string | null;
+    customerId: string | null;
+    firstInvoiceId: string | null;
+  } | null;
 }
 
 /** Paiement réussi : commande enregistrée et accès donné (idempotent, les webhooks sont rejoués). */
@@ -333,6 +402,17 @@ export async function completeCheckout(
   }
 
   const orderRef = db().doc(`orders/${checkout.sessionId}`);
+  const existing = (await orderRef.get()).data() as OrderDoc | undefined;
+  const plan = checkout.installments;
+  const installments: OrderInstallments | null = plan
+    ? {
+        ...installmentPlan(checkout.amount, plan.count),
+        paidInvoiceIds: plan.firstInvoiceId ? [plan.firstInvoiceId] : [],
+        subscriptionId: plan.subscriptionId,
+        customerId: plan.customerId,
+        status: plan.count > 1 ? "active" : "completed",
+      }
+    : null;
   const order: OrderDoc<FieldValue> = {
     schoolId: account.schoolId,
     courseId: checkout.courseId,
@@ -347,7 +427,11 @@ export async function completeCheckout(
     livemode: checkout.livemode,
     termsAcceptedAt: checkout.termsAcceptedAt ?? null,
     billingAddress: checkout.billingAddress ?? null,
-    createdAt: FieldValue.serverTimestamp(),
+    // Webhook rejoué : la date d'achat et l'échéancier déjà suivi sont conservés.
+    installments: existing?.installments ?? installments,
+    createdAt: existing?.createdAt
+      ? (existing.createdAt as FieldValue)
+      : FieldValue.serverTimestamp(),
   };
   await orderRef.set(order, { merge: true });
   // La facture ne doit jamais bloquer l'accès : une erreur est journalisée, pas propagée.
@@ -367,20 +451,7 @@ export async function completeCheckout(
   if (result.errors.length) throw new Error(result.errors[0].message);
 }
 
-/** Remboursement total : la commande est marquée remboursée et l'accès retiré. */
-export async function refundOrder(paymentIntentId: string): Promise<void> {
-  const orders = await db()
-    .collection("orders")
-    .where("paymentIntentId", "==", paymentIntentId)
-    .limit(1)
-    .get();
-  const orderDoc = orders.docs[0];
-  if (!orderDoc) return;
-  const order = orderDoc.data() as OrderDoc<Timestamp>;
-  await orderDoc.ref.update({ status: "refunded" });
-  await issueCreditNote(orderDoc.id).catch((error) =>
-    console.error(`Avoir de la commande ${orderDoc.id}`, error),
-  );
+async function revokeOrderAccess(order: OrderDoc): Promise<void> {
   const enrollments = await db()
     .collection("enrollments")
     .where("courseId", "==", order.courseId)
@@ -388,6 +459,144 @@ export async function refundOrder(paymentIntentId: string): Promise<void> {
     .limit(1)
     .get();
   await enrollments.docs[0]?.ref.update({ status: "revoked" });
+}
+
+async function orderBySubscription(subscriptionId: string) {
+  const snap = await db()
+    .collection("orders")
+    .where("installments.subscriptionId", "==", subscriptionId)
+    .limit(1)
+    .get();
+  return snap.docs[0] ?? null;
+}
+
+/** Notification (dans l'application) à l'équipe de l'école : échéance impayée, arrêt… */
+async function notifySchool(
+  schoolId: string,
+  id: string,
+  title: string,
+  body: string,
+  link: string,
+) {
+  const creator = (await db().doc(`creators/${schoolId}`).get()).data() as CreatorDoc | undefined;
+  const batch = db().batch();
+  for (const uid of schoolAdminSet(schoolId, creator)) {
+    batch.set(db().doc(`users/${uid}/notifications/${id}`), {
+      type: "payment_issue",
+      title,
+      body,
+      link,
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+  await batch.commit();
+}
+
+/**
+ * Échéance réglée (webhook invoice.paid) : comptée une seule fois ; après la dernière,
+ * l'abonnement est arrêté. La première échéance est comptée à la création de la commande.
+ */
+export async function recordInstallmentPaid(params: {
+  accountId: string;
+  subscriptionId: string;
+  invoiceId: string;
+  client: PaymentsClient;
+}): Promise<OrderInstallments | null> {
+  const doc = await orderBySubscription(params.subscriptionId);
+  if (!doc) return null;
+  const installments = await db().runTransaction(async (tx) => {
+    const order = (await tx.get(doc.ref)).data() as OrderDoc;
+    const current = order.installments;
+    if (!current || current.paidInvoiceIds.includes(params.invoiceId)) return current ?? null;
+    const paidInvoiceIds = [...current.paidInvoiceIds, params.invoiceId];
+    const status = paidInvoiceIds.length >= current.count ? "completed" : "active";
+    tx.update(doc.ref, {
+      "installments.paidInvoiceIds": paidInvoiceIds,
+      "installments.status": status,
+    });
+    return { ...current, paidInvoiceIds, status } as OrderInstallments;
+  });
+  if (installments?.status === "completed") {
+    await params.client
+      .cancelSubscription(params.accountId, params.subscriptionId)
+      .catch((error) => console.error(`Abonnement ${params.subscriptionId}`, error));
+  }
+  return installments;
+}
+
+/** Échéance refusée (webhook invoice.payment_failed) : l'école est prévenue, Stripe relance. */
+export async function recordInstallmentFailed(subscriptionId: string): Promise<void> {
+  const doc = await orderBySubscription(subscriptionId);
+  const order = doc?.data() as OrderDoc | undefined;
+  if (!doc || !order?.installments || order.installments.status === "completed") return;
+  await doc.ref.update({ "installments.status": "past_due" });
+  await notifySchool(
+    order.schoolId,
+    `payment_${doc.id}`,
+    "Échéance impayée",
+    `${order.name || order.email} · ${order.courseTitle ?? "formation"} : Stripe va relancer le paiement.`,
+    routes.adminCourseSales(order.courseId),
+  );
+}
+
+/**
+ * Abonnement arrêté (webhook customer.subscription.deleted) avant la dernière échéance, par
+ * exemple après plusieurs refus de paiement : l'accès est retiré et l'école prévenue.
+ */
+export async function recordInstallmentsEnded(subscriptionId: string): Promise<void> {
+  const doc = await orderBySubscription(subscriptionId);
+  const order = doc?.data() as OrderDoc | undefined;
+  const installments = order?.installments;
+  if (!doc || !order || !installments) return;
+  if (installments.paidInvoiceIds.length >= installments.count || order.status === "refunded") {
+    return;
+  }
+  await doc.ref.update({ "installments.status": "canceled" });
+  await revokeOrderAccess(order);
+  await notifySchool(
+    order.schoolId,
+    `payment_${doc.id}`,
+    "Paiement en plusieurs fois interrompu",
+    `${order.name || order.email} · ${order.courseTitle ?? "formation"} : ${installments.paidInvoiceIds.length}/${installments.count} échéances payées, accès retiré.`,
+    routes.adminCourseSales(order.courseId),
+  );
+}
+
+/**
+ * Remboursement total : la commande est marquée remboursée et l'accès retiré. Paiement en
+ * plusieurs fois : la commande est retrouvée par le client Stripe, l'abonnement est arrêté.
+ */
+export async function refundOrder(
+  paymentIntentId: string | null,
+  installments?: { customerId: string | null; accountId: string; client: PaymentsClient },
+): Promise<void> {
+  const orders = paymentIntentId
+    ? await db().collection("orders").where("paymentIntentId", "==", paymentIntentId).limit(1).get()
+    : null;
+  let orderDoc = orders?.docs[0];
+  if (!orderDoc && installments?.customerId) {
+    const byCustomer = await db()
+      .collection("orders")
+      .where("installments.customerId", "==", installments.customerId)
+      .limit(1)
+      .get();
+    orderDoc = byCustomer.docs[0];
+  }
+  if (!orderDoc) return;
+  const order = orderDoc.data() as OrderDoc<Timestamp>;
+  if (order.status === "refunded") return;
+  await orderDoc.ref.update({ status: "refunded" });
+  const subscriptionId = order.installments?.subscriptionId;
+  if (installments && subscriptionId && order.installments?.status !== "completed") {
+    await installments.client
+      .cancelSubscription(installments.accountId, subscriptionId)
+      .catch((error) => console.error(`Abonnement ${subscriptionId}`, error));
+  }
+  await issueCreditNote(orderDoc.id).catch((error) =>
+    console.error(`Avoir de la commande ${orderDoc.id}`, error),
+  );
+  await revokeOrderAccess(order);
 }
 
 /** Code promo sur la formation (compte Stripe de l'école), avec son miroir Firestore. */
@@ -504,5 +713,6 @@ export function fakePaymentsClient(livemode = false): PaymentsClient {
       return 0;
     },
     async deactivatePromo() {},
+    async cancelSubscription() {},
   };
 }

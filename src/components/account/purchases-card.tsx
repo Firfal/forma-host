@@ -42,6 +42,18 @@ export function PurchasesCard() {
               </span>
               <span className="text-[13px] text-muted">{formatDate(order.createdAt)}</span>
               <span className="tabular-nums">{formatPrice(order.amount, order.currency)}</span>
+              {order.installments && order.status !== "refunded" ? (
+                <Badge
+                  tone={order.installments.status === "past_due" ? "warning" : "neutral"}
+                  title={
+                    order.installments.status === "past_due"
+                      ? "Échéance impayée : vérifie ta carte bancaire"
+                      : undefined
+                  }
+                >
+                  {order.installments.paidInvoiceIds.length}/{order.installments.count} échéances
+                </Badge>
+              ) : null}
               {order.status === "refunded" ? <Badge tone="danger">Remboursé</Badge> : null}
               {order.invoice ? (
                 <Link

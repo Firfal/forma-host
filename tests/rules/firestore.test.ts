@@ -348,6 +348,16 @@ describe("paiements", () => {
     await assertFails(
       updateDoc(ref, { price: { amount: 19700, currency: "usd" }, updatedAt: serverTimestamp() }),
     );
+    // Paiement en 2, 3 ou 4 fois, à partir de 50 €.
+    const price = (amount: number, installments: unknown) => ({
+      price: { amount, currency: "eur", installments },
+      updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(updateDoc(ref, price(19700, [3, 4])));
+    await assertSucceeds(updateDoc(ref, price(1000, [])));
+    await assertFails(updateDoc(ref, price(1000, [3])));
+    await assertFails(updateDoc(ref, price(19700, [6])));
+    await assertFails(updateDoc(ref, price(19700, "3")));
   });
 
   it("commandes, codes promo et compte Stripe : lecture équipe, écriture serveur", async () => {

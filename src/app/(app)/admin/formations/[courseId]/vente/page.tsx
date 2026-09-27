@@ -7,6 +7,9 @@ import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import {
   formatPrice,
+  INSTALLMENT_OPTIONS,
+  installmentLabel,
+  MIN_INSTALLMENTS_PRICE_CENTS,
   parsePriceInput,
   promoCodeInput,
   promoLabel,
@@ -22,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/cn";
 import { updateCourse, type CourseWithId } from "@/lib/courses";
 import {
   callCreatePromoCode,
@@ -38,8 +42,11 @@ import { useSchoolPayments } from "@/lib/payments";
 
 function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActive: boolean }) {
   const [value, setValue] = useState(course.price ? String(course.price.amount / 100) : "");
+  const [installments, setInstallments] = useState<number[]>(course.price?.installments ?? []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const typed = value.trim() ? parsePriceInput(value.trim()) : null;
+  const installmentsAllowed = typed !== null && typed >= MIN_INSTALLMENTS_PRICE_CENTS;
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -49,9 +56,14 @@ function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActiv
       setError("Prix entre 1 € et 10 000 € (ex. 197 ou 197,50)");
       return;
     }
+    const counts = amount && amount >= MIN_INSTALLMENTS_PRICE_CENTS ? [...installments].sort() : [];
     setSaving(true);
     try {
-      await updateCourse(course.id, { price: amount ? { amount, currency: "eur" } : null });
+      await updateCourse(course.id, {
+        price: amount
+          ? { amount, currency: "eur", ...(counts.length ? { installments: counts } : {}) }
+          : null,
+      });
       toast.success(
         amount ? `Prix enregistré : ${formatPrice(amount)}` : "Vente directe désactivée",
       );
@@ -62,11 +74,24 @@ function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActiv
     }
   }
 
+  function toggle(count: number, checked: boolean) {
+    setInstallments((current) =>
+      checked ? [...new Set([...current, count])] : current.filter((value) => value !== count),
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Prix</CardTitle>
-        {course.price ? <Badge tone="success">{formatPrice(course.price.amount)}</Badge> : null}
+        {course.price ? (
+          <Badge tone="success">
+            {formatPrice(course.price.amount)}
+            {course.price.installments?.length
+              ? ` · ${course.price.installments.map((count) => `${count}×`).join(", ")}`
+              : ""}
+          </Badge>
+        ) : null}
       </CardHeader>
       <CardBody className="space-y-3">
         {!stripeActive ? (
@@ -79,13 +104,12 @@ function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActiv
             paiement externe éventuel (onglet « Page de vente »).
           </p>
         ) : null}
-        <form onSubmit={save} className="flex items-end gap-2" noValidate>
+        <form onSubmit={save} className="space-y-4" noValidate>
           <Field
             label="Prix TTC (€)"
             htmlFor="course-price"
             error={error}
-            hint="Laisse vide pour ne pas vendre directement. Paiement unique par carte."
-            className="flex-1"
+            hint="Laisse vide pour ne pas vendre directement."
           >
             <Input
               id="course-price"
@@ -99,6 +123,39 @@ function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActiv
               className="max-w-40"
             />
           </Field>
+          <fieldset className="space-y-2">
+            <legend className="text-[13px] font-medium">
+              Paiement en plusieurs fois sans frais
+            </legend>
+            <p className="text-[13px] text-muted">
+              {installmentsAllowed
+                ? "Mensualités prélevées automatiquement ; accès dès le premier paiement. Les codes promo s'appliquent au paiement en une fois."
+                : "Disponible à partir de 50 €."}
+            </p>
+            <div className="space-y-1.5">
+              {INSTALLMENT_OPTIONS.map((count) => (
+                <label
+                  key={count}
+                  className={cn(
+                    "flex items-center gap-2.5 text-sm",
+                    !installmentsAllowed && "text-muted",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={installmentsAllowed && installments.includes(count)}
+                    disabled={!installmentsAllowed}
+                    onChange={(e) => toggle(count, e.target.checked)}
+                    className="size-4 accent-ink"
+                  />
+                  <span className="font-medium">En {count} fois</span>
+                  {installmentsAllowed && typed ? (
+                    <span className="text-[13px] text-muted">{installmentLabel(typed, count)}</span>
+                  ) : null}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <Button type="submit" disabled={saving}>
             {saving ? "Enregistrement…" : "Enregistrer"}
           </Button>
@@ -335,6 +392,26 @@ function OrdersCard({ course, livemode }: { course: CourseWithId; livemode: bool
                 <span className="w-20 text-right font-medium tabular-nums">
                   {formatPrice(order.amount, order.currency)}
                 </span>
+                {order.installments ? (
+                  <Badge
+                    tone={
+                      order.installments.status === "past_due" ||
+                      order.installments.status === "canceled"
+                        ? "warning"
+                        : "neutral"
+                    }
+                    title={
+                      order.installments.status === "past_due"
+                        ? "Échéance impayée : Stripe relance le paiement"
+                        : order.installments.status === "canceled"
+                          ? "Paiement interrompu : accès retiré"
+                          : undefined
+                    }
+                  >
+                    {order.installments.count}× · {order.installments.paidInvoiceIds.length}/
+                    {order.installments.count}
+                  </Badge>
+                ) : null}
                 {order.livemode ? null : <Badge tone="info">Test</Badge>}
                 {order.status === "refunded" ? <Badge tone="danger">Remboursée</Badge> : null}
                 {order.invoice ? (

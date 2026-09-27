@@ -177,13 +177,20 @@ service cloud.firestore {
         && data.updatedAt == request.time;
     }
 
-    // Prix en centimes (1 € à 10 000 €), paiement Stripe.
+    // Prix en centimes (1 € à 10 000 €), paiement Stripe ; paiement en 2, 3 ou 4 fois à partir de 50 €.
     function isValidPrice(price) {
       return price == null
         || (price is map
-            && price.keys().hasOnly(['amount', 'currency'])
+            && price.keys().hasOnly(['amount', 'currency', 'installments'])
             && price.amount is int && price.amount >= 100 && price.amount <= 1000000
-            && price.currency == 'eur');
+            && price.currency == 'eur'
+            && isValidInstallments(price.get('installments', null), price.amount));
+    }
+
+    function isValidInstallments(installments, amount) {
+      return installments == null
+        || (installments is list && installments.size() <= 3 && installments.hasOnly([2, 3, 4])
+            && (installments.size() == 0 || amount >= 5000));
     }
 
     match /courses/{courseId} {

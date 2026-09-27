@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  coursePriceSchema,
   formatPrice,
+  installmentLabel,
+  installmentPlan,
   isLiveKey,
   parsePriceInput,
   promoCodeInput,
@@ -52,5 +55,36 @@ describe("mode Stripe", () => {
     expect(sameStripeMode(undefined, false)).toBe(true);
     expect(sameStripeMode(undefined, true)).toBe(false);
     expect(sameStripeMode(true, true)).toBe(true);
+  });
+});
+
+describe("paiement en plusieurs fois", () => {
+  it("mensualités égales, reliquat au premier paiement, total exact", () => {
+    expect(installmentPlan(19700, 3)).toEqual({ count: 3, first: 6568, monthly: 6566 });
+    expect(installmentPlan(19800, 3)).toEqual({ count: 3, first: 6600, monthly: 6600 });
+    for (const [total, count] of [
+      [19700, 3],
+      [9999, 4],
+      [5000, 2],
+    ]) {
+      const plan = installmentPlan(total, count);
+      expect(plan.first + plan.monthly * (count - 1)).toBe(total);
+      expect(plan.first).toBeGreaterThanOrEqual(plan.monthly);
+    }
+  });
+
+  it("libellé de l'échéancier", () => {
+    expect(installmentLabel(19800, 3).replace(/\s/g, " ")).toBe(
+      "66 € aujourd'hui, puis 2 × 66 € par mois",
+    );
+  });
+
+  it("options valides : 2, 3 ou 4 fois", () => {
+    expect(
+      coursePriceSchema.safeParse({ amount: 19700, currency: "eur", installments: [3] }).success,
+    ).toBe(true);
+    expect(
+      coursePriceSchema.safeParse({ amount: 19700, currency: "eur", installments: [6] }).success,
+    ).toBe(false);
   });
 });

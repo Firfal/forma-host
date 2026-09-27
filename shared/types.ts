@@ -164,7 +164,8 @@ export type NotificationType =
   | "creator_request"
   | "creator_request_decision"
   | "new_message"
-  | "domain_active";
+  | "domain_active"
+  | "payment_issue";
 
 export interface NotificationDoc<T = TimestampLike> {
   type: NotificationType;

@@ -104,10 +104,16 @@ function InvoiceDocument({
       </dl>
 
       <footer className="mt-10 space-y-1 border-t border-line-soft pt-4 text-[12px] text-muted">
-        <p>
-          Payée le {formatDate(order.createdAt)} par carte bancaire (Stripe)
-          {order.promoCode ? `, code promo ${order.promoCode}` : ""}.
-        </p>
+        {invoice.paymentTerms ? (
+          <p>
+            {invoice.paymentTerms} Commande du {formatDate(order.createdAt)}.
+          </p>
+        ) : (
+          <p>
+            Payée le {formatDate(order.createdAt)} par carte bancaire (Stripe)
+            {order.promoCode ? `, code promo ${order.promoCode}` : ""}.
+          </p>
+        )}
         {invoice.vatRate === 0 ? <p>{invoice.vatMention}</p> : null}
       </footer>
 

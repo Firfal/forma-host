@@ -2,6 +2,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import {
   buildInvoice,
   formatInvoiceNumber,
+  installmentTerms,
   invoiceSeries,
   type InvoicingCounters,
   type OrderInvoice,
@@ -47,6 +48,7 @@ export async function issueInvoice(orderId: string): Promise<OrderInvoice | null
       buyer: { name: order.name, email: order.email, address: order.billingAddress ?? null },
       description: `Formation en ligne : ${course?.title ?? "formation"}`,
       amountInclTax: order.amount,
+      paymentTerms: order.installments ? installmentTerms(order.installments) : null,
     });
     tx.set(counterRef(order.schoolId), { [series]: { [year]: sequence } }, { merge: true });
     tx.update(orderRef, { invoice });

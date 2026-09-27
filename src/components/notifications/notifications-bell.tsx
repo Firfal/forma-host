@@ -2,6 +2,7 @@
 
 import { collection, doc, limit, orderBy, query, updateDoc, writeBatch } from "firebase/firestore";
 import {
+  AlertTriangle,
   BadgeCheck,
   Bell,
   BookOpen,
@@ -36,6 +37,7 @@ const icons: Record<NotificationType, typeof Bell> = {
   creator_request_decision: BadgeCheck,
   new_message: MessagesSquare,
   domain_active: Globe,
+  payment_issue: AlertTriangle,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

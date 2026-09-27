@@ -10,6 +10,28 @@ export interface CoursePrice {
   /** Montant en centimes. */
   amount: number;
   currency: "eur";
+  /** Paiement en plusieurs fois proposé (nombres d'échéances mensuelles, ex. [3]). */
+  installments?: number[];
+}
+
+/** Nombres d'échéances proposables, et prix minimum pour les proposer. */
+export const INSTALLMENT_OPTIONS = [2, 3, 4] as const;
+export const MIN_INSTALLMENTS_PRICE_CENTS = 5000;
+
+/**
+ * Échéancier sans frais : des mensualités égales (arrondies au centime inférieur), le reliquat
+ * de quelques centimes s'ajoutant au premier paiement, pour un total exact.
+ */
+export function installmentPlan(total: number, count: number) {
+  const monthly = Math.floor(total / count);
+  return { count, first: total - monthly * (count - 1), monthly };
+}
+
+/** « 65,68 € aujourd'hui, puis 2 × 65,66 € par mois ». */
+export function installmentLabel(total: number, count: number): string {
+  const plan = installmentPlan(total, count);
+  const rest = `${count - 1} × ${formatPrice(plan.monthly)} par mois`;
+  return `${formatPrice(plan.first)} aujourd'hui, puis ${rest}`;
 }
 
 export const MIN_PRICE_CENTS = 100;
@@ -37,6 +59,10 @@ export const coursePriceSchema = z.object({
     .min(MIN_PRICE_CENTS, "Prix minimum : 1 €")
     .max(MAX_PRICE_CENTS, "Prix maximum : 10 000 €"),
   currency: z.literal("eur"),
+  installments: z
+    .array(z.union(INSTALLMENT_OPTIONS.map((count) => z.literal(count))))
+    .max(INSTALLMENT_OPTIONS.length)
+    .optional(),
 });
 
 /** Compte Stripe relié à l'école (creators/{id}/private/stripe), écrit par les Functions. */
@@ -71,6 +97,8 @@ export interface PlatformSettingsDoc {
 
 export const createCheckoutInput = z.object({
   courseId: z.string().min(1).max(128),
+  /** Paiement en plusieurs fois (nombre d'échéances) ; absent : paiement unique. */
+  installments: z.number().int().min(2).max(4).nullish(),
   /** CGV acceptées et renonciation au droit de rétractation (accès immédiat). */
   acceptTerms: z.literal(true, { message: "Accepte les conditions pour continuer" }),
 });
@@ -127,6 +155,19 @@ export function promoLabel(promo: Pick<PromoCodeDoc, "kind" | "value">): string 
   return promo.kind === "percent" ? `-${promo.value} %` : `-${formatPrice(promo.value)}`;
 }
 
+/** Échéancier d'un achat en plusieurs fois (abonnement Stripe arrêté après la dernière). */
+export interface OrderInstallments {
+  count: number;
+  /** Échéances payées (identifiants des factures Stripe réglées). */
+  paidInvoiceIds: string[];
+  first: number;
+  monthly: number;
+  subscriptionId: string | null;
+  customerId: string | null;
+  /** active : en cours ; completed : tout payé ; past_due : échéance impayée ; canceled : arrêté. */
+  status: "active" | "completed" | "past_due" | "canceled";
+}
+
 /** orders/{sessionId} : achat d'une formation (lu par l'équipe de l'école). */
 export interface OrderDoc<T = unknown> {
   schoolId: string;
@@ -148,5 +189,7 @@ export interface OrderDoc<T = unknown> {
   billingAddress?: string | null;
   /** Facture émise au paiement (absente : informations légales manquantes à ce moment). */
   invoice?: OrderInvoice<T> | null;
+  /** Paiement en plusieurs fois (absent : paiement unique). */
+  installments?: OrderInstallments | null;
   createdAt: T;
 }

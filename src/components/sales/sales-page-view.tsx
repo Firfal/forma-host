@@ -59,6 +59,12 @@ function CtaButton({
           {page.ctaLabel} <ArrowRight className="size-4" />
         </a>
       )}
+      {checkout?.price.installments?.length ? (
+        <p className="text-[13px] font-medium text-muted">
+          ou {checkout.price.installments.length > 1 ? "jusqu'à " : "en "}
+          {Math.max(...checkout.price.installments)} fois sans frais
+        </p>
+      ) : null}
       {page.priceLabel ? <p className="text-[13px] text-muted">{page.priceLabel}</p> : null}
     </div>
   );

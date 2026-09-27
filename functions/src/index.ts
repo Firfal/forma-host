@@ -67,6 +67,9 @@ import {
   deactivatePromoCode as deactivatePromoCodeImpl,
   fakePaymentsClient,
   paymentErrorMessage,
+  recordInstallmentFailed,
+  recordInstallmentPaid,
+  recordInstallmentsEnded,
   refreshStripeAccount,
   refundOrder,
   stripeClient,
@@ -622,10 +625,12 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
       appUrl,
       client,
       termsAcceptedAt,
+      installments: input.installments ?? null,
     });
     if (fakePayments && course) {
       // Émulateurs : paiement simulé, validé tout de suite (le webhook ne passe pas).
       const stripe = (await db().doc(`creators/${course.creatorId}/private/stripe`).get()).data();
+      const price = (course as { price?: { amount: number } }).price;
       await completeCheckout(
         {
           sessionId: session.id,
@@ -633,12 +638,20 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
           courseId: input.courseId,
           email: email ?? "acheteur@exemple.fr",
           name: null,
-          amount: 0,
+          amount: price?.amount ?? 0,
           currency: "eur",
-          paymentIntentId: `pi_${session.id}`,
+          paymentIntentId: input.installments ? null : `pi_${session.id}`,
           promoCode: null,
           livemode: false,
           termsAcceptedAt,
+          installments: input.installments
+            ? {
+                count: input.installments,
+                subscriptionId: `sub_${session.id}`,
+                customerId: `cus_${session.id}`,
+                firstInvoiceId: `in_${session.id}_1`,
+              }
+            : null,
         },
         appUrlFor,
       );
@@ -719,6 +732,9 @@ export const stripeWebhook = onRequest(
           const email = session.customer_details?.email;
           const courseId = session.metadata?.courseId;
           if (session.payment_status !== "paid" || !event.account || !email || !courseId) break;
+          const count = Number(session.metadata?.installments) || 0;
+          const idOf = (value: string | { id: string } | null) =>
+            typeof value === "string" ? value : (value?.id ?? null);
           await completeCheckout(
             {
               sessionId: session.id,
@@ -726,7 +742,11 @@ export const stripeWebhook = onRequest(
               courseId,
               email,
               name: session.customer_details?.name ?? null,
-              amount: session.amount_total ?? 0,
+              // Plusieurs fois : prix total de la formation (la session ne porte que la 1re échéance).
+              amount:
+                session.mode === "subscription"
+                  ? Number(session.metadata?.totalAmount) || (session.amount_total ?? 0)
+                  : (session.amount_total ?? 0),
               currency: session.currency ?? "eur",
               paymentIntentId:
                 typeof session.payment_intent === "string"
@@ -736,9 +756,41 @@ export const stripeWebhook = onRequest(
               livemode: event.livemode,
               termsAcceptedAt: session.metadata?.termsAcceptedAt ?? null,
               billingAddress: formatPostalAddress(session.customer_details?.address),
+              installments:
+                session.mode === "subscription" && count > 1
+                  ? {
+                      count,
+                      subscriptionId: idOf(session.subscription),
+                      customerId: idOf(session.customer),
+                      firstInvoiceId: idOf(session.invoice),
+                    }
+                  : null,
             },
             appUrlFor,
           );
+          break;
+        }
+        case "invoice.paid":
+        case "invoice.payment_failed": {
+          const invoice = event.data.object as Stripe.Invoice;
+          const subscription = invoice.parent?.subscription_details?.subscription;
+          const subscriptionId = typeof subscription === "string" ? subscription : subscription?.id;
+          if (!subscriptionId || !event.account || !invoice.id) break;
+          if (event.type === "invoice.paid") {
+            await recordInstallmentPaid({
+              accountId: event.account,
+              subscriptionId,
+              invoiceId: invoice.id,
+              client: stripeClient(key),
+            });
+          } else {
+            await recordInstallmentFailed(subscriptionId);
+          }
+          break;
+        }
+        case "customer.subscription.deleted": {
+          const subscription = event.data.object as Stripe.Subscription;
+          await recordInstallmentsEnded(subscription.id);
           break;
         }
         case "account.updated": {
@@ -763,7 +815,15 @@ export const stripeWebhook = onRequest(
             typeof charge.payment_intent === "string"
               ? charge.payment_intent
               : charge.payment_intent?.id;
-          if (charge.refunded && paymentIntent) await refundOrder(paymentIntent);
+          const customer =
+            typeof charge.customer === "string" ? charge.customer : (charge.customer?.id ?? null);
+          if (charge.refunded && event.account) {
+            await refundOrder(paymentIntent ?? null, {
+              customerId: customer,
+              accountId: event.account,
+              client: stripeClient(key),
+            });
+          }
           break;
         }
         default:
