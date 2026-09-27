@@ -13,6 +13,11 @@
 import { randomBytes } from "node:crypto";
 import { GoogleAuth } from "google-auth-library";
 import { REGION } from "../shared/constants";
+import {
+  summarizeDomain,
+  type AppHostingDomain,
+  type AppHostingOperation,
+} from "../shared/domains";
 import { parseArgs } from "./admin";
 
 const args = parseArgs();
@@ -106,6 +111,7 @@ const REQUIRED_APIS = [
   "storage.googleapis.com",
   "identitytoolkit.googleapis.com",
   "cloudfunctions.googleapis.com",
+  "cloudscheduler.googleapis.com",
   "cloudbuild.googleapis.com",
   "artifactregistry.googleapis.com",
   "run.googleapis.com",
@@ -437,55 +443,65 @@ async function grantFunctionsDomainAccess() {
   );
 }
 
-interface DnsRecord {
-  type?: string;
-  domainName?: string;
-  rdata?: string;
-  requiredAction?: string;
-}
-
 /**
  * Domaine de la plateforme (--domain) : ajouté au backend App Hosting. Les enregistrements DNS
  * à créer chez l'hébergeur du domaine sont affichés (et écrits dans le résumé du workflow).
+ * Juste après la création, ils sont portés par l'opération de création, pas par le domaine.
  */
 async function ensurePlatformDomain() {
   if (typeof args.domain !== "string") return;
   const host = args.domain.toLowerCase();
-  const base = `https://firebaseapphosting.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}/backends/${BACKEND_ID}/domains`;
-  let domain = await api<{
-    customDomainStatus?: {
-      hostState?: string;
-      certState?: string;
-      requiredDnsUpdates?: {
-        desired?: { records?: DnsRecord[] }[];
-        discovered?: { records?: DnsRecord[] }[];
-      }[];
-    };
-  }>("GET", `${base}/${host}`, undefined, { allow404: true });
+  const base = `https://firebaseapphosting.googleapis.com/v1/projects/${PROJECT}/locations/${REGION}`;
+  const domainsUrl = `${base}/backends/${BACKEND_ID}/domains`;
+  let domain = await api<AppHostingDomain>("GET", `${domainsUrl}/${host}`, undefined, {
+    allow404: true,
+  });
+  let operation: AppHostingOperation | null = null;
   if (!domain) {
-    // L'opération reste en cours tant que le DNS n'est pas configuré : on relit le domaine.
-    await api("POST", `${base}?domainId=${encodeURIComponent(host)}`, {});
-    for (let attempt = 0; attempt < 10 && !domain; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      domain = await api("GET", `${base}/${host}`, undefined, { allow404: true });
-    }
+    operation = await api<AppHostingOperation>(
+      "POST",
+      `${domainsUrl}?domainId=${encodeURIComponent(host)}`,
+      {},
+    );
+  } else {
+    const target = `/backends/${BACKEND_ID}/domains/${host}`;
+    const list = await api<{ operations?: AppHostingOperation[] }>(
+      "GET",
+      `${base}/operations?pageSize=200`,
+    );
+    operation =
+      (list?.operations ?? [])
+        .filter((op) => op.metadata?.target?.endsWith(target))
+        .sort((a, b) =>
+          (b.metadata?.createTime ?? "").localeCompare(a.metadata?.createTime ?? ""),
+        )[0] ?? null;
   }
-  const status = domain?.customDomainStatus;
-  if (status?.hostState === "HOST_ACTIVE" && status.certState === "CERT_ACTIVE") {
+  let summary = summarizeDomain(domain, operation);
+  // L'opération reçoit ses enregistrements DNS en quelques secondes.
+  for (let attempt = 0; attempt < 10 && !summary.records.length && operation?.name; attempt++) {
+    if (summary.status === "active") break;
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    operation = await api<AppHostingOperation>(
+      "GET",
+      `https://firebaseapphosting.googleapis.com/v1/${operation.name}`,
+    );
+    domain = await api<AppHostingDomain>("GET", `${domainsUrl}/${host}`, undefined, {
+      allow404: true,
+    });
+    summary = summarizeDomain(domain, operation);
+  }
+  if (summary.status === "active") {
     ok(`Domaine ${host} actif`);
     return;
   }
-  const records = (status?.requiredDnsUpdates ?? [])
-    .flatMap((update) => [...(update.desired ?? []), ...(update.discovered ?? [])])
-    .flatMap((set) => set.records ?? [])
-    .filter((record) => record.requiredAction === "ADD" || record.requiredAction === "REMOVE");
-  const lines = records.map(
-    (r) =>
-      `${r.requiredAction === "REMOVE" ? "Supprimer" : "Ajouter"} ${r.type} ${r.domainName} → ${r.rdata}`,
-  );
+  const lines = summary.records
+    .filter((record) => record.action !== "ok")
+    .map(
+      (r) => `${r.action === "remove" ? "Supprimer" : "Ajouter"} ${r.type} ${r.name} → ${r.value}`,
+    );
   warn(
-    `Domaine ${host} en attente (${status?.hostState ?? "?"}, ${status?.certState ?? "?"}). ` +
-      `Enregistrements DNS : ${lines.join(" ; ") || "vérification en cours"}`,
+    `Domaine ${host} en attente (${summary.hostState ?? "?"}, ${summary.ownershipState ?? "?"}, ${summary.certState ?? "?"}). ` +
+      `Enregistrements DNS : ${lines.join(" ; ") || "aucun changement demandé, vérification en cours"}`,
   );
 }
 

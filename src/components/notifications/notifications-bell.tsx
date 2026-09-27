@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Bell,
   BookOpen,
+  Globe,
   GraduationCap,
   MessageSquare,
   MessagesSquare,
@@ -34,6 +35,7 @@ const icons: Record<NotificationType, typeof Bell> = {
   creator_request: GraduationCap,
   creator_request_decision: BadgeCheck,
   new_message: MessagesSquare,
+  domain_active: Globe,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

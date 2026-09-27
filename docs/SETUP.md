@@ -77,15 +77,22 @@ L'envoi se configure **dans l'application**, par chaque formateur : *Admin > Par
 
 ## 4. Domaines
 
-**Domaine d'une école** (dans l'application, propriétaire de l'école) : *Admin > Paramètres > Domaine*.
+**Domaine d'une école** (dans l'application, propriétaire de l'école) : *Admin > Paramètres > Domaine personnalisé*.
 
-1. Saisir le domaine, de préférence un sous-domaine (ex. `formation.ecolemotion.com`).
-2. Créer chez l'hébergeur du domaine les enregistrements DNS affichés (A et TXT en général), puis « Vérifier les DNS ». La propagation et le certificat HTTPS peuvent prendre jusqu'à 24 h.
-3. Une fois actif :
+1. Saisir l'adresse, de préférence un sous-domaine (ex. `formation.ecolemotion.com`). Pour un domaine principal, la carte propose un sous-domaine.
+2. Créer chez l'hébergeur du domaine les enregistrements affichés :
+   - en général A, TXT et CNAME ;
+   - les noms sont donnés en version courte (`formation`), prêts à copier ;
+   - l'hébergeur (IONOS, OVH, Gandi, Cloudflare…) est détecté, avec le chemin vers sa zone DNS.
+3. Chaque enregistrement passe à « Détecté » dès qu'il est visible dans le DNS public. La suite est automatique :
+   - vérification toutes les 10 minutes par la fonction `checkPendingDomains` ;
+   - vérification aussi tant que la page est ouverte ;
+   - email et notification au propriétaire dès que le domaine est actif (souvent moins d'une heure, jusqu'à 24 h).
+4. Une fois actif :
    - la page de l'école s'affiche à la racine du domaine, et ses pages de vente sous `/{formation}` ;
    - l'espace élève et la connexion fonctionnent sur ce domaine ;
    - les emails envoient des liens vers ce domaine.
-4. Ajouter le domaine dans les réglages d'intégration des vidéos Vimeo.
+5. Ajouter le domaine dans les réglages d'intégration des vidéos Vimeo.
 
 **Domaine de la plateforme** (adresse commune à toutes les écoles) :
 

@@ -163,7 +163,8 @@ export type NotificationType =
   | "team_member"
   | "creator_request"
   | "creator_request_decision"
-  | "new_message";
+  | "new_message"
+  | "domain_active";
 
 export interface NotificationDoc<T = TimestampLike> {
   type: NotificationType;

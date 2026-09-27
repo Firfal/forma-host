@@ -1,6 +1,7 @@
 import "./setup";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import Stripe from "stripe";
 import { logger } from "firebase-functions";
 import {
@@ -83,6 +84,7 @@ import {
   refreshSchoolDomain as refreshSchoolDomainImpl,
   removeSchoolDomain as removeSchoolDomainImpl,
   schoolBaseUrl,
+  syncPendingDomains,
 } from "./domains";
 import {
   inviteSchoolAdmin as inviteSchoolAdminImpl,
@@ -439,21 +441,30 @@ export const addSchoolDomain = onCall({ timeoutSeconds: 60 }, async (request) =>
   const caller = await requireSchoolOwner(request);
   const input = parseInput(schoolDomainInput, request.data);
   try {
-    return await addSchoolDomainImpl(caller.uid, input.host, domainsClient);
+    return await addSchoolDomainImpl(caller.uid, input.host, domainsClient, APP_URL.value());
   } catch (error) {
     domainError(error);
   }
 });
 
-/** Vérifie l'état du domaine (DNS, certificat HTTPS). */
-export const refreshSchoolDomain = onCall(async (request) => {
+/** Vérifie l'état du domaine (DNS public, App Hosting, certificat HTTPS). */
+export const refreshSchoolDomain = onCall({ timeoutSeconds: 60 }, async (request) => {
   const caller = await requireSchoolOwner(request);
   try {
-    return await refreshSchoolDomainImpl(caller.uid, domainsClient);
+    return await refreshSchoolDomainImpl(caller.uid, domainsClient, APP_URL.value());
   } catch (error) {
     domainError(error);
   }
 });
+
+/** Domaines en attente vérifiés toutes les 10 minutes : email au formateur dès l'activation. */
+export const checkPendingDomains = onSchedule(
+  { schedule: "every 10 minutes", timeoutSeconds: 300 },
+  async () => {
+    const result = await syncPendingDomains(domainsClient, APP_URL.value());
+    if (result.checked || result.failed) logger.info("Domaines en attente", result);
+  },
+);
 
 export const removeSchoolDomain = onCall(async (request) => {
   const caller = await requireSchoolOwner(request);
