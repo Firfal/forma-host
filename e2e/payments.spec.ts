@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, stubVimeo, THEO } from "./helpers";
+import { login, publishLegalInfo, stubVimeo, THEO } from "./helpers";
 
 test("vente directe : Stripe relié, prix, code promo, achat puis accès", async ({
   page,
@@ -7,6 +7,8 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
 }) => {
   // Deux navigateurs, inscription et achat : plus long que les autres scénarios.
   test.setTimeout(120_000);
+  // Informations légales de l'école : CGV liées au paiement, facture émise à l'achat.
+  await publishLegalInfo("ecole-motion");
   await login(page, THEO);
   await page.goto("/admin/parametres");
   await page.getByRole("button", { name: "Connecter mon compte Stripe" }).click();
@@ -37,14 +39,36 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
   await expect(buyer).toHaveURL(/\/formations$/);
   await buyer.goto("/ecole-motion/maitriser-after-effects");
   await buyer.getByRole("button", { name: /197/ }).first().click();
+  // Récapitulatif : l'accès immédiat exige de renoncer au droit de rétractation.
+  const order = buyer.getByRole("dialog", { name: "Ta commande" });
+  const pay = order.getByRole("button", { name: "Continuer vers le paiement" });
+  await expect(pay).toBeDisabled();
+  await expect(order.getByRole("link", { name: "conditions générales de vente" })).toHaveAttribute(
+    "href",
+    "/ecole-motion/legal/cgv",
+  );
+  await order.getByRole("checkbox").check();
+  await pay.click();
   await expect(buyer.getByText("Merci pour ton achat !")).toBeVisible();
   await buyer.getByRole("link", { name: "Commencer la formation" }).click();
   await expect(buyer.getByText("0 sur 15 terminé")).toBeVisible();
 
-  // La vente apparaît côté formateur, puis la vente directe est désactivée.
+  // Facture de l'acheteur, dans « Mon compte » (série de test : aucun paiement réel).
+  await buyer.goto("/compte");
+  const purchases = buyer.locator("div.rounded-card", {
+    has: buyer.getByRole("heading", { name: "Mes achats" }),
+  });
+  await purchases.getByRole("link", { name: "Facture" }).click();
+  await expect(buyer.getByRole("heading", { name: "Facture", exact: true })).toBeVisible();
+  await expect(buyer.getByText(/N° TEST-F-\d{4}-0001/)).toBeVisible();
+  await expect(buyer.getByText("Facture de test : aucun paiement réel.")).toBeVisible();
+  await expect(buyer.getByText(/293 B du Code général des impôts/)).toBeVisible();
+
+  // La vente apparaît côté formateur, avec sa facture, puis la vente directe est désactivée.
   await page.reload();
-  await expect(page.getByText("1 vente")).toBeVisible();
+  await expect(page.getByText(/^1 vente · /)).toBeVisible();
   await expect(page.getByText("Test", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Facture" })).toBeVisible();
   await page.fill("#course-price", "");
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Vente directe désactivée")).toBeVisible();

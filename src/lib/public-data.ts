@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import type { SchoolLegalDoc } from "@shared/legal";
 import { sameStripeMode, type PlatformSettingsDoc, type SchoolStripeDoc } from "@shared/payments";
 import type { CourseDoc, CoursePrivateSettings, CreatorDoc, LessonDoc } from "@shared/types";
 import { adminDb } from "./firebase/admin";
@@ -82,3 +83,9 @@ export async function isCheckoutAvailable(creatorId: string): Promise<boolean> {
     sameStripeMode(account.livemode, settings.stripeLivemode),
   );
 }
+
+/** Informations légales publiées par l'école (null : pages légales pas encore publiées). */
+export const getSchoolLegal = cache(async (creatorId: string): Promise<SchoolLegalDoc | null> => {
+  const snap = await adminDb.doc(`creators/${creatorId}/legal/info`).get();
+  return (snap.data() as SchoolLegalDoc | undefined) ?? null;
+});

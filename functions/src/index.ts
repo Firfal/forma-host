@@ -1,4 +1,5 @@
 import "./setup";
+import { FieldValue } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -19,9 +20,11 @@ import {
 } from "@shared/creator-requests";
 import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
 import { schoolDomainInput } from "@shared/domains";
+import { formatPostalAddress } from "@shared/invoices";
+import { schoolLegalInput } from "@shared/legal";
 import { mailSettingsInput } from "@shared/mail-settings";
 import { createCheckoutInput, promoCodeIdInput, promoCodeInput } from "@shared/payments";
-import { inviteSchoolAdminInput, removeSchoolAdminInput } from "@shared/school";
+import { inviteSchoolAdminInput, removeSchoolAdminInput, schoolIdInput } from "@shared/school";
 import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";
 import { enrollmentId, paths } from "@shared/paths";
@@ -93,6 +96,7 @@ import {
   updateSchoolProfile as updateSchoolProfileImpl,
 } from "./schools";
 import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
+import { issueMissingInvoices as issueMissingInvoicesImpl } from "./invoices";
 import { resolveVimeo } from "./vimeo";
 import {
   deleteVimeoSettings as deleteVimeoSettingsImpl,
@@ -399,6 +403,34 @@ export const updateSchoolProfile = onCall(async (request) => {
   return { ok: true };
 });
 
+/** Informations légales de l'école (pages légales publiques, factures). */
+export const saveSchoolLegal = onCall(async (request) => {
+  const { schoolId: target, ...info } = parseInput(schoolLegalInput, request.data);
+  const schoolId = target ?? request.auth?.uid ?? "";
+  requireSchoolAdmin(request, schoolId);
+  if (!(await db().doc(`creators/${schoolId}`).get()).exists) {
+    throw new HttpsError("not-found", "École introuvable");
+  }
+  await db()
+    .doc(`creators/${schoolId}/legal/info`)
+    .set({ ...info, updatedAt: FieldValue.serverTimestamp() });
+  return { ok: true };
+});
+
+/** Factures des ventes passées avant la saisie des informations légales. */
+export const issueMissingInvoices = onCall(async (request) => {
+  const input = parseInput(schoolIdInput, request.data);
+  const schoolId = input.schoolId ?? request.auth?.uid ?? "";
+  requireSchoolAdmin(request, schoolId);
+  if (!(await db().doc(`creators/${schoolId}/legal/info`).get()).exists) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Complète d'abord les informations légales (Paramètres).",
+    );
+  }
+  return { issued: await issueMissingInvoicesImpl(schoolId) };
+});
+
 /** Invite un co-administrateur dans l'équipe de l'école (propriétaire uniquement). */
 export const inviteSchoolAdmin = onCall(async (request) => {
   const caller = await requireSchoolOwner(request);
@@ -583,7 +615,14 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
     const course = (await db().doc(`courses/${input.courseId}`).get()).data() as
       { creatorId: string } | undefined;
     const appUrl = course ? await appUrlFor(course.creatorId) : APP_URL.value();
-    const session = await createCheckout({ courseId: input.courseId, email, appUrl, client });
+    const termsAcceptedAt = new Date().toISOString();
+    const session = await createCheckout({
+      courseId: input.courseId,
+      email,
+      appUrl,
+      client,
+      termsAcceptedAt,
+    });
     if (fakePayments && course) {
       // Émulateurs : paiement simulé, validé tout de suite (le webhook ne passe pas).
       const stripe = (await db().doc(`creators/${course.creatorId}/private/stripe`).get()).data();
@@ -599,6 +638,7 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
           paymentIntentId: `pi_${session.id}`,
           promoCode: null,
           livemode: false,
+          termsAcceptedAt,
         },
         appUrlFor,
       );
@@ -694,6 +734,8 @@ export const stripeWebhook = onRequest(
                   : (session.payment_intent?.id ?? null),
               promoCode: null,
               livemode: event.livemode,
+              termsAcceptedAt: session.metadata?.termsAcceptedAt ?? null,
+              billingAddress: formatPostalAddress(session.customer_details?.address),
             },
             appUrlFor,
           );

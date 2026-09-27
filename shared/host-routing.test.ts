@@ -32,6 +32,17 @@ describe("routage par domaine d'école", () => {
     }
   });
 
+  it("sert les pages légales de l'école sous /legal", () => {
+    expect(routeForSchoolHost("/legal/cgv", "ecole-motion")).toEqual({
+      type: "rewrite",
+      pathname: "/ecole-motion/legal/cgv",
+    });
+    expect(routeForSchoolHost("/ecole-motion/legal/cgv", "ecole-motion")).toEqual({
+      type: "redirect",
+      pathname: "/legal/cgv",
+    });
+  });
+
   it("redirige les liens au format de la plateforme vers l'adresse courte", () => {
     expect(routeForSchoolHost("/ecole-motion/after-effects", "ecole-motion")).toEqual({
       type: "redirect",

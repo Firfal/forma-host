@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PurchasesCard } from "@/components/account/purchases-card";
 import { PushSettingsCard } from "@/components/settings/push-settings-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
@@ -82,6 +83,7 @@ export default function AccountPage() {
           </CardBody>
         </Card>
         <PushSettingsCard />
+        <PurchasesCard />
         {isCreator ? (
           <Card>
             <CardBody className="flex items-center justify-between gap-4">

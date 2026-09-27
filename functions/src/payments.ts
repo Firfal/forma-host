@@ -13,6 +13,7 @@ import { routes } from "@shared/paths";
 import type { CourseDoc, CreatorDoc } from "@shared/types";
 import { grantAccessToStudents } from "./access";
 import { db } from "./db";
+import { issueCreditNote, issueInvoice } from "./invoices";
 
 /**
  * Paiements Stripe Connect : chaque école relie son propre compte Stripe (compte « Standard »,
@@ -35,7 +36,13 @@ export interface CheckoutRequest {
   email: string | null;
   successUrl: string;
   cancelUrl: string;
+  /** Acceptation des CGV et renonciation à la rétractation (ISO 8601). */
+  termsAcceptedAt: string;
 }
+
+/** Rappel affiché sous le bouton de paiement Stripe. */
+const CHECKOUT_TERMS_MESSAGE =
+  "En payant, vous demandez l'accès immédiat à la formation et renoncez à votre droit de rétractation (article L221-28 du Code de la consommation).";
 
 export interface PaymentsClient {
   /** Clé réelle (true) ou de test (false). */
@@ -113,7 +120,12 @@ export function stripeClient(secretKey: string): PaymentsClient {
           ...(request.email ? { customer_email: request.email } : {}),
           success_url: request.successUrl,
           cancel_url: request.cancelUrl,
-          metadata: { courseId: request.courseId, schoolId: request.schoolId },
+          metadata: {
+            courseId: request.courseId,
+            schoolId: request.schoolId,
+            termsAcceptedAt: request.termsAcceptedAt,
+          },
+          custom_text: { submit: { message: CHECKOUT_TERMS_MESSAGE } },
           locale: "fr",
         },
         { stripeAccount: request.accountId },
@@ -266,6 +278,7 @@ export async function createCheckout(params: {
   email: string | null;
   appUrl: string;
   client: PaymentsClient;
+  termsAcceptedAt?: string;
 }): Promise<{ id: string; url: string }> {
   const course = (await db().doc(`courses/${params.courseId}`).get()).data() as
     CourseDoc | undefined;
@@ -286,6 +299,7 @@ export async function createCheckout(params: {
     email: params.email,
     successUrl: `${params.appUrl}/merci?session={CHECKOUT_SESSION_ID}&formation=${params.courseId}`,
     cancelUrl: `${params.appUrl}${routes.salesPage(creator.slug, course.slug)}`,
+    termsAcceptedAt: params.termsAcceptedAt ?? new Date().toISOString(),
   });
 }
 
@@ -300,6 +314,8 @@ export interface CompletedCheckout {
   paymentIntentId: string | null;
   promoCode: string | null;
   livemode: boolean;
+  termsAcceptedAt?: string | null;
+  billingAddress?: string | null;
 }
 
 /** Paiement réussi : commande enregistrée et accès donné (idempotent, les webhooks sont rejoués). */
@@ -320,6 +336,7 @@ export async function completeCheckout(
   const order: OrderDoc<FieldValue> = {
     schoolId: account.schoolId,
     courseId: checkout.courseId,
+    courseTitle: course.title,
     email: checkout.email.toLowerCase(),
     name: checkout.name,
     amount: checkout.amount,
@@ -328,9 +345,15 @@ export async function completeCheckout(
     paymentIntentId: checkout.paymentIntentId,
     status: "paid",
     livemode: checkout.livemode,
+    termsAcceptedAt: checkout.termsAcceptedAt ?? null,
+    billingAddress: checkout.billingAddress ?? null,
     createdAt: FieldValue.serverTimestamp(),
   };
   await orderRef.set(order, { merge: true });
+  // La facture ne doit jamais bloquer l'accès : une erreur est journalisée, pas propagée.
+  await issueInvoice(checkout.sessionId).catch((error) =>
+    console.error(`Facture de la commande ${checkout.sessionId}`, error),
+  );
 
   const result = await grantAccessToStudents({
     courseId: checkout.courseId,
@@ -355,6 +378,9 @@ export async function refundOrder(paymentIntentId: string): Promise<void> {
   if (!orderDoc) return;
   const order = orderDoc.data() as OrderDoc<Timestamp>;
   await orderDoc.ref.update({ status: "refunded" });
+  await issueCreditNote(orderDoc.id).catch((error) =>
+    console.error(`Avoir de la commande ${orderDoc.id}`, error),
+  );
   const enrollments = await db()
     .collection("enrollments")
     .where("courseId", "==", order.courseId)

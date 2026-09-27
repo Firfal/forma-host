@@ -15,6 +15,7 @@ import type {
   RejectCreatorRequestInput,
 } from "@shared/creator-requests";
 import type { SchoolDomain, SchoolDomainInput } from "@shared/domains";
+import type { SchoolLegalInput } from "@shared/legal";
 import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
 import type { CreateCheckoutInput, PromoCodeIdInput, PromoCodeInput } from "@shared/payments";
 import type {
@@ -80,6 +81,10 @@ export const callDeactivatePromoCode = callable<PromoCodeIdInput, { ok: true }>(
 );
 export const callUpdateSchoolProfile = callable<SchoolProfileInput, { ok: true }>(
   "updateSchoolProfile",
+);
+export const callSaveSchoolLegal = callable<SchoolLegalInput, { ok: true }>("saveSchoolLegal");
+export const callIssueMissingInvoices = callable<{ schoolId?: string | null }, { issued: number }>(
+  "issueMissingInvoices",
 );
 
 export const callOpenConversation = callable<OpenConversationInput, { conversationId: string }>(

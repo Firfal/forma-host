@@ -9,6 +9,7 @@ import {
   getPreviewVideo,
   getPublishedCourse,
   getRenamedCreatorSlug,
+  getSchoolLegal,
   isCheckoutAvailable,
 } from "@/lib/public-data";
 
@@ -50,10 +51,11 @@ export default async function SalesPageRoute({ params }: { params: Promise<Param
     if (renamed) permanentRedirect(routes.salesPage(renamed, courseSlug));
     notFound();
   }
-  const [ctaUrl, preview, checkoutAvailable] = await Promise.all([
+  const [ctaUrl, preview, checkoutAvailable, legal] = await Promise.all([
     getExternalCtaUrl(data.course.id),
     getPreviewVideo(data.course),
     data.course.price ? isCheckoutAvailable(data.creator.id) : false,
+    getSchoolLegal(data.creator.id),
   ]);
   return (
     <SalesPageView
@@ -63,6 +65,7 @@ export default async function SalesPageRoute({ params }: { params: Promise<Param
       ctaUrl={ctaUrl}
       preview={preview}
       checkout={checkoutAvailable && data.course.price ? { price: data.course.price } : null}
+      legal={legal ? { accessMonths: legal.accessMonths } : null}
     />
   );
 }

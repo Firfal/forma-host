@@ -9,6 +9,7 @@ import { RichText } from "@/components/editor/rich-text";
 import { LogoMark } from "@/components/logo";
 import { VimeoPlayer } from "@/components/video/vimeo-player";
 import { BuyButton } from "./buy-button";
+import { SchoolFooter } from "./school-footer";
 
 export interface SalesPageViewProps {
   course: CourseDoc & { id: string };
@@ -18,6 +19,15 @@ export interface SalesPageViewProps {
   preview: { lessonTitle: string; video: VimeoVideo } | null;
   /** Vente directe (prix + compte Stripe actif) : bouton d'achat au lieu du lien. */
   checkout: { price: CoursePrice } | null;
+  /** Pages légales publiées par l'école (null : pas encore). */
+  legal: { accessMonths: number | null } | null;
+}
+
+interface CheckoutContext {
+  courseId: string;
+  courseTitle: string;
+  brandColor: string;
+  termsUrl: string | null;
 }
 
 const ctaClass =
@@ -26,20 +36,21 @@ const ctaClass =
 function CtaButton({
   page,
   ctaUrl,
-  courseId,
+  context,
   checkout,
 }: {
   page: SalesPage;
   ctaUrl: string | null;
-  courseId: string;
+  context: CheckoutContext;
   checkout: { price: CoursePrice } | null;
 }) {
-  const href = ctaUrl ?? routes.course(courseId);
+  const href = ctaUrl ?? routes.course(context.courseId);
   return (
     <div className="flex flex-col items-center gap-2">
       {checkout ? (
         <BuyButton
-          courseId={courseId}
+          {...context}
+          price={checkout.price}
           label={`${page.ctaLabel} — ${formatPrice(checkout.price.amount)}`}
           className={ctaClass}
         />
@@ -61,11 +72,18 @@ export function SalesPageView({
   ctaUrl,
   preview,
   checkout,
+  legal,
 }: SalesPageViewProps) {
   const lessons = visibleLessons(course.items);
   const chapters = groupByChapter(course.items);
   const totalSeconds = lessons.reduce((sum, lesson) => sum + (lesson.durationSec ?? 0), 0);
   const brandColor = /^#[0-9a-f]{6}$/i.test(creator.brandColor) ? creator.brandColor : "#5a0eb5";
+  const context: CheckoutContext = {
+    courseId: course.id,
+    courseTitle: course.title,
+    brandColor,
+    termsUrl: legal ? routes.legalPage(creator.slug, "cgv") : null,
+  };
 
   return (
     <div style={{ "--brand": brandColor } as CSSProperties} className="min-h-dvh bg-white">
@@ -103,7 +121,7 @@ export function SalesPageView({
           </p>
         ) : null}
         <div className="mt-8">
-          <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} checkout={checkout} />
+          <CtaButton page={page} ctaUrl={ctaUrl} context={context} checkout={checkout} />
         </div>
         <div className="mx-auto mt-10 max-w-3xl overflow-hidden rounded-xl border border-line shadow-xl shadow-black/5">
           {preview ? (
@@ -122,7 +140,10 @@ export function SalesPageView({
             </span>
           ) : null}
           <span className="inline-flex items-center gap-1.5">
-            <CheckCircle2 className="size-4" /> Accès à vie, à ton rythme
+            <CheckCircle2 className="size-4" />{" "}
+            {legal?.accessMonths
+              ? `Accès ${legal.accessMonths} mois, à ton rythme`
+              : "Accès à vie, à ton rythme"}
           </span>
         </div>
       </section>
@@ -192,7 +213,7 @@ export function SalesPageView({
           ))}
         </ol>
         <div className="mt-10">
-          <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} checkout={checkout} />
+          <CtaButton page={page} ctaUrl={ctaUrl} context={context} checkout={checkout} />
         </div>
       </section>
 
@@ -247,20 +268,12 @@ export function SalesPageView({
             ))}
           </div>
           <div className="mt-10">
-            <CtaButton page={page} ctaUrl={ctaUrl} courseId={course.id} checkout={checkout} />
+            <CtaButton page={page} ctaUrl={ctaUrl} context={context} checkout={checkout} />
           </div>
         </section>
       ) : null}
 
-      <footer className="border-t border-line-soft px-4 py-8 text-center text-[12px] text-muted">
-        © {new Date().getFullYear()} {creator.name}
-        {creator.supportEmail ? (
-          <>
-            {" "}
-            · <a href={`mailto:${creator.supportEmail}`}>{creator.supportEmail}</a>
-          </>
-        ) : null}
-      </footer>
+      <SchoolFooter school={creator} hasLegal={Boolean(legal)} />
     </div>
   );
 }

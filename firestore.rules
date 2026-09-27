@@ -145,6 +145,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Informations légales (pages légales publiques), écrites par la callable saveSchoolLegal.
+      match /legal/{docId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
       // Mot de passe SMTP chiffré.
       match /secrets/{docId} {
         allow read, write: if false;
@@ -326,9 +332,11 @@ service cloud.firestore {
 
     // ---------- Paiements ----------
 
-    // Achats (webhook Stripe) : lus par l'équipe de l'école.
+    // Achats (webhook Stripe) : lus par l'équipe de l'école et par l'acheteur (ses factures).
     match /orders/{orderId} {
-      allow read: if isSchoolAdmin(resource.data.schoolId);
+      allow read: if isSchoolAdmin(resource.data.schoolId)
+        || (signedIn() && request.auth.token.email is string
+            && resource.data.email == request.auth.token.email.lower());
       allow write: if false;
     }
 

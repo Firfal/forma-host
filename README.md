@@ -11,15 +11,15 @@ Plateforme d'hébergement de formations en ligne, pensée comme une alternative 
 
 ## Fonctionnalités
 
-| Espace | Fonctionnalités |
-|---|---|
-| Comptes | Inscription, connexion, mot de passe oublié, activation par invitation (`/bienvenue/[token]`), notifications push sur ordinateur et téléphone (*Mon compte*) |
-| Formateur (`/admin`) | Formations (titre, description, miniature, slug), plan avec chapitres, sous-chapitres et leçons, leçons (vidéo Vimeo, miniature, description, liens, pièces jointes), élèves (invitation, import CSV, progression), commentaires, messages (chat avec les élèves), notifications, mail de bienvenue |
-| École (*Paramètres*) | Profil (nom, adresse, logo, couleur), équipe (co-administrateurs), domaine personnalisé, envoi des emails par son propre SMTP (Brevo, Gmail…), compte Vimeo, paiements Stripe Connect |
-| Vente | Prix, paiement Stripe (0 % de commission), codes promo, accès automatique après paiement |
-| Élève (`/formations`) | Mes formations (tous formateurs confondus), lecteur vidéo, progression, reprise, commentaires, « Écrire au formateur » (`/messages`) |
-| Plateforme | Demandes d'espace formateur validées par l'administrateur (`/plateforme/demandes`) |
-| Public | Page de l'école `/{ecole}` et page de vente `/{ecole}/{formation}`, ou `/{formation}` sur le domaine de l'école |
+| Espace                | Fonctionnalités                                                                                                                                                                                                                                                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Comptes               | Inscription, connexion, mot de passe oublié, activation par invitation (`/bienvenue/[token]`), notifications push sur ordinateur et téléphone (_Mon compte_)                                                                                                                                        |
+| Formateur (`/admin`)  | Formations (titre, description, miniature, slug), plan avec chapitres, sous-chapitres et leçons, leçons (vidéo Vimeo, miniature, description, liens, pièces jointes), élèves (invitation, import CSV, progression), commentaires, messages (chat avec les élèves), notifications, mail de bienvenue |
+| École (_Paramètres_)  | Profil (nom, adresse, logo, couleur), équipe (co-administrateurs), domaine personnalisé, informations légales (mentions légales, CGV, confidentialité générées), envoi des emails par son propre SMTP (Brevo, Gmail…), compte Vimeo, paiements Stripe Connect                                       |
+| Vente                 | Prix, paiement Stripe (0 % de commission), codes promo, récapitulatif avec acceptation des CGV et renonciation à la rétractation, accès automatique après paiement, factures et avoirs numérotés (série de test séparée)                                                                            |
+| Élève (`/formations`) | Mes formations (tous formateurs confondus), lecteur vidéo, progression, reprise, commentaires, « Écrire au formateur » (`/messages`), achats et factures (_Mon compte_)                                                                                                                             |
+| Plateforme            | Demandes d'espace formateur validées par l'administrateur (`/plateforme/demandes`)                                                                                                                                                                                                                  |
+| Public                | Page de l'école `/{ecole}`, page de vente `/{ecole}/{formation}` et pages légales `/{ecole}/legal/{cgv,mentions-legales,confidentialite}` (sans le préfixe `/{ecole}` sur le domaine de l'école)                                                                                                    |
 
 ## État d'avancement
 
@@ -53,6 +53,7 @@ npm run dev                       # terminal 3 : http://localhost:3000
 ```
 
 Comptes de démo :
+
 - **formateur** : `theo@ecolemotion.com` / `motion123`
 - **élève** : `anne@exemple.fr` / `eleve123`
 

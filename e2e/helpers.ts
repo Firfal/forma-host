@@ -16,7 +16,8 @@ export async function login(page: Page, user: { email: string; password: string 
   await page.fill("#email", user.email);
   await page.fill("#password", user.password);
   await page.click("button[type=submit]");
-  await expect(page).toHaveURL(/\/(admin|formations)$/);
+  // Premier passage : Next.js (mode dev) compile l'espace connecté, ce qui peut être long.
+  await expect(page).toHaveURL(/\/(admin|formations)$/, { timeout: 60_000 });
 }
 
 /** Emails écrits dans la collection `mail` de l'émulateur (SMTP simulé en local). */
@@ -64,4 +65,55 @@ export async function pushesSent(): Promise<{ tokens: string[]; title: string; l
     title: doc.fields.data.mapValue.fields.title.stringValue,
     link: doc.fields.data.mapValue.fields.link.stringValue,
   }));
+}
+
+const FIRESTORE = "http://127.0.0.1:8080/v1/projects/demo-forma/databases/(default)/documents";
+const OWNER = { Authorization: "Bearer owner", "Content-Type": "application/json" };
+
+/** Identifiant d'une école de démo, d'après son adresse publique. */
+export async function schoolIdBySlug(slug: string): Promise<string> {
+  const response = await fetch(`${FIRESTORE}:runQuery`, {
+    method: "POST",
+    headers: OWNER,
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "creators" }],
+        where: {
+          fieldFilter: { field: { fieldPath: "slug" }, op: "EQUAL", value: { stringValue: slug } },
+        },
+      },
+    }),
+  });
+  const [row] = (await response.json()) as { document?: { name: string } }[];
+  if (!row?.document) throw new Error(`École ${slug} introuvable`);
+  return row.document.name.split("/").pop()!;
+}
+
+/** Informations légales de démo (factures, pages légales) écrites directement dans l'émulateur. */
+export async function publishLegalInfo(slug: string) {
+  const id = await schoolIdBySlug(slug);
+  const text = (value: string) => ({ stringValue: value });
+  await fetch(`${FIRESTORE}/creators/${id}/legal/info`, {
+    method: "PATCH",
+    headers: OWNER,
+    body: JSON.stringify({
+      fields: {
+        companyName: text("Ecole Motion"),
+        legalForm: text("Entreprise individuelle"),
+        siret: text("12345678900012"),
+        address: text("1 rue de la Paix, 75002 Paris"),
+        vatMode: text("franchise"),
+        vatNumber: { nullValue: null },
+        publisherName: text("Théo Robert"),
+        contactEmail: text("contact@ecolemotion.com"),
+        phone: { nullValue: null },
+        mediatorName: text("CM2C"),
+        mediatorUrl: { nullValue: null },
+        refundDays: { integerValue: "0" },
+        accessMonths: { nullValue: null },
+        extraTerms: { nullValue: null },
+        updatedAt: { timestampValue: new Date().toISOString() },
+      },
+    }),
+  });
 }

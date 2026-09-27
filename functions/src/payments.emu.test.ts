@@ -1,6 +1,7 @@
 import { deleteApp, getApps, initializeApp } from "firebase-admin/app";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { auth, db } from "./db";
+import { issueMissingInvoices } from "./invoices";
 import {
   completeCheckout,
   connectStripe,
@@ -194,5 +195,111 @@ describe("paiements Stripe", () => {
     expect((await db().doc("courses/c1/private/stripe").get()).data()?.accountId).toBe(
       stripe?.accountId,
     );
+  });
+});
+
+describe("factures", () => {
+  const legal = {
+    companyName: "Ecole Motion",
+    legalForm: "SAS",
+    siret: "12345678900012",
+    address: "1 rue de la Paix, 75002 Paris",
+    vatMode: "standard",
+    vatNumber: "FR12345678901",
+    publisherName: "Théo Robert",
+    contactEmail: "contact@ecolemotion.com",
+    phone: null,
+    mediatorName: "CM2C",
+    mediatorUrl: null,
+    refundDays: 0,
+    accessMonths: null,
+    extraTerms: null,
+  };
+  const year = new Date().getFullYear();
+
+  async function buy(accountId: string, suffix: string, livemode = false) {
+    const session = await createCheckout({ courseId: "c1", email: null, appUrl: APP_URL, client });
+    await completeCheckout(
+      {
+        sessionId: session.id,
+        accountId,
+        courseId: "c1",
+        email: `eleve-${suffix}@test.fr`,
+        name: `Élève ${suffix}`,
+        amount: 19700,
+        currency: "eur",
+        paymentIntentId: `pi_${suffix}`,
+        promoCode: null,
+        livemode,
+        billingAddress: "1 rue A, 75002 Paris",
+      },
+      appUrlFor,
+    );
+    return session.id;
+  }
+  const invoiceOf = async (orderId: string) =>
+    (await db().doc(`orders/${orderId}`).get()).data()?.invoice;
+
+  it("émise au paiement, numérotée sans trou, rejouable, avec avoir au remboursement", async () => {
+    const accountId = await connectedAccount();
+    await db().doc("creators/theo/legal/info").set(legal);
+    const first = await buy(accountId, "1");
+    const second = await buy(accountId, "2");
+    // Webhook rejoué : même facture.
+    await completeCheckout(
+      {
+        sessionId: first,
+        accountId,
+        courseId: "c1",
+        email: "eleve-1@test.fr",
+        name: "Élève 1",
+        amount: 19700,
+        currency: "eur",
+        paymentIntentId: "pi_1",
+        promoCode: null,
+        livemode: false,
+      },
+      appUrlFor,
+    );
+    expect(await invoiceOf(first)).toMatchObject({
+      number: `TEST-F-${year}-0001`,
+      seller: { companyName: "Ecole Motion", siret: "12345678900012" },
+      buyer: { name: "Élève 1", email: "eleve-1@test.fr", address: "1 rue A, 75002 Paris" },
+      description: "Formation en ligne : After Effects",
+      vatRate: 20,
+      amountExclTax: 16417,
+      vatAmount: 3283,
+      amountInclTax: 19700,
+    });
+    expect((await invoiceOf(second)).number).toBe(`TEST-F-${year}-0002`);
+    expect((await db().doc(`orders/${first}`).get()).data()?.courseTitle).toBe("After Effects");
+
+    await refundOrder("pi_2");
+    await refundOrder("pi_2");
+    expect((await invoiceOf(second)).creditNote.number).toBe(`TEST-A-${year}-0001`);
+
+    // Vente réelle : série distincte de celle des tests.
+    const live = await buy(accountId, "3", true);
+    expect((await invoiceOf(live)).number).toBe(`F-${year}-0001`);
+  });
+
+  it("sans informations légales : pas de facture, puis émission des factures manquantes", async () => {
+    const accountId = await connectedAccount();
+    const first = await buy(accountId, "a");
+    const second = await buy(accountId, "b");
+    expect(await invoiceOf(first)).toBeUndefined();
+    expect(
+      (
+        await db()
+          .doc(`enrollments/c1_${(await auth().getUserByEmail("eleve-a@test.fr")).uid}`)
+          .get()
+      ).data()?.status,
+    ).toBe("active");
+
+    await db().doc("creators/theo/legal/info").set(legal);
+    expect(await issueMissingInvoices("theo")).toBe(2);
+    expect(await issueMissingInvoices("theo")).toBe(0);
+    expect((await invoiceOf(first)).number).toBe(`TEST-F-${year}-0001`);
+    expect((await invoiceOf(second)).number).toBe(`TEST-F-${year}-0002`);
   });
 });

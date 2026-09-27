@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { PageContainer } from "@/components/layout/page";
 import { DomainSettingsCard } from "@/components/settings/domain-settings-card";
+import { LegalSettingsCard } from "@/components/settings/legal-settings-card";
 import { MailSettingsCard } from "@/components/settings/mail-settings-card";
 import { PaymentsSettingsCard } from "@/components/settings/payments-settings-card";
 import { SchoolSettingsCard } from "@/components/settings/school-settings-card";
@@ -23,6 +24,7 @@ export default function SettingsPage() {
           <>
             <TeamSettingsCard />
             <DomainSettingsCard />
+            <LegalSettingsCard />
             {/* useSearchParams (retour de Stripe) : rendu côté client uniquement. */}
             <Suspense fallback={null}>
               <PaymentsSettingsCard />

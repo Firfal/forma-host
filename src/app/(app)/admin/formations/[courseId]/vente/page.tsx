@@ -1,7 +1,7 @@
 "use client";
 
 import { collection, limit, orderBy, query, where } from "firebase/firestore";
-import { RefreshCw, Tag } from "lucide-react";
+import { FileText, RefreshCw, Tag } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -26,12 +26,14 @@ import { updateCourse, type CourseWithId } from "@/lib/courses";
 import {
   callCreatePromoCode,
   callDeactivatePromoCode,
+  callIssueMissingInvoices,
   callSyncPromoCodes,
   errorMessage,
 } from "@/lib/firebase/callables";
 import { db } from "@/lib/firebase/client";
 import { formatDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
+import { useSchoolLegal } from "@/lib/legal";
 import { useSchoolPayments } from "@/lib/payments";
 
 function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActive: boolean }) {
@@ -293,6 +295,23 @@ function OrdersCard({ course, livemode }: { course: CourseWithId; livemode: bool
     (order) => order.status === "paid" && sameStripeMode(order.livemode, livemode),
   );
   const revenue = paid.reduce((sum, order) => sum + order.amount, 0);
+  const { data: legal } = useSchoolLegal(course.creatorId);
+  const missingInvoices = orders.filter(
+    (order) => order.status === "paid" && !order.invoice,
+  ).length;
+  const [issuing, setIssuing] = useState(false);
+
+  async function issue() {
+    setIssuing(true);
+    try {
+      const { issued } = await callIssueMissingInvoices({ schoolId: course.creatorId });
+      toast.success(`${issued} facture${issued > 1 ? "s" : ""} émise${issued > 1 ? "s" : ""}`);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setIssuing(false);
+    }
+  }
 
   return (
     <Card>
@@ -318,10 +337,36 @@ function OrdersCard({ course, livemode }: { course: CourseWithId; livemode: bool
                 </span>
                 {order.livemode ? null : <Badge tone="info">Test</Badge>}
                 {order.status === "refunded" ? <Badge tone="danger">Remboursée</Badge> : null}
+                {order.invoice ? (
+                  <Link
+                    href={routes.invoice(order.id)}
+                    className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-ink"
+                    title={`Facture ${order.invoice.number}`}
+                  >
+                    <FileText className="size-3.5" /> Facture
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>
         )}
+        {missingInvoices ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-surface px-3 py-2.5 text-[13px]">
+            <p className="flex-1 text-muted">
+              {missingInvoices} vente{missingInvoices > 1 ? "s" : ""} sans facture
+              {legal ? "." : " : complète d'abord tes informations légales (Paramètres)."}
+            </p>
+            {legal ? (
+              <Button size="sm" variant="secondary" onClick={issue} disabled={issuing}>
+                {issuing ? "Émission…" : "Émettre les factures"}
+              </Button>
+            ) : (
+              <Button asChild size="sm" variant="secondary">
+                <Link href={routes.adminSettings}>Paramètres</Link>
+              </Button>
+            )}
+          </div>
+        ) : null}
       </CardBody>
     </Card>
   );

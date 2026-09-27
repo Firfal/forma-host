@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { OrderInvoice } from "./invoices";
 
 /**
  * Paiements des formations (Stripe Connect, 0 % de commission) : le formateur relie son compte
@@ -68,7 +69,11 @@ export interface PlatformSettingsDoc {
   stripeLivemode?: boolean;
 }
 
-export const createCheckoutInput = z.object({ courseId: z.string().min(1).max(128) });
+export const createCheckoutInput = z.object({
+  courseId: z.string().min(1).max(128),
+  /** CGV acceptées et renonciation au droit de rétractation (accès immédiat). */
+  acceptTerms: z.literal(true, { message: "Accepte les conditions pour continuer" }),
+});
 export type CreateCheckoutInput = z.infer<typeof createCheckoutInput>;
 
 export const promoCodeInput = z
@@ -126,6 +131,8 @@ export function promoLabel(promo: Pick<PromoCodeDoc, "kind" | "value">): string 
 export interface OrderDoc<T = unknown> {
   schoolId: string;
   courseId: string;
+  /** Titre de la formation au moment de l'achat (absent sur les premières commandes). */
+  courseTitle?: string;
   email: string;
   name: string | null;
   amount: number;
@@ -135,5 +142,11 @@ export interface OrderDoc<T = unknown> {
   status: "paid" | "refunded";
   /** Paiement réel (absent ou false : paiement de test). */
   livemode?: boolean;
+  /** CGV acceptées et renonciation à la rétractation (ISO 8601, avant le paiement). */
+  termsAcceptedAt?: string | null;
+  /** Adresse de facturation saisie chez Stripe (si demandée). */
+  billingAddress?: string | null;
+  /** Facture émise au paiement (absente : informations légales manquantes à ce moment). */
+  invoice?: OrderInvoice<T> | null;
   createdAt: T;
 }

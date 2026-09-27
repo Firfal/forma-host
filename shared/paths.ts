@@ -58,6 +58,7 @@ export const routes = {
   adminCourseSalesPage: (courseId: string) => `/admin/formations/${courseId}/page-de-vente`,
   adminCourseSales: (courseId: string) => `/admin/formations/${courseId}/vente`,
   thanks: "/merci",
+  invoice: (orderId: string) => `/factures/${orderId}`,
   adminLesson: (courseId: string, lessonId: string) =>
     `/admin/formations/${courseId}/lecons/${lessonId}`,
   adminMembers: "/admin/membres",
@@ -71,4 +72,6 @@ export const routes = {
   platformRequests: "/plateforme/demandes",
   salesPage: (creatorSlug: string, courseSlug: string) => `/${creatorSlug}/${courseSlug}`,
   creatorPage: (creatorSlug: string) => `/${creatorSlug}`,
+  /** Page légale d'une école (mentions-legales, cgv, confidentialite). */
+  legalPage: (creatorSlug: string, page: string) => `/${creatorSlug}/legal/${page}`,
 };

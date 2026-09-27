@@ -23,6 +23,8 @@ export function routeForSchoolHost(pathname: string, slug: string): HostRoute {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return { type: "rewrite", pathname: `/${slug}` };
   const [first] = segments;
+  // Pages légales de l'école : /legal/cgv sur son domaine, /{ecole}/legal/cgv sur la plateforme.
+  if (first === "legal") return { type: "rewrite", pathname: `/${slug}${pathname}` };
   if (RESERVED_SLUGS.has(first) || first.startsWith("_") || first.includes(".")) {
     return { type: "next" };
   }

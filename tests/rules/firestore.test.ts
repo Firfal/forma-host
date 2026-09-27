@@ -369,6 +369,28 @@ describe("paiements", () => {
     await assertSucceeds(getDoc(doc(db(null), "platform/settings")));
     await assertFails(setDoc(doc(creatorDb(), "platform/settings"), { paymentsEnabled: true }));
   });
+
+  it("l'acheteur lit ses commandes (factures) par son email, pas celles des autres", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const admin = ctx.firestore();
+      await setDoc(doc(admin, "orders/cs_anne"), {
+        schoolId: THEO,
+        courseId: "c1",
+        email: `${ANNE}@test.fr`,
+      });
+      await setDoc(doc(admin, "orders/cs_autre"), {
+        schoolId: THEO,
+        courseId: "c1",
+        email: "autre@test.fr",
+      });
+    });
+    await assertSucceeds(getDoc(doc(db(ANNE), "orders/cs_anne")));
+    await assertFails(getDoc(doc(db(ANNE), "orders/cs_autre")));
+    await assertSucceeds(
+      getDocs(query(collection(db(ANNE), "orders"), where("email", "==", `${ANNE}@test.fr`))),
+    );
+    await assertFails(getDocs(collection(db(ANNE), "orders")));
+  });
 });
 
 describe("chat école ↔ élève", () => {
@@ -665,5 +687,15 @@ describe("utilisateurs et zones serveur", () => {
     );
     await assertFails(getDoc(doc(creatorDb(), "creators/theo/secrets/mail")));
     await assertFails(setDoc(doc(creatorDb(), "creators/theo/secrets/mail"), { password: "x" }));
+  });
+
+  it("informations légales : publiques, écrites par le serveur", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "creators/theo/legal/info"), { companyName: "Ecole" });
+    });
+    await assertSucceeds(getDoc(doc(db(null), "creators/theo/legal/info")));
+    await assertFails(
+      setDoc(doc(creatorDb(), "creators/theo/legal/info"), { companyName: "Autre" }),
+    );
   });
 });
