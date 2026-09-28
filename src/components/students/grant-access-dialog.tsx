@@ -184,9 +184,9 @@ export function GrantAccessDialog({
         ) : (
           <div className="space-y-3">
             <p className="text-[13px] text-muted">
-              Export Podia (Audience → Export) ou tout CSV avec une colonne <strong>email</strong>.
-              Colonnes reconnues aussi : nom / name, prénom, date d&apos;inscription / signed up
-              (conservée).
+              Export de Podia, Teachable, Thinkific, Kajabi, Systeme.io… ou tout CSV avec une
+              colonne <strong>email</strong>. Colonnes reconnues aussi : nom / name, prénom, date
+              d&apos;inscription / signed up (conservée).
             </p>
             <Button variant="secondary" onClick={() => fileInput.current?.click()} disabled={busy}>
               <FileSpreadsheet /> {imported ? "Choisir un autre fichier" : "Choisir un fichier CSV"}

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+import { publicSchoolUrl } from "@shared/host-routing";
 import { visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
 import { LogoMark } from "@/components/logo";
 import { SchoolFooter } from "@/components/sales/school-footer";
+import { brand } from "@/lib/brand";
 import {
   getCreatorBySlug,
   getPublishedCourses,
@@ -21,7 +23,11 @@ export async function generateMetadata({
   params: Promise<{ creatorSlug: string }>;
 }): Promise<Metadata> {
   const creator = await getCreatorBySlug((await params).creatorSlug);
-  return { title: { absolute: creator ? `Formations · ${creator.name}` : "Introuvable" } };
+  if (!creator) return { title: { absolute: "Introuvable" } };
+  return {
+    title: { absolute: `Formations · ${creator.name}` },
+    alternates: { canonical: publicSchoolUrl(creator, brand.appUrl) },
+  };
 }
 
 export default async function CreatorPage({

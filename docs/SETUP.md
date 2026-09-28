@@ -162,7 +162,8 @@ Tout est livré désactivé : rien ne change pour les élèves tant qu'une optio
 
 - **Assistant IA** (réponses aux questions des élèves à partir du contenu des formations) :
   1. Crée une clé sur [console.anthropic.com](https://console.anthropic.com) > *API Keys* (la
-     consommation est facturée sur ce compte ; 30 questions par élève et par jour au maximum).
+     consommation est facturée sur ce compte ; 30 questions par élève et par jour, 1 000 par jour au
+     total sur la plateforme).
   2. Dans l'app, *Plateforme > Vue d'ensemble > Assistant IA* : colle la clé (jamais dans un
      chat ni un email). Elle est vérifiée puis enregistrée chiffrée.
   3. Sur chaque formation concernée : *Détails > Assistant IA > Activé*.

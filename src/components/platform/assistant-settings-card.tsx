@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   ASSISTANT_DAILY_LIMIT,
+  ASSISTANT_PLATFORM_DAILY_LIMIT,
   assistantKeyInput,
   type AssistantSettingsDoc,
 } from "@shared/assistant";
@@ -75,8 +76,9 @@ export function AssistantSettingsCard() {
         <p className="text-[13px] text-muted">
           Sous chaque leçon, les élèves posent leurs questions à un assistant (Claude) qui répond à
           partir du contenu de la formation. Les formateurs l&apos;activent formation par formation.{" "}
-          {ASSISTANT_DAILY_LIMIT} questions par élève et par jour ; la consommation est facturée sur
-          le compte Anthropic de la clé.
+          {ASSISTANT_DAILY_LIMIT} questions par élève et par jour,{" "}
+          {ASSISTANT_PLATFORM_DAILY_LIMIT.toLocaleString("fr-FR")} au total ; la consommation est
+          facturée sur le compte Anthropic de la clé.
         </p>
         {enabled && !editing ? (
           <div className="flex flex-wrap items-center gap-2">

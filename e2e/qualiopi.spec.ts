@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { login, publishLegalInfo, THEO } from "./helpers";
 
@@ -20,6 +21,17 @@ test("Qualiopi : attestation d'assiduité et avis de fin de formation", async ({
   await expect(theo.getByText("Jours de connexion").locator("..")).toContainText(/[3-9]/);
   await expect(theo.getByText("Relevé de connexion")).toBeVisible();
   await expect(theo.getByRole("button", { name: "Télécharger en PDF" })).toBeVisible();
+
+  // Export CSV des élèves : temps passé et jours de connexion (bilans, financements).
+  await theo.goto("/admin/formations/after-effects");
+  const download = theo.waitForEvent("download");
+  await theo.getByRole("button", { name: "Exporter" }).click();
+  const csv = readFileSync((await (await download).path())!, "utf8");
+  expect(csv).toContain("Temps passé (min),Jours de connexion,Quiz réussis");
+  const anneRow = csv.split("\n").find((line) => line.includes("anne@exemple.fr"))!;
+  const [minutes, days] = anneRow.split(",").slice(5, 7).map(Number);
+  expect(minutes).toBeGreaterThanOrEqual(120);
+  expect(days).toBeGreaterThanOrEqual(3);
 
   // Pierre (presque au bout de la formation) donne son avis.
   const pierre = await browser.newPage();

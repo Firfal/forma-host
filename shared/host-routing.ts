@@ -34,3 +34,18 @@ export function routeForSchoolHost(pathname: string, slug: string): HostRoute {
   if (segments.length === 1) return { type: "rewrite", pathname: `/${slug}/${first}` };
   return { type: "next" };
 }
+
+/**
+ * Adresse publique canonique d'une école ou d'une page de vente : son domaine s'il est actif
+ * (https://app.ecolemotion.com/formation), sinon l'adresse de la plateforme (/ecole/formation).
+ */
+export function publicSchoolUrl(
+  school: { slug: string; customDomain?: { host: string; status: string } | null },
+  appUrl: string,
+  courseSlug?: string,
+): string {
+  const domain = school.customDomain?.status === "active" ? school.customDomain.host : null;
+  if (domain) return `https://${domain}${courseSlug ? `/${courseSlug}` : "/"}`;
+  const base = appUrl.replace(/\/$/, "");
+  return `${base}/${school.slug}${courseSlug ? `/${courseSlug}` : ""}`;
+}

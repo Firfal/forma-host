@@ -1,6 +1,10 @@
 import { deleteApp, getApps, initializeApp } from "firebase-admin/app";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { ASSISTANT_DAILY_LIMIT, type AssistantTurn } from "@shared/assistant";
+import {
+  ASSISTANT_DAILY_LIMIT,
+  ASSISTANT_PLATFORM_DAILY_LIMIT,
+  type AssistantTurn,
+} from "@shared/assistant";
 import {
   askAssistant,
   deleteAssistantKey,
@@ -110,6 +114,11 @@ describe("assistant IA", () => {
     await expect(ask("quentin", "Test ?", ["theo"])).resolves.toMatchObject({ answer: "Réponse" });
     await db().doc("assistantUsage/lea_2026-09-27").set({ count: ASSISTANT_DAILY_LIMIT });
     await expect(ask()).rejects.toThrow(`${ASSISTANT_DAILY_LIMIT} questions aujourd'hui`);
+    await db()
+      .doc("assistantUsage/_platform_2026-09-27")
+      .set({ count: ASSISTANT_PLATFORM_DAILY_LIMIT });
+    await expect(ask("quentin", "Test ?", ["theo"])).rejects.toThrow("limite du jour");
+    await db().doc("assistantUsage/_platform_2026-09-27").delete();
     await db().doc("courses/c1").update({ assistant: false });
     await expect(ask("quentin", "Test ?", ["theo"])).rejects.toThrow("pas activé");
     await deleteAssistantKey();

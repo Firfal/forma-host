@@ -8,6 +8,7 @@ import { completedCount, resumeLesson, visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import type { CourseDoc, CreatorDoc, EnrollmentDoc } from "@shared/types";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
+import { NextLiveBanner } from "@/components/learn/course-lives";
 import { PageContainer } from "@/components/layout/page";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
 import { Badge } from "@/components/ui/badge";
@@ -126,6 +127,12 @@ export default function MyCoursesPage() {
         />
       ) : (
         <>
+          {enrollments.map((enrollment) => {
+            const course = courses.get(enrollment.courseId);
+            return course ? (
+              <NextLiveBanner key={course.id} courseId={course.id} courseTitle={course.title} />
+            ) : null;
+          })}
           <ResumeCard enrollments={enrollments} courses={courses} />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {enrollments.map((enrollment) => {

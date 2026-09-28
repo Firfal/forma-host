@@ -64,6 +64,11 @@ const EMAIL_HEADERS = [
   "adresse e-mail",
   "customer email",
   "email address",
+  "e-mail address",
+  "adresse mail",
+  "courriel",
+  "user email",
+  "student email",
 ];
 const NAME_HEADERS = [
   "name",
@@ -73,6 +78,10 @@ const NAME_HEADERS = [
   "customer",
   "customer name",
   "client",
+  "student name",
+  "user name",
+  "nom et prénom",
+  "prénom et nom",
 ];
 const FIRST_NAME_HEADERS = ["first name", "prénom", "prenom", "firstname"];
 const LAST_NAME_HEADERS = ["last name", "nom de famille", "lastname", "surname"];
@@ -88,11 +97,29 @@ const DATE_HEADERS = [
   "created at",
   "inscription",
   "date d'inscription",
+  "enrolled at",
+  "enrolled on",
+  "enrollment date",
+  "date enrolled",
+  "started at",
+  "member since",
+  "purchase date",
+  "date d'achat",
+  "créé le",
+  "date de création",
 ];
 
+/** En-tête comparable : sans BOM (Excel), guillemets ni espaces superflus, en minuscules. */
+const normalizeHeader = (header: string) =>
+  header
+    .replace(/^\uFEFF/, "")
+    .replace(/^["']|["']$/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
 function findColumn(headers: string[], candidates: string[]): number {
-  const normalized = headers.map((header) => header.trim().toLowerCase());
-  return normalized.findIndex((header) => candidates.includes(header));
+  return headers.map(normalizeHeader).findIndex((header) => candidates.includes(header));
 }
 
 /** Date d'un export (ISO, « Feb 6, 2025 », « 06/02/2025 » en jour/mois) → ISO 8601, sinon undefined. */
@@ -113,6 +140,22 @@ export function parseLooseDate(value: string | undefined): string | undefined {
   return date.toISOString();
 }
 
+function studentName(
+  row: string[],
+  columns: { nameIndex: number; firstIndex: number; lastIndex: number; lastIsNom: boolean },
+): string {
+  const cell = (index: number) => (index >= 0 ? (row[index] ?? "").trim() : "");
+  if (
+    columns.firstIndex >= 0 &&
+    (columns.lastIndex >= 0 || columns.lastIsNom || columns.nameIndex === -1)
+  ) {
+    const last = columns.lastIsNom ? cell(columns.nameIndex) : cell(columns.lastIndex);
+    return [cell(columns.firstIndex), last].filter(Boolean).join(" ");
+  }
+  if (columns.nameIndex >= 0) return cell(columns.nameIndex);
+  return cell(columns.lastIndex);
+}
+
 /** Lignes d'un CSV (première ligne = en-têtes) → élèves. */
 export function parseStudentRows(rows: string[][]): ParseResult & { emailColumnFound: boolean } {
   const [headers = [], ...data] = rows;
@@ -121,6 +164,9 @@ export function parseStudentRows(rows: string[][]): ParseResult & { emailColumnF
   const firstIndex = findColumn(headers, FIRST_NAME_HEADERS);
   const lastIndex = findColumn(headers, LAST_NAME_HEADERS);
   const dateIndex = findColumn(headers, DATE_HEADERS);
+  // Exports français (Systeme.io, LearnyBox…) : « Prénom » + « Nom » = nom de famille.
+  const lastIsNom =
+    firstIndex >= 0 && lastIndex === -1 && normalizeHeader(headers[nameIndex] ?? "") === "nom";
   // Sans en-tête reconnu : colonne contenant des emails.
   if (emailIndex === -1) emailIndex = headers.findIndex((cell) => cell.includes("@"));
   if (emailIndex === -1) return { students: [], invalid: [], emailColumnFound: false };
@@ -135,11 +181,7 @@ export function parseStudentRows(rows: string[][]): ParseResult & { emailColumnF
       invalid.push(email);
       continue;
     }
-    const name =
-      (nameIndex >= 0
-        ? row[nameIndex]
-        : [row[firstIndex] ?? "", row[lastIndex] ?? ""].join(" ")
-      )?.trim() ?? "";
+    const name = studentName(row, { nameIndex, firstIndex, lastIndex, lastIsNom });
     const joinedAt = dateIndex >= 0 ? parseLooseDate(row[dateIndex]) : undefined;
     students.set(email, { email, ...(name ? { name } : {}), ...(joinedAt ? { joinedAt } : {}) });
   }

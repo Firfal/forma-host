@@ -3,6 +3,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import {
   ASSISTANT_DAILY_LIMIT,
   ASSISTANT_HISTORY_MAX,
+  ASSISTANT_PLATFORM_DAILY_LIMIT,
   ASSISTANT_MODEL,
   assistantSystemPrompt,
   courseContext,
@@ -183,16 +184,24 @@ export async function askAssistant(
   const apiKey = await loadAssistantKey(deps.key);
   if (!apiKey) throw new AssistantError("L'assistant n'est pas disponible pour le moment.");
 
-  // Quota du jour, compté avant l'appel (une question en échec compte aussi).
-  const usageRef = db().doc(`assistantUsage/${uid}_${usageDay(deps.now ?? new Date())}`);
+  // Quotas du jour (élève et plateforme), comptés avant l'appel : une question en échec compte.
+  const day = usageDay(deps.now ?? new Date());
+  const usageRef = db().doc(`assistantUsage/${uid}_${day}`);
+  const platformRef = db().doc(`assistantUsage/_platform_${day}`);
   const used = await db().runTransaction(async (tx) => {
-    const count = ((await tx.get(usageRef)).data()?.count as number | undefined) ?? 0;
+    const [mine, platform] = await tx.getAll(usageRef, platformRef);
+    const count = (mine?.data()?.count as number | undefined) ?? 0;
+    const total = (platform?.data()?.count as number | undefined) ?? 0;
     if (count >= ASSISTANT_DAILY_LIMIT) {
       throw new AssistantError(
         `Tu as posé ${ASSISTANT_DAILY_LIMIT} questions aujourd'hui : l'assistant sera de nouveau disponible demain.`,
       );
     }
+    if (total >= ASSISTANT_PLATFORM_DAILY_LIMIT) {
+      throw new AssistantError("L'assistant a atteint sa limite du jour : réessaie demain.");
+    }
     tx.set(usageRef, { uid, count: count + 1, updatedAt: FieldValue.serverTimestamp() });
+    tx.set(platformRef, { count: total + 1, updatedAt: FieldValue.serverTimestamp() });
     return count + 1;
   });
 

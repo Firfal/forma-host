@@ -25,6 +25,14 @@ test("directs : le formateur programme un direct, l'élève le rejoint et l'ajou
   try {
     const anne = await browser.newPage();
     await login(anne, ANNE);
+    // « Mes formations » : bandeau du prochain direct, déjà rejoignable (dans 10 min).
+    await anne.goto("/formations");
+    await expect(anne.getByText("Prochain direct : Questions-réponses du mois")).toBeVisible();
+    await expect(anne.getByRole("link", { name: "Rejoindre" })).toHaveAttribute(
+      "href",
+      "https://meet.google.com/abc-defg-hij",
+    );
+
     await anne.goto("/formations/after-effects");
     const lives = anne.locator("#directs");
     await expect(lives.getByText("Questions-réponses du mois")).toBeVisible();

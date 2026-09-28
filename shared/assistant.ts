@@ -12,6 +12,8 @@ import type { OutlineItem, RichText } from "./types";
 export const ASSISTANT_MODEL = "claude-opus-5";
 /** Questions par élève et par jour (toutes formations confondues). */
 export const ASSISTANT_DAILY_LIMIT = 30;
+/** Questions par jour sur toute la plateforme : plafond de dépense en cas d'abus. */
+export const ASSISTANT_PLATFORM_DAILY_LIMIT = 1000;
 export const ASSISTANT_QUESTION_MAX = 2000;
 /** Échanges précédents renvoyés au modèle (questions + réponses). */
 export const ASSISTANT_HISTORY_MAX = 10;

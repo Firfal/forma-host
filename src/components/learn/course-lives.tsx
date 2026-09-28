@@ -1,8 +1,10 @@
 "use client";
 
 import { CalendarPlus, PlayCircle, Radio, Video } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { JOIN_EARLY_MIN, formatLiveDate, liveStatus, splitLives } from "@shared/lives";
+import { routes } from "@shared/paths";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -100,5 +102,48 @@ export function CourseLives({ courseId, courseTitle }: { courseId: string; cours
         </Card>
       ) : null}
     </section>
+  );
+}
+
+/** Bandeau « prochain direct » d'une formation (page « Mes formations »). */
+export function NextLiveBanner({
+  courseId,
+  courseTitle,
+}: {
+  courseId: string;
+  courseTitle: string;
+}) {
+  const { lives } = useLives(courseId);
+  const [now] = useState(() => new Date());
+  const next = splitLives(lives, now).upcoming[0];
+  if (!next) return null;
+  const status = liveStatus(next.start, next.durationMin, now);
+  const open = status === "soon" || status === "live";
+  return (
+    <Card className="mb-3 flex flex-wrap items-center gap-3 px-4 py-3">
+      <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand-soft text-brand">
+        <Radio className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">
+          {status === "live" ? "En direct : " : "Prochain direct : "}
+          {next.title}
+        </span>
+        <span className="block truncate text-[13px] text-muted first-letter:uppercase">
+          {formatLiveDate(next.start)} · {courseTitle}
+        </span>
+      </span>
+      {open ? (
+        <Button asChild size="sm">
+          <a href={next.joinUrl} target="_blank" rel="noopener noreferrer">
+            <Video /> Rejoindre
+          </a>
+        </Button>
+      ) : (
+        <Button asChild variant="secondary" size="sm">
+          <Link href={`${routes.course(courseId)}#directs`}>Voir</Link>
+        </Button>
+      )}
+    </Card>
   );
 }

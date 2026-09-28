@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPlatformHost, routeForSchoolHost } from "./host-routing";
+import { isPlatformHost, publicSchoolUrl, routeForSchoolHost } from "./host-routing";
 
 describe("routage par domaine d'école", () => {
   it("reconnaît les hôtes de la plateforme", () => {
@@ -52,5 +52,30 @@ describe("routage par domaine d'école", () => {
       type: "redirect",
       pathname: "/",
     });
+  });
+});
+
+describe("adresse canonique", () => {
+  const school = { slug: "ecole-motion", customDomain: null };
+  const withDomain = {
+    slug: "ecole-motion",
+    customDomain: { host: "app.ecolemotion.com", status: "active" },
+  };
+  it("domaine de l'école s'il est actif, sinon adresse de la plateforme", () => {
+    expect(publicSchoolUrl(school, "https://forma.app/")).toBe("https://forma.app/ecole-motion");
+    expect(publicSchoolUrl(school, "https://forma.app", "after")).toBe(
+      "https://forma.app/ecole-motion/after",
+    );
+    expect(publicSchoolUrl(withDomain, "https://forma.app")).toBe("https://app.ecolemotion.com/");
+    expect(publicSchoolUrl(withDomain, "https://forma.app", "after")).toBe(
+      "https://app.ecolemotion.com/after",
+    );
+    expect(
+      publicSchoolUrl(
+        { ...withDomain, customDomain: { host: "app.ecolemotion.com", status: "pending" } },
+        "https://forma.app",
+        "after",
+      ),
+    ).toBe("https://forma.app/ecole-motion/after");
   });
 });

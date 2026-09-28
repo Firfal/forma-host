@@ -71,4 +71,32 @@ describe("parseStudentRows", () => {
     expect(parseLooseDate("2999-01-01")).toBeUndefined();
     expect(parseLooseDate("")).toBeUndefined();
   });
+
+  it("lit les exports d'autres plateformes (BOM Excel, prénom + nom, dates)", () => {
+    // Thinkific / Teachable
+    expect(
+      parseStudentRows([
+        ["\uFEFFFirst Name", "Last Name", "Email", "Enrollment Date"],
+        ["Léa", "Martin", "Lea@Exemple.fr", "2025-03-02"],
+      ]).students,
+    ).toEqual([
+      { email: "lea@exemple.fr", name: "Léa Martin", joinedAt: "2025-03-02T00:00:00.000Z" },
+    ]);
+    // Systeme.io / LearnyBox : « Nom » est le nom de famille quand « Prénom » existe.
+    expect(
+      parseStudentRows([
+        ["Prénom", "Nom", "E-mail", "Date d'inscription"],
+        ["Paul", "Durand", "paul@exemple.fr", "12/01/2025"],
+      ]).students,
+    ).toEqual([
+      { email: "paul@exemple.fr", name: "Paul Durand", joinedAt: "2025-01-12T12:00:00.000Z" },
+    ]);
+    // Kajabi : nom complet.
+    expect(
+      parseStudentRows([
+        ["Name", "Email", "Member Since"],
+        ["Ana Silva", "ana@exemple.fr", ""],
+      ]).students,
+    ).toEqual([{ email: "ana@exemple.fr", name: "Ana Silva" }]);
+  });
 });

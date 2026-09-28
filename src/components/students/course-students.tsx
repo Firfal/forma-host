@@ -1,6 +1,15 @@
 "use client";
 
-import { collection, getCountFromServer, orderBy, query, where } from "firebase/firestore";
+import {
+  collection,
+  count,
+  getAggregateFromServer,
+  getCountFromServer,
+  orderBy,
+  query,
+  sum,
+  where,
+} from "firebase/firestore";
 import {
   Download,
   FileCheck2,
@@ -64,9 +73,22 @@ function StatRow({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function exportCsv(course: CourseWithId, rows: Enrollment[]) {
+/** Temps passé (secondes) et jours de connexion d'un élève, d'après son relevé d'activité. */
+async function attendanceOf(enrollmentId: string): Promise<{ seconds: number; days: number }> {
+  const snap = await getAggregateFromServer(
+    collection(db, "enrollments", enrollmentId, "activity"),
+    { seconds: sum("seconds"), days: count() },
+  );
+  return { seconds: snap.data().seconds ?? 0, days: snap.data().days ?? 0 };
+}
+
+/** Export CSV des élèves (bilans, financements) : progression, temps passé, quiz réussis. */
+async function exportCsv(course: CourseWithId, rows: Enrollment[]) {
   const total = visibleLessons(course.items).length;
   const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const attendance = await Promise.all(
+    rows.map((row) => attendanceOf(row.id).catch(() => ({ seconds: 0, days: 0 }))),
+  );
   const lines = [
     [
       "Nom",
@@ -74,23 +96,30 @@ function exportCsv(course: CourseWithId, rows: Enrollment[]) {
       "Statut",
       "Progression",
       "Leçons terminées",
+      "Temps passé (min)",
+      "Jours de connexion",
+      "Quiz réussis",
       "Inscription",
       "Dernière activité",
     ].join(","),
-    ...rows.map((row) => {
+    ...rows.map((row, index) => {
       const done = completedCount(course.items, row.progress.completedLessonIds);
+      const quizzes = Object.values(row.quizResults ?? {});
       return [
         escape(row.displayName ?? ""),
         escape(row.email),
         row.status === "active" ? "Actif" : "Retiré",
         `${total ? Math.round((done / total) * 100) : 0}%`,
         `${done}/${total}`,
+        String(Math.round((attendance[index]?.seconds ?? 0) / 60)),
+        String(attendance[index]?.days ?? 0),
+        quizzes.length ? `${quizzes.filter((q) => q.passed).length}/${quizzes.length}` : "",
         toDate(row.joinedAt)?.toISOString().slice(0, 10) ?? "",
         toDate(row.progress.lastActivityAt)?.toISOString().slice(0, 10) ?? "",
       ].join(",");
     }),
   ];
-  const blob = new Blob([`﻿${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -179,6 +208,7 @@ export function CourseStudents({ course }: { course: CourseWithId }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("active");
   const [commentCount, setCommentCount] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const enrollmentsQuery = useMemo(
     () =>
@@ -282,10 +312,15 @@ export function CourseStudents({ course }: { course: CourseWithId }) {
           <Button
             variant="subtle"
             size="sm"
-            onClick={() => exportCsv(course, rows)}
-            disabled={rows.length === 0}
+            onClick={() => {
+              setExporting(true);
+              exportCsv(course, rows)
+                .catch((error) => toast.error(errorMessage(error)))
+                .finally(() => setExporting(false));
+            }}
+            disabled={rows.length === 0 || exporting}
           >
-            <Download /> Exporter
+            <Download /> {exporting ? "Export…" : "Exporter"}
           </Button>
         </div>
 
@@ -300,7 +335,7 @@ export function CourseStudents({ course }: { course: CourseWithId }) {
             <EmptyState
               icon={<Users />}
               title="Aucun élève pour l'instant"
-              description="Invite tes élèves par email ou importe l'export clients de Podia."
+              description="Invite tes élèves par email ou importe l'export clients de ton ancienne plateforme (Podia, Teachable, Systeme.io…)."
               action={
                 <GrantAccessDialog
                   courseId={course.id}

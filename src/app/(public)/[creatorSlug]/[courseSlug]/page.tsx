@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
+import { publicSchoolUrl } from "@shared/host-routing";
 import { routes } from "@shared/paths";
 import { resolveSalesPage } from "@shared/sales-page";
 import { SalesPageView } from "@/components/sales/sales-page-view";
+import { brand } from "@/lib/brand";
 import {
   getCreatorBySlug,
   getExternalCtaUrl,
@@ -31,7 +33,9 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const data = await load(await params);
   if (!data) return { title: "Formation introuvable" };
   const page = resolveSalesPage(data.course, data.creator.name);
+  const canonical = publicSchoolUrl(data.creator, brand.appUrl, data.course.slug);
   return {
+    alternates: { canonical },
     title: { absolute: `${page.headline} · ${data.creator.name}` },
     description: page.subheadline || data.course.summary,
     openGraph: {
@@ -39,6 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
       description: page.subheadline || data.course.summary,
       images: data.course.thumbnailUrl ? [{ url: data.course.thumbnailUrl }] : undefined,
       type: "website",
+      url: canonical,
     },
   };
 }
