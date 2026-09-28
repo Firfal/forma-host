@@ -17,6 +17,7 @@ import { useMemo } from "react";
 import { completedCount, visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import type { CommentDoc, CourseDoc, EnrollmentDoc } from "@shared/types";
+import { SetupCard, useSetupHidden } from "@/components/dashboard/setup-card";
 import { PageContainer } from "@/components/layout/page";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -24,13 +25,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildActivity, groupByDay, type ActivityEvent } from "@/lib/activity";
 import { useUnreadConversations } from "@/lib/chat";
+import { useCreator } from "@/lib/creator";
 import { usePendingSubmissions } from "@/lib/exercises";
 import { db } from "@/lib/firebase/client";
 import { toDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
 import { useSchoolLegal } from "@/lib/legal";
 import { useMailSettings } from "@/lib/mail-settings";
+import { useSchoolPayments } from "@/lib/payments";
 import { useSchool, useSchoolStaff } from "@/lib/school";
+import { setupSteps } from "@/lib/setup";
 
 const DAY = 86_400_000;
 
@@ -98,8 +102,11 @@ interface Todo {
   icon: typeof ClipboardCheck;
 }
 
-/** Ce qui attend le formateur : exercices, messages, informations légales. */
-function TodoCard({ schoolId }: { schoolId: string }) {
+/**
+ * Ce qui attend le formateur : exercices, messages, et informations légales (quand les
+ * « Premiers pas », qui les rappellent déjà, ne sont pas affichés).
+ */
+function TodoCard({ schoolId, showLegal }: { schoolId: string; showLegal: boolean }) {
   const pending = usePendingSubmissions(schoolId);
   const unread = useUnreadConversations("school", schoolId);
   const { data: legal, loading: legalLoading } = useSchoolLegal(schoolId);
@@ -122,7 +129,7 @@ function TodoCard({ schoolId }: { schoolId: string }) {
           },
         ]
       : []),
-    ...(!legalLoading && !legal
+    ...(showLegal && !legalLoading && !legal
       ? [
           {
             href: routes.adminSettings,
@@ -156,8 +163,35 @@ function TodoCard({ schoolId }: { schoolId: string }) {
   );
 }
 
+/** Premiers pas du propriétaire de l'école, tant qu'il reste une étape (et qu'il ne les masque pas). */
+function useSetup(
+  schoolId: string | null,
+  courses: (CourseDoc & { id: string })[],
+  ready: boolean,
+  hasStudents: boolean,
+) {
+  const { data: creator, loading: creatorLoading } = useCreator(schoolId);
+  const { data: legal, loading: legalLoading } = useSchoolLegal(schoolId);
+  const payments = useSchoolPayments(schoolId);
+  const [hidden, hide] = useSetupHidden(schoolId);
+  const steps = useMemo(
+    () =>
+      setupSteps({
+        logoUrl: creator?.logoUrl,
+        courses,
+        hasLegal: Boolean(legal),
+        payments: { enabled: payments.enabled, active: payments.active },
+        hasStudents,
+      }),
+    [creator, courses, legal, payments.enabled, payments.active, hasStudents],
+  );
+  const loading = !ready || creatorLoading || legalLoading || payments.loading;
+  const visible = !loading && !hidden && steps.some((step) => !step.done);
+  return { steps, visible, hide };
+}
+
 export default function AdminHomePage() {
-  const { schoolId: uid } = useSchool();
+  const { schoolId: uid, isOwner } = useSchool();
   const staff = useSchoolStaff(uid);
   const enrollmentsQuery = useMemo(
     () => (uid ? query(collection(db, "enrollments"), where("creatorId", "==", uid)) : null),
@@ -180,7 +214,7 @@ export default function AdminHomePage() {
     [uid],
   );
   const { data: enrollments, loading } = useQueryData<EnrollmentDoc>(enrollmentsQuery);
-  const { data: courses } = useQueryData<CourseDoc>(coursesQuery);
+  const { data: courses, loading: coursesLoading } = useQueryData<CourseDoc>(coursesQuery);
   const { data: comments } = useQueryData<CommentDoc>(commentsQuery);
   const { data: mailSettings, loading: mailLoading } = useMailSettings(uid);
 
@@ -213,6 +247,13 @@ export default function AdminHomePage() {
     };
   }, [enrollments, courseMap, comments, staff]);
 
+  const setup = useSetup(
+    isOwner ? uid : null,
+    courses,
+    isOwner && !loading && !coursesLoading,
+    enrollments.length > 0,
+  );
+
   const activity = useMemo(
     () => (uid ? groupByDay(buildActivity(enrollments, comments, courseMap, { staff })) : []),
     [enrollments, comments, courseMap, staff, uid],
@@ -241,7 +282,8 @@ export default function AdminHomePage() {
           <span className="shrink-0 font-medium">{mailSettings ? "Voir" : "Configurer"} →</span>
         </Link>
       ) : null}
-      {uid ? <TodoCard schoolId={uid} /> : null}
+      {setup.visible ? <SetupCard steps={setup.steps} onHide={setup.hide} /> : null}
+      {uid ? <TodoCard schoolId={uid} showLegal={!setup.visible} /> : null}
       {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {Array.from({ length: 5 }, (_, i) => (

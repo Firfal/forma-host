@@ -84,7 +84,11 @@ export default function LessonPage() {
     [canView, lock, courseId, lessonId],
   );
   const { data: lesson, loading: lessonLoading } = useDocData<LessonDoc>(lessonRef);
-  const assistantRef = useMemo(() => doc(db, "platform", "assistant"), []);
+  // Réglage de la plateforme lu seulement si la formation propose l'assistant.
+  const assistantRef = useMemo(
+    () => (course?.assistant ? doc(db, "platform", "assistant") : null),
+    [course?.assistant],
+  );
   const { data: assistantSettings } = useDocData<AssistantSettingsDoc>(assistantRef);
   // Assiduité : temps passé sur les leçons ouvertes (élève inscrit seulement).
   const markActive = useActivityTracker(
