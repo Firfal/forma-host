@@ -48,8 +48,14 @@ défaut : rien ne change pour les élèves tant que l'école ne l'active pas.
 
 ## Sous le capot
 
-- Pages plus légères : environ un quart de JavaScript en moins sur les pages élèves, et 40 ko de
-  moins sur toutes les pages (outils de téléversement et de validation chargés à la demande).
+- Pages plus légères : environ un quart de JavaScript en moins sur les pages élèves, 40 ko de
+  moins sur toutes les pages, page de vente trois fois plus légère (la fenêtre de commande se
+  charge à la demande).
+- Accessibilité (contrôlée avec axe) : contrastes AA ; la couleur de l'école est légèrement
+  assombrie sur les pages publiques et dans les emails quand le texte blanc serait peu lisible.
+- Leçon : boutons « Précédente » et « Suivante » visibles.
+- Pages « introuvable » et « erreur » en français ; après une mise en ligne, la page se recharge
+  d'elle-même au lieu d'afficher une erreur.
 - Référencement : robots.txt, plan du site par domaine, adresse canonique sur le domaine de
   l'école, données structurées (formation, école, prix) lisibles par Google.
 - Aucun email n'est envoyé par ces nouveautés, sauf les annonces si le formateur coche l'envoi par

@@ -37,7 +37,7 @@ import type { LessonAttachment, LessonDoc, LessonLink, RichText, VimeoVideo } fr
 import { useLoadedCourse } from "@/components/course/admin-course-context";
 import { ImageUpload } from "@/components/course/image-upload";
 import { QuizEditor, QuizResultsSummary } from "@/components/course/quiz-editor";
-import { RichTextEditor } from "@/components/editor/rich-text-editor";
+import { RichTextEditor } from "@/components/editor/lazy-rich-text-editor";
 import { PageContainer } from "@/components/layout/page";
 import { VimeoPlayer } from "@/components/video/vimeo-player";
 import { Button } from "@/components/ui/button";

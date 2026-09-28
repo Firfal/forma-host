@@ -10,7 +10,7 @@ import { storagePaths } from "@shared/paths";
 import type { CommentsMode, CourseVisibility, RichText } from "@shared/types";
 import { useLoadedCourse } from "@/components/course/admin-course-context";
 import { ImageUpload } from "@/components/course/image-upload";
-import { RichTextEditor } from "@/components/editor/rich-text-editor";
+import { RichTextEditor } from "@/components/editor/lazy-rich-text-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
