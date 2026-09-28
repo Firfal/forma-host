@@ -56,6 +56,7 @@ test("la page de vente publique se personnalise", async ({ page }) => {
     "https://buy.stripe.com/test_123",
   );
   expect((await page.goto("/ecole-motion/nexiste-pas"))?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: "Page introuvable" })).toBeVisible();
 });
 
 test("l'envoi des emails se configure dans Paramètres", async ({ page }) => {
