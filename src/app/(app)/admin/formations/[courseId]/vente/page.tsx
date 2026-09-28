@@ -420,9 +420,11 @@ function OrdersCard({ course, livemode }: { course: CourseWithId; livemode: bool
                     }
                     title={
                       order.installments.status === "past_due"
-                        ? "Échéance impayée : Stripe relance le paiement"
+                        ? order.installments.suspended
+                          ? "Échéance impayée : accès suspendu jusqu'au paiement"
+                          : "Échéance impayée : Stripe relance le paiement"
                         : order.installments.status === "canceled"
-                          ? "Paiement interrompu : accès retiré"
+                          ? "Paiement interrompu"
                           : undefined
                     }
                   >
