@@ -9,6 +9,7 @@ import { homeFor, useNextPath } from "@/components/auth/use-next-path";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useAuth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { errorMessage } from "@/lib/firebase/callables";
@@ -63,9 +64,8 @@ export function LoginForm() {
         />
       </Field>
       <Field label="Mot de passe" htmlFor="password">
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
           placeholder="••••••••"
           value={password}

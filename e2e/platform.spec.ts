@@ -14,6 +14,8 @@ test("inscription formateur : demande, validation par la plateforme, école cré
   await page.fill("#name", "Léa Martin");
   await page.fill("#email", email);
   await page.fill("#password", "lea12345");
+  await page.getByRole("button", { name: "Afficher le mot de passe" }).click();
+  await expect(page.locator("#password")).toHaveAttribute("type", "text");
   await page.getByRole("button", { name: "Créer mon compte" }).click();
   await expect(page).toHaveURL(/\/formations$/);
   await page.getByRole("link", { name: "Devenir formateur" }).click();

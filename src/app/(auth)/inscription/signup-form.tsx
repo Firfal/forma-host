@@ -9,6 +9,7 @@ import { useNextPath } from "@/components/auth/use-next-path";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { errorMessage } from "@/lib/firebase/callables";
 import { auth } from "@/lib/firebase/client";
 
@@ -71,9 +72,8 @@ export function SignupForm() {
         />
       </Field>
       <Field label="Mot de passe" htmlFor="password" hint="8 caractères minimum.">
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
