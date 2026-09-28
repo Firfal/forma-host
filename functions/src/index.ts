@@ -35,6 +35,9 @@ import {
 } from "@shared/community";
 import type { FeedbackDoc, SubmissionDoc } from "@shared/exercises";
 import type { LiveDoc } from "@shared/lives";
+import { webhookIdInput, webhookInput } from "@shared/webhooks";
+import type { CertificateDoc } from "@shared/certificates";
+import type { OrderDoc } from "@shared/payments";
 import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
 import { schoolLegalInput } from "@shared/legal";
@@ -43,10 +46,11 @@ import { createCheckoutInput, promoCodeIdInput, promoCodeInput } from "@shared/p
 import { inviteSchoolAdminInput, removeSchoolAdminInput, schoolIdInput } from "@shared/school";
 import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";
-import { enrollmentId, paths } from "@shared/paths";
+import { enrollmentId, paths, routes } from "@shared/paths";
 import { emailLayout, escapeHtml } from "@shared/template";
 import type {
   CommentDoc,
+  CourseDoc,
   CoursePrivateSettings,
   CreatorDoc,
   EnrollmentDoc,
@@ -134,6 +138,15 @@ import {
 } from "./community";
 import { handleNewFeedback, handleNewSubmission, handleSubmissionReviewed } from "./exercises";
 import { handleNewLive } from "./lives";
+import {
+  WebhookError,
+  deleteWebhook as deleteWebhookImpl,
+  dispatchWebhookEvent,
+  fakeSender,
+  httpSender,
+  saveWebhook as saveWebhookImpl,
+  testWebhook as testWebhookImpl,
+} from "./webhooks";
 import {
   AssistantError,
   anthropicAssistant,
@@ -607,16 +620,132 @@ export const setCommunity = onCall({ timeoutSeconds: 300 }, async (request) => {
 export const onEnrollmentWritten = onDocumentWritten(
   "enrollments/{enrollmentId}",
   async (event) => {
+    const before = event.data?.before.data() as EnrollmentDoc | undefined;
+    const after = event.data?.after.data() as EnrollmentDoc | undefined;
     try {
-      await handleEnrollmentWritten(
-        event.data?.before.data() as EnrollmentDoc | undefined,
-        event.data?.after.data() as EnrollmentDoc | undefined,
-      );
+      await handleEnrollmentWritten(before, after);
     } catch (error) {
       logger.error("onEnrollmentWritten", error);
     }
+    // Webhook « nouvel élève » : accès ouvert (création ou accès rétabli).
+    if (after?.status === "active" && before?.status !== "active") {
+      try {
+        const course = (await db().doc(`courses/${after.courseId}`).get()).data() as
+          CourseDoc | undefined;
+        await dispatchWebhookEvent({
+          schoolId: after.creatorId,
+          event: "student.enrolled",
+          deliveryId: `student.enrolled_${event.params.enrollmentId}_${event.id}`,
+          data: {
+            courseId: after.courseId,
+            courseTitle: course?.title ?? null,
+            email: after.email,
+            name: after.displayName,
+            source: after.source,
+          },
+          sender: webhookSender,
+        });
+      } catch (error) {
+        logger.error("webhook student.enrolled", error);
+      }
+    }
   },
 );
+
+/** Vente payée : webhook « order.paid » de l'école. */
+export const onOrderWritten = onDocumentWritten("orders/{orderId}", async (event) => {
+  const before = event.data?.before.data() as OrderDoc | undefined;
+  const after = event.data?.after.data() as OrderDoc | undefined;
+  if (after?.status !== "paid" || before?.status === "paid") return;
+  try {
+    await dispatchWebhookEvent({
+      schoolId: after.schoolId,
+      event: "order.paid",
+      deliveryId: `order.paid_${event.params.orderId}`,
+      data: {
+        orderId: event.params.orderId,
+        courseId: after.courseId,
+        courseTitle: after.courseTitle ?? null,
+        email: after.email,
+        name: after.name,
+        amount: after.amount,
+        currency: after.currency,
+        promoCode: after.promoCode,
+        installments: after.installments?.count ?? null,
+        livemode: Boolean(after.livemode),
+      },
+      sender: webhookSender,
+    });
+  } catch (error) {
+    logger.error("webhook order.paid", error);
+  }
+});
+
+/** Certificat délivré : webhook « certificate.issued » de l'école. */
+export const onCertificateCreated = onDocumentCreated(
+  "certificates/{certificateId}",
+  async (event) => {
+    const certificate = event.data?.data() as CertificateDoc | undefined;
+    if (!certificate) return;
+    try {
+      await dispatchWebhookEvent({
+        schoolId: certificate.schoolId,
+        event: "certificate.issued",
+        deliveryId: `certificate.issued_${event.params.certificateId}`,
+        data: {
+          certificateId: event.params.certificateId,
+          courseId: certificate.courseId,
+          courseTitle: certificate.courseTitle,
+          studentName: certificate.studentName,
+          url: `${APP_URL.value()}${routes.certificate(event.params.certificateId)}`,
+        },
+        sender: webhookSender,
+      });
+    } catch (error) {
+      logger.error("webhook certificate.issued", error);
+    }
+  },
+);
+
+// Webhooks simulés dans les émulateurs (WEBHOOKS_FAKE=true) : livraisons dans _fakeWebhooks.
+const webhookSender =
+  process.env.FUNCTIONS_EMULATOR === "true" && process.env.WEBHOOKS_FAKE === "true"
+    ? fakeSender
+    : httpSender;
+
+function webhookHttpError(error: unknown): never {
+  if (error instanceof WebhookError) throw new HttpsError("failed-precondition", error.message);
+  throw error;
+}
+
+/** Nouveau webhook (Zapier, Make…) de l'école : clé de signature générée par le serveur. */
+export const saveWebhook = onCall(async (request) => {
+  const input = parseInput(webhookInput, request.data);
+  requireSchoolAdmin(request, input.schoolId);
+  try {
+    return await saveWebhookImpl(input);
+  } catch (error) {
+    webhookHttpError(error);
+  }
+});
+
+export const deleteWebhook = onCall(async (request) => {
+  const input = parseInput(webhookIdInput, request.data);
+  requireSchoolAdmin(request, input.schoolId);
+  await deleteWebhookImpl(input.schoolId, input.webhookId);
+  return { ok: true };
+});
+
+/** Envoie un événement de test et retourne le code HTTP reçu. */
+export const testWebhook = onCall(async (request) => {
+  const input = parseInput(webhookIdInput, request.data);
+  requireSchoolAdmin(request, input.schoolId);
+  try {
+    return await testWebhookImpl(input.schoolId, input.webhookId, webhookSender);
+  } catch (error) {
+    webhookHttpError(error);
+  }
+});
 
 export const onCommunityPostCreated = onDocumentCreated(
   "communities/{schoolId}/posts/{postId}",
@@ -690,6 +819,23 @@ export const onSubmissionCreated = onDocumentCreated(
       await handleNewSubmission(event.params.submissionId, submission);
     } catch (error) {
       logger.error("onSubmissionCreated", error);
+    }
+    try {
+      await dispatchWebhookEvent({
+        schoolId: submission.creatorId,
+        event: "submission.created",
+        deliveryId: `submission.created_${event.params.submissionId}`,
+        data: {
+          submissionId: event.params.submissionId,
+          courseId: submission.courseId,
+          lessonTitle: submission.lessonTitle,
+          studentName: submission.studentName,
+          url: `${APP_URL.value()}${routes.adminSubmission(event.params.submissionId)}`,
+        },
+        sender: webhookSender,
+      });
+    } catch (error) {
+      logger.error("webhook submission.created", error);
     }
   },
 );

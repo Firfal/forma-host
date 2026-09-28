@@ -139,6 +139,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Webhooks (Zapier, Make…) : créés par la callable saveWebhook, lus par l'équipe.
+      match /webhooks/{webhookId} {
+        allow read: if isSchoolAdmin(creatorId);
+        allow write: if false;
+      }
+
       // Équipe de l'école : gérée par les Functions (invitation, retrait).
       match /members/{memberId} {
         allow read: if isSchoolAdmin(creatorId);

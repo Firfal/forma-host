@@ -278,6 +278,8 @@ function privacyPolicy(info: SchoolLegalInfo, ctx: LegalContext): LegalPage {
           "Vimeo : diffusion des vidéos, sans suivi publicitaire.",
           `${ctx.platformName} : éditeur de la plateforme technique.`,
           "Le prestataire d'envoi des emails de l'école.",
+          "Anthropic : assistant IA des formations, s'il est activé (la question posée et le contenu de la formation lui sont transmis pour générer la réponse).",
+          "Les outils que l'école connecte, le cas échéant (ex. Zapier, Make).",
         ],
       },
       {

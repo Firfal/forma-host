@@ -13,6 +13,7 @@ import type { PublishAnnouncementInput } from "@shared/announcements";
 import type { IssueCertificateInput } from "@shared/certificates";
 import type { AskAssistantInput, AssistantAnswer, AssistantKeyInput } from "@shared/assistant";
 import type { PlatformOverview } from "@shared/platform";
+import type { WebhookIdInput, WebhookInput } from "@shared/webhooks";
 import type { QuizGrade, SubmitQuizInput } from "@shared/quiz";
 import type { OpenConversationInput, UpdateConversationInput } from "@shared/chat";
 import type { SetCommunityInput } from "@shared/community";
@@ -93,6 +94,9 @@ export const callIssueCertificate = callable<IssueCertificateInput, { id: string
   "issueCertificate",
 );
 export const callSubmitQuiz = callable<SubmitQuizInput, QuizGrade>("submitQuiz");
+export const callSaveWebhook = callable<WebhookInput, { id: string }>("saveWebhook");
+export const callDeleteWebhook = callable<WebhookIdInput, { ok: true }>("deleteWebhook");
+export const callTestWebhook = callable<WebhookIdInput, { status: number }>("testWebhook");
 export const callSetCommunity = callable<SetCommunityInput, { ok: true }>("setCommunity");
 export const callAskAssistant = callable<AskAssistantInput, AssistantAnswer>("askAssistant");
 export const callSaveAssistantKey = callable<AssistantKeyInput, { keyLast4: string }>(

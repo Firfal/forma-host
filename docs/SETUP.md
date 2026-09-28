@@ -172,6 +172,9 @@ Tout est livré désactivé : rien ne change pour les élèves tant qu'une optio
   Informations légales*. Attestation d'assiduité : menu « … » d'un élève dans la formation
   (l'élève la retrouve aussi sur la page de sa formation). Avis de fin de formation :
   *Statistiques > Satisfaction des élèves*.
+- **Intégrations (Zapier, Make, n8n)** : *Paramètres > Intégrations* : colle l'adresse du webhook,
+  choisis les événements (nouvel élève, vente, certificat, exercice rendu), puis « Tester ».
+- **Directs** : onglet *Directs* de la formation (lien Zoom, Meet, Teams…).
 - **Quiz, exercices à rendre, ouverture progressive** : dans chaque leçon ou dans *Détails* de la
   formation.
 

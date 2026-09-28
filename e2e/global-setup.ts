@@ -31,6 +31,22 @@ const ROUTES = [
   "/plateforme/demandes",
   "/ecole-motion",
   "/ecole-motion/maitriser-after-effects",
+  "/ecole-motion/legal/cgv",
+  // Routes dynamiques : un identifiant quelconque suffit à compiler la page.
+  `/admin/formations/${COURSE}/directs`,
+  "/admin/exercices/exemple",
+  "/admin/messages/exemple",
+  "/admin/communaute",
+  "/messages/exemple",
+  "/communaute",
+  "/communaute/exemple",
+  "/attestations/exemple",
+  "/certificats/exemple",
+  "/factures/exemple",
+  "/bienvenue/exemple",
+  "/merci",
+  "/inscription",
+  "/devenir-formateur",
 ];
 
 export default async function globalSetup() {

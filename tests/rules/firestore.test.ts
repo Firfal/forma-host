@@ -1116,3 +1116,16 @@ describe("directs", () => {
     await assertSucceeds(deleteDoc(doc(creatorDb(), "courses/c1/lives/d1")));
   });
 });
+
+describe("webhooks", () => {
+  it("lus par l'équipe de l'école, écrits par le serveur", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "creators/theo/webhooks/w1"), { url: "https://x.fr" });
+    });
+    await assertSucceeds(getDoc(doc(coAdminDb(), "creators/theo/webhooks/w1")));
+    await assertFails(getDoc(doc(db(ANNE), "creators/theo/webhooks/w1")));
+    await assertFails(
+      setDoc(doc(creatorDb(), "creators/theo/webhooks/w2"), { url: "https://y.fr" }),
+    );
+  });
+});

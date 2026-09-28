@@ -9,6 +9,7 @@ import { PaymentsSettingsCard } from "@/components/settings/payments-settings-ca
 import { SchoolSettingsCard } from "@/components/settings/school-settings-card";
 import { TeamSettingsCard } from "@/components/settings/team-settings-card";
 import { VimeoSettingsCard } from "@/components/settings/vimeo-settings-card";
+import { WebhooksSettingsCard } from "@/components/settings/webhooks-settings-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { useSchool } from "@/lib/school";
 
@@ -31,6 +32,7 @@ export default function SettingsPage() {
             </Suspense>
             <MailSettingsCard />
             <VimeoSettingsCard />
+            <WebhooksSettingsCard />
           </>
         ) : (
           <p className="rounded-md bg-surface px-3 py-2.5 text-[13px] text-muted">
