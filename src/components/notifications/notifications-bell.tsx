@@ -12,6 +12,7 @@ import {
   Megaphone,
   MessageSquare,
   MessagesSquare,
+  UsersRound,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -43,6 +44,8 @@ const icons: Record<NotificationType, typeof Bell> = {
   announcement: Megaphone,
   new_submission: ClipboardCheck,
   submission_feedback: ClipboardCheck,
+  community_post: UsersRound,
+  community_reply: UsersRound,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

@@ -24,6 +24,7 @@ export const RESERVED_SLUGS = new Set([
   "attestations",
   "c",
   "certificats",
+  "communaute",
   "compte",
   "connexion",
   "devenir-formateur",

@@ -2,6 +2,7 @@ import "./setup";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   onDocumentCreated,
+  onDocumentDeleted,
   onDocumentUpdated,
   onDocumentWritten,
 } from "firebase-functions/v2/firestore";
@@ -27,6 +28,11 @@ import { issueCertificateInput } from "@shared/certificates";
 import { askAssistantInput, assistantKeyInput } from "@shared/assistant";
 import { submitQuizInput } from "@shared/quiz";
 import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
+import {
+  setCommunityInput,
+  type CommunityPostDoc,
+  type CommunityReplyDoc,
+} from "@shared/community";
 import type { FeedbackDoc, SubmissionDoc } from "@shared/exercises";
 import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
@@ -38,7 +44,13 @@ import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";
 import { enrollmentId, paths } from "@shared/paths";
 import { emailLayout, escapeHtml } from "@shared/template";
-import type { CommentDoc, CoursePrivateSettings, CreatorDoc, NotificationDoc } from "@shared/types";
+import type {
+  CommentDoc,
+  CoursePrivateSettings,
+  CreatorDoc,
+  EnrollmentDoc,
+  NotificationDoc,
+} from "@shared/types";
 import { grantAccessToStudents, resendAccessEmail } from "./access";
 import { auth, db } from "./db";
 import {
@@ -111,6 +123,14 @@ import { fakeSmtpClient, smtpClient, smtpErrorMessage } from "./smtp";
 import { publishAnnouncement as publishAnnouncementImpl } from "./announcements";
 import { CertificateError, issueCertificate as issueCertificateImpl } from "./certificates";
 import { issueMissingInvoices as issueMissingInvoicesImpl } from "./invoices";
+import {
+  handleEnrollmentWritten,
+  handleNewPost,
+  handleNewReply,
+  handlePostDeleted,
+  handleReplyDeleted,
+  setCommunityEnabled,
+} from "./community";
 import { handleNewFeedback, handleNewSubmission, handleSubmissionReviewed } from "./exercises";
 import {
   AssistantError,
@@ -572,6 +592,77 @@ export const submitQuiz = onCall(async (request) => {
     throw error;
   }
 });
+
+/** Communauté d'école : ouverture (et adhésion des élèves actuels) ou fermeture. */
+export const setCommunity = onCall({ timeoutSeconds: 300 }, async (request) => {
+  const input = parseInput(setCommunityInput, request.data);
+  requireSchoolAdmin(request, input.schoolId);
+  await setCommunityEnabled(input.schoolId, input.enabled);
+  return { ok: true };
+});
+
+/** Inscription créée ou modifiée : l'adhésion à la communauté de l'école suit. */
+export const onEnrollmentWritten = onDocumentWritten(
+  "enrollments/{enrollmentId}",
+  async (event) => {
+    try {
+      await handleEnrollmentWritten(
+        event.data?.before.data() as EnrollmentDoc | undefined,
+        event.data?.after.data() as EnrollmentDoc | undefined,
+      );
+    } catch (error) {
+      logger.error("onEnrollmentWritten", error);
+    }
+  },
+);
+
+export const onCommunityPostCreated = onDocumentCreated(
+  "communities/{schoolId}/posts/{postId}",
+  async (event) => {
+    const post = event.data?.data() as CommunityPostDoc | undefined;
+    if (!post) return;
+    try {
+      await handleNewPost(event.params.schoolId, event.params.postId, post);
+    } catch (error) {
+      logger.error("onCommunityPostCreated", error);
+    }
+  },
+);
+
+export const onCommunityPostDeleted = onDocumentDeleted(
+  "communities/{schoolId}/posts/{postId}",
+  async (event) => {
+    try {
+      await handlePostDeleted(event.params.schoolId, event.params.postId);
+    } catch (error) {
+      logger.error("onCommunityPostDeleted", error);
+    }
+  },
+);
+
+export const onCommunityReplyCreated = onDocumentCreated(
+  "communities/{schoolId}/posts/{postId}/replies/{replyId}",
+  async (event) => {
+    const reply = event.data?.data() as CommunityReplyDoc | undefined;
+    if (!reply) return;
+    try {
+      await handleNewReply(event.params.schoolId, event.params.postId, event.params.replyId, reply);
+    } catch (error) {
+      logger.error("onCommunityReplyCreated", error);
+    }
+  },
+);
+
+export const onCommunityReplyDeleted = onDocumentDeleted(
+  "communities/{schoolId}/posts/{postId}/replies/{replyId}",
+  async (event) => {
+    try {
+      await handleReplyDeleted(event.params.schoolId, event.params.postId);
+    } catch (error) {
+      logger.error("onCommunityReplyDeleted", error);
+    }
+  },
+);
 
 /** Exercice rendu : l'équipe de l'école est prévenue (in-app). */
 export const onSubmissionCreated = onDocumentCreated(

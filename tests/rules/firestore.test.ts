@@ -1004,3 +1004,76 @@ describe("assistant IA", () => {
     await assertFails(getDoc(doc(db(ANNE), "assistantUsage/anne_2026-09-27")));
   });
 });
+
+describe("communauté d'école", () => {
+  const post = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    authorUid: uid,
+    authorName: "Anne",
+    authorAvatarUrl: null,
+    body: "Bonjour à tous !",
+    pinned: false,
+    replyCount: 0,
+    lastReplyAt: null,
+    createdAt: serverTimestamp(),
+    ...overrides,
+  });
+  const open = (enabled = true) =>
+    env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "communities/theo"), { enabled });
+      await setDoc(doc(ctx.firestore(), "communities/theo/people/anne"), { uid: ANNE });
+      await setDoc(doc(ctx.firestore(), "communities/theo/posts/p1"), {
+        ...post(ANNE),
+        createdAt: Timestamp.now(),
+      });
+    });
+
+  it("membres et équipe publient ; les autres ne voient rien", async () => {
+    await open();
+    await assertSucceeds(setDoc(doc(db(ANNE), "communities/theo/posts/a"), post(ANNE)));
+    await assertSucceeds(setDoc(doc(coAdminDb(), "communities/theo/posts/b"), post(COADMIN)));
+    await assertFails(setDoc(doc(db(STRANGER), "communities/theo/posts/c"), post(STRANGER)));
+    await assertFails(
+      setDoc(doc(db(ANNE), "communities/theo/posts/d"), post(ANNE, { pinned: true })),
+    );
+    await assertFails(setDoc(doc(db(ANNE), "communities/theo/posts/e"), post(THEO)));
+    await assertSucceeds(getDocs(collection(db(ANNE), "communities/theo/posts")));
+    await assertFails(getDocs(collection(db(STRANGER), "communities/theo/posts")));
+    await assertFails(setDoc(doc(db(ANNE), "communities/theo"), { enabled: true }));
+    await assertFails(setDoc(doc(db(ANNE), "communities/theo/people/inconnu"), { uid: STRANGER }));
+  });
+
+  it("communauté fermée : plus de lecture ni de publication pour les élèves", async () => {
+    await open(false);
+    await assertFails(getDocs(collection(db(ANNE), "communities/theo/posts")));
+    await assertFails(setDoc(doc(db(ANNE), "communities/theo/posts/a"), post(ANNE)));
+  });
+
+  it("épingler : l'équipe ; modifier : l'auteur ; supprimer : l'auteur ou l'équipe", async () => {
+    await open();
+    await assertFails(updateDoc(doc(db(ANNE), "communities/theo/posts/p1"), { pinned: true }));
+    await assertSucceeds(
+      updateDoc(doc(creatorDb(), "communities/theo/posts/p1"), { pinned: true }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(db(ANNE), "communities/theo/posts/p1"), {
+        body: "Modifié",
+        editedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(creatorDb(), "communities/theo/posts/p1"), { body: "Censuré" }),
+    );
+    await assertSucceeds(
+      setDoc(doc(db(ANNE), "communities/theo/posts/p1/replies/r1"), {
+        authorUid: ANNE,
+        authorName: "Anne",
+        authorAvatarUrl: null,
+        body: "Merci",
+        createdAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(deleteDoc(doc(db(STRANGER), "communities/theo/posts/p1")));
+    await assertSucceeds(deleteDoc(doc(creatorDb(), "communities/theo/posts/p1/replies/r1")));
+    await assertSucceeds(deleteDoc(doc(creatorDb(), "communities/theo/posts/p1")));
+  });
+});

@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck,
   UserRound,
+  UsersRound,
   Users,
   X,
 } from "lucide-react";
@@ -39,6 +40,7 @@ import { useAuth } from "@/lib/auth";
 import { brand } from "@/lib/brand";
 import { useStudentConversations, useUnreadConversations } from "@/lib/chat";
 import { cn } from "@/lib/cn";
+import { useMyCommunities } from "@/lib/community";
 import { usePendingSubmissions } from "@/lib/exercises";
 import { useCreator } from "@/lib/creator";
 import { useSchool, useSchoolDocs } from "@/lib/school";
@@ -58,6 +60,7 @@ const adminNav: NavItem[] = [
   { href: routes.adminMembers, label: "Membres", icon: Users },
   { href: routes.adminMessages, label: "Messages", icon: MessagesSquare },
   { href: routes.adminComments, label: "Commentaires", icon: MessageSquare },
+  { href: routes.adminCommunity, label: "Communauté", icon: UsersRound },
   {
     href: routes.adminExercises,
     label: "Exercices",
@@ -71,6 +74,12 @@ const adminNav: NavItem[] = [
 const memberNav: NavItem[] = [
   { href: routes.myCourses, label: "Mes formations", icon: LayoutGrid },
 ];
+
+const communityNav: NavItem = {
+  href: routes.communities,
+  label: "Communauté",
+  icon: UsersRound,
+};
 
 const studentMessagesNav: NavItem = {
   href: routes.messages,
@@ -199,6 +208,9 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
   // Formateur : « Messages » côté élève seulement s'il écrit lui-même à une autre école.
   const { data: studentConversations } = useStudentConversations(isCreator ? user?.uid : undefined);
   const showStudentMessages = !isCreator || studentConversations.length > 0;
+  // Communautés des écoles où l'on est élève (pas celles que l'on administre).
+  const communities = useMyCommunities();
+  const showCommunity = communities.schoolIds.some((id) => !schools.includes(id));
 
   return (
     <div className="flex h-full flex-col">
@@ -241,6 +253,7 @@ function SidebarContent({ onNavigate }: { onNavigate: () => void }) {
             {showStudentMessages ? (
               <NavLink item={studentMessagesNav} onNavigate={onNavigate} badge={studentUnread} />
             ) : null}
+            {showCommunity ? <NavLink item={communityNav} onNavigate={onNavigate} /> : null}
             {isCreator ? null : <NavLink item={becomeCreatorNav} onNavigate={onNavigate} />}
           </div>
         </div>

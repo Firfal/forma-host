@@ -442,6 +442,71 @@ service cloud.firestore {
         && progress.lastActivityAt == request.time;
     }
 
+    // ---------- Communauté d'école ----------
+
+    function isCommunityMember(schoolId) {
+      return signedIn()
+        && (isSchoolAdmin(schoolId)
+          || exists(/databases/$(database)/documents/communities/$(schoolId)/people/$(request.auth.uid)));
+    }
+
+    function canUseCommunity(schoolId) {
+      return isCommunityMember(schoolId)
+        && get(/databases/$(database)/documents/communities/$(schoolId)).data.enabled == true;
+    }
+
+    // Ouverture et membres : gérés par les Functions (setCommunity, inscriptions).
+    match /communities/{schoolId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /people/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isSchoolAdmin(schoolId));
+        allow write: if false;
+      }
+
+      match /posts/{postId} {
+        allow read: if canUseCommunity(schoolId);
+        allow create: if canUseCommunity(schoolId)
+          && request.resource.data.keys().hasOnly([
+              'authorUid', 'authorName', 'authorAvatarUrl', 'body', 'pinned', 'replyCount',
+              'lastReplyAt', 'createdAt'])
+          && request.resource.data.authorUid == request.auth.uid
+          && isShortString(request.resource.data.authorName, 1, 80)
+          && isNullableString(request.resource.data.authorAvatarUrl, 2000)
+          && isShortString(request.resource.data.body, 1, 5000)
+          && request.resource.data.pinned == false
+          && request.resource.data.replyCount == 0
+          && request.resource.data.lastReplyAt == null
+          && request.resource.data.createdAt == request.time;
+        allow update: if canUseCommunity(schoolId)
+          && ((resource.data.authorUid == request.auth.uid
+                && changedOnly(['body', 'editedAt'])
+                && isShortString(request.resource.data.body, 1, 5000)
+                && request.resource.data.editedAt == request.time)
+            || (isSchoolAdmin(schoolId)
+                && changedOnly(['pinned'])
+                && request.resource.data.pinned is bool));
+        allow delete: if signedIn()
+          && (resource.data.authorUid == request.auth.uid || isSchoolAdmin(schoolId));
+
+        match /replies/{replyId} {
+          allow read: if canUseCommunity(schoolId);
+          allow create: if canUseCommunity(schoolId)
+            && request.resource.data.keys().hasOnly([
+                'authorUid', 'authorName', 'authorAvatarUrl', 'body', 'createdAt'])
+            && request.resource.data.authorUid == request.auth.uid
+            && isShortString(request.resource.data.authorName, 1, 80)
+            && isNullableString(request.resource.data.authorAvatarUrl, 2000)
+            && isShortString(request.resource.data.body, 1, 3000)
+            && request.resource.data.createdAt == request.time
+            && exists(/databases/$(database)/documents/communities/$(schoolId)/posts/$(postId));
+          allow delete: if signedIn()
+            && (resource.data.authorUid == request.auth.uid || isSchoolAdmin(schoolId));
+        }
+      }
+    }
+
     // Exercices rendus : l'élève inscrit envoie, l'équipe de l'école corrige.
     match /submissions/{submissionId} {
       allow read: if signedIn()

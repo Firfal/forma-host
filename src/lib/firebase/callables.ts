@@ -15,6 +15,7 @@ import type { AskAssistantInput, AssistantAnswer, AssistantKeyInput } from "@sha
 import type { PlatformOverview } from "@shared/platform";
 import type { QuizGrade, SubmitQuizInput } from "@shared/quiz";
 import type { OpenConversationInput, UpdateConversationInput } from "@shared/chat";
+import type { SetCommunityInput } from "@shared/community";
 import type {
   ApproveCreatorRequestInput,
   RejectCreatorRequestInput,
@@ -92,6 +93,7 @@ export const callIssueCertificate = callable<IssueCertificateInput, { id: string
   "issueCertificate",
 );
 export const callSubmitQuiz = callable<SubmitQuizInput, QuizGrade>("submitQuiz");
+export const callSetCommunity = callable<SetCommunityInput, { ok: true }>("setCommunity");
 export const callAskAssistant = callable<AskAssistantInput, AssistantAnswer>("askAssistant");
 export const callSaveAssistantKey = callable<AssistantKeyInput, { keyLast4: string }>(
   "saveAssistantKey",

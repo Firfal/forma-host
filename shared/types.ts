@@ -185,7 +185,9 @@ export type NotificationType =
   | "payment_issue"
   | "announcement"
   | "new_submission"
-  | "submission_feedback";
+  | "submission_feedback"
+  | "community_post"
+  | "community_reply";
 
 export interface NotificationDoc<T = TimestampLike> {
   type: NotificationType;
