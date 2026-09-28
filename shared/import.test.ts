@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseInviteText, parseLooseDate, parseStudentRows } from "./import";
+import { EMAIL_PATTERN, parseInviteText, parseLooseDate, parseStudentRows } from "./import";
 
 describe("parseInviteText", () => {
   it("accepte plusieurs formats et dédoublonne", () => {
@@ -98,5 +98,27 @@ describe("parseStudentRows", () => {
         ["Ana Silva", "ana@exemple.fr", ""],
       ]).students,
     ).toEqual([{ email: "ana@exemple.fr", name: "Ana Silva" }]);
+  });
+});
+
+describe("contrôle des emails", () => {
+  it("même règle que z.email() (validation serveur)", async () => {
+    const { z } = await import("zod");
+    const samples = [
+      "anne@exemple.fr",
+      "jean.dupont+podia@mail.co.uk",
+      "o'neil@exemple.com",
+      "a..b@exemple.fr",
+      ".anne@exemple.fr",
+      "anne@exemple",
+      "anne@-exemple.fr",
+      "anne @exemple.fr",
+      "anne@exemple.f",
+      "é@exemple.fr",
+      "anne@sous.domaine.exemple.io",
+    ];
+    for (const email of samples) {
+      expect(EMAIL_PATTERN.test(email), email).toBe(z.email().safeParse(email).success);
+    }
   });
 });

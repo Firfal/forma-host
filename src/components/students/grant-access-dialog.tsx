@@ -1,6 +1,5 @@
 "use client";
 
-import Papa from "papaparse";
 import { FileSpreadsheet, Loader2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type ChangeEvent } from "react";
@@ -66,10 +65,12 @@ export function GrantAccessDialog({
     setSendEmail(true);
   }
 
-  function onFile(event: ChangeEvent<HTMLInputElement>) {
+  async function onFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    // Lecteur CSV chargé au premier import seulement.
+    const { default: Papa } = await import("papaparse");
     Papa.parse<string[]>(file, {
       skipEmptyLines: true,
       complete: (result) => {

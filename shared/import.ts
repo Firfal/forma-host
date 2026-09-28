@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /** Analyse des listes d'élèves : saisie libre (invitation) et CSV exporté de Podia ou autre. */
 
 export interface ParsedStudent {
@@ -13,7 +11,13 @@ export interface ParseResult {
   invalid: string[];
 }
 
-const isEmail = (value: string) => z.email().safeParse(value).success;
+/**
+ * Même règle que z.email() (zod 4), vérifiée par un test : pas de zod dans la page des élèves
+ * pour ce seul contrôle. Le serveur revalide de toute façon chaque email.
+ */
+export const EMAIL_PATTERN =
+  /^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$/;
+const isEmail = (value: string) => EMAIL_PATTERN.test(value);
 
 /**
  * Une ligne par élève : « email », « Nom <email> » ou « email, Nom ».
