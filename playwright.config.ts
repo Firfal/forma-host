@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // Lancé par `npm run test:e2e` : émulateurs + données de démo, puis Next.js en mode dev.
 export default defineConfig({
   testDir: "e2e",
+  // Pages principales compilées avant les scénarios (mode dev).
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

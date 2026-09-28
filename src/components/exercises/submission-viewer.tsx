@@ -69,7 +69,10 @@ export function SubmissionViewer({
   }
 
   async function send() {
-    if (!user || !body.trim()) return;
+    const text = body.trim();
+    if (!user || !text) return;
+    // Zone vidée tout de suite (le retour apparaît en temps réel), rétablie en cas d'erreur.
+    setBody("");
     setSending(true);
     try {
       await addFeedback(submissionId, {
@@ -77,10 +80,10 @@ export function SubmissionViewer({
         authorName:
           profile?.displayName || user.displayName || user.email?.split("@")[0] || "Membre",
         atSec: media === "video" && atCurrentTime ? currentTime : null,
-        body: body.trim(),
+        body: text,
       });
-      setBody("");
     } catch (error) {
+      setBody(text);
       toast.error(errorMessage(error));
     } finally {
       setSending(false);

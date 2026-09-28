@@ -10,7 +10,16 @@ export interface BarListRow {
 }
 
 /** Barres horizontales (une série, en %), libellé à gauche et valeur en bout de barre. */
-export function BarList({ rows, title }: { rows: BarListRow[]; title: string }) {
+export function BarList({
+  rows,
+  title,
+  numbered = true,
+}: {
+  rows: BarListRow[];
+  title: string;
+  /** Numéro d'ordre devant chaque libellé (ex. leçons dans l'ordre du plan). */
+  numbered?: boolean;
+}) {
   return (
     <ol className="space-y-1.5" aria-label={title}>
       {rows.map((row, index) => (
@@ -23,7 +32,7 @@ export function BarList({ rows, title }: { rows: BarListRow[]; title: string }) 
           title={row.detail}
         >
           <span className="truncate text-ink">
-            <span className="mr-1.5 tabular-nums text-muted">{index + 1}.</span>
+            {numbered ? <span className="mr-1.5 tabular-nums text-muted">{index + 1}.</span> : null}
             {row.label}
           </span>
           <span className="flex items-center gap-2">
@@ -33,7 +42,7 @@ export function BarList({ rows, title }: { rows: BarListRow[]; title: string }) 
                 style={{ width: `${Math.max(row.percent, row.percent > 0 ? 1 : 0)}%` }}
               />
             </span>
-            <span className="w-10 shrink-0 text-right tabular-nums text-muted">
+            <span className="w-12 shrink-0 whitespace-nowrap text-right tabular-nums text-muted">
               {row.percent} %
             </span>
           </span>

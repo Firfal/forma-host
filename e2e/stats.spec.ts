@@ -9,8 +9,13 @@ test("statistiques : chiffres clés, courbes mensuelles, formations et décrocha
     .getByRole("navigation", { name: "Navigation principale" })
     .getByRole("link", { name: "Statistiques" })
     .click();
-  await expect(page.getByRole("heading", { name: "Statistiques" })).toBeVisible();
-  await expect(page.getByText("Nouveaux élèves", { exact: true }).first()).toBeVisible();
+  // Première visite de la page : compilée à la demande en mode dev (lent sur la CI).
+  await expect(page.getByRole("heading", { name: "Statistiques" })).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByText("Nouveaux élèves", { exact: true }).first()).toBeVisible({
+    timeout: 30_000,
+  });
   // Avec ou sans vente (selon les scénarios déjà passés) : graphique ou message vide.
   await expect(page.getByRole("heading", { name: "Chiffre d'affaires par mois" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Nouveaux élèves par mois" })).toBeVisible();

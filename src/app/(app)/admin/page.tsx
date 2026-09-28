@@ -1,7 +1,17 @@
 "use client";
 
 import { collection, collectionGroup, limit, orderBy, query, where } from "firebase/firestore";
-import { AlertTriangle, Mail, MessageSquare, PlayCircle, UserPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  ClipboardCheck,
+  Mail,
+  MessageSquare,
+  MessagesSquare,
+  PlayCircle,
+  Scale,
+  UserPlus,
+} from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { completedCount, visibleLessons } from "@shared/outline";
@@ -13,9 +23,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildActivity, groupByDay, type ActivityEvent } from "@/lib/activity";
+import { useUnreadConversations } from "@/lib/chat";
+import { usePendingSubmissions } from "@/lib/exercises";
 import { db } from "@/lib/firebase/client";
 import { toDate } from "@/lib/format";
 import { useQueryData } from "@/lib/hooks";
+import { useSchoolLegal } from "@/lib/legal";
 import { useMailSettings } from "@/lib/mail-settings";
 import { useSchool, useSchoolStaff } from "@/lib/school";
 
@@ -76,6 +89,70 @@ function ActivityLine({ event }: { event: ActivityEvent }) {
         ) : null}
       </div>
     </li>
+  );
+}
+
+interface Todo {
+  href: string;
+  label: string;
+  icon: typeof ClipboardCheck;
+}
+
+/** Ce qui attend le formateur : exercices, messages, informations légales. */
+function TodoCard({ schoolId }: { schoolId: string }) {
+  const pending = usePendingSubmissions(schoolId);
+  const unread = useUnreadConversations("school", schoolId);
+  const { data: legal, loading: legalLoading } = useSchoolLegal(schoolId);
+  const todos: Todo[] = [
+    ...(pending
+      ? [
+          {
+            href: routes.adminExercises,
+            label: `${pending} exercice${pending > 1 ? "s" : ""} à corriger`,
+            icon: ClipboardCheck,
+          },
+        ]
+      : []),
+    ...(unread
+      ? [
+          {
+            href: routes.adminMessages,
+            label: `${unread} conversation${unread > 1 ? "s" : ""} non lue${unread > 1 ? "s" : ""}`,
+            icon: MessagesSquare,
+          },
+        ]
+      : []),
+    ...(!legalLoading && !legal
+      ? [
+          {
+            href: routes.adminSettings,
+            label: "Complète tes informations légales (CGV, mentions légales, factures)",
+            icon: Scale,
+          },
+        ]
+      : []),
+  ];
+  if (!todos.length) return null;
+  return (
+    <Card className="mb-4">
+      <CardHeader className="pb-3">
+        <CardTitle>À faire</CardTitle>
+      </CardHeader>
+      <ul className="divide-y divide-line-soft border-t border-line-soft">
+        {todos.map(({ href, label, icon: Icon }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              className="flex items-center gap-3 px-4 py-2.5 text-[14px] hover:bg-surface/60"
+            >
+              <Icon className="size-4 shrink-0 text-muted" />
+              <span className="flex-1">{label}</span>
+              <ChevronRight className="size-4 text-muted" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -164,6 +241,7 @@ export default function AdminHomePage() {
           <span className="shrink-0 font-medium">{mailSettings ? "Voir" : "Configurer"} →</span>
         </Link>
       ) : null}
+      {uid ? <TodoCard schoolId={uid} /> : null}
       {loading ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {Array.from({ length: 5 }, (_, i) => (

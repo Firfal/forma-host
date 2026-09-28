@@ -3,6 +3,7 @@
 import { doc } from "firebase/firestore";
 import {
   ArrowLeft,
+  Award,
   ArrowRight,
   Check,
   Download,
@@ -13,10 +14,12 @@ import {
   Paperclip,
   Square,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { certificateEnabled } from "@shared/certificates";
 import { AUTO_COMPLETE_RATIO } from "@shared/constants";
 import { adjacentLessons, completedCount, visibleLessons } from "@shared/outline";
 import { enrollmentId, routes } from "@shared/paths";
@@ -25,9 +28,6 @@ import type { LessonDoc } from "@shared/types";
 import { LessonComments } from "@/components/comments/lesson-comments";
 import { RichText } from "@/components/editor/rich-text";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
-import { LessonAssistant } from "@/components/learn/lesson-assistant";
-import { LessonExercise } from "@/components/learn/lesson-exercise";
-import { LessonQuiz } from "@/components/learn/lesson-quiz";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
 import { useStudentCourse } from "@/components/learn/student-course-context";
@@ -48,6 +48,17 @@ import {
   writeVideoPosition,
 } from "@/lib/progress";
 import { downloadProtectedFile, formatFileSize } from "@/lib/storage";
+
+// Blocs facultatifs de la leçon : téléchargés seulement si la leçon les utilise.
+const LessonQuiz = dynamic(() =>
+  import("@/components/learn/lesson-quiz").then((m) => m.LessonQuiz),
+);
+const LessonExercise = dynamic(() =>
+  import("@/components/learn/lesson-exercise").then((m) => m.LessonExercise),
+);
+const LessonAssistant = dynamic(() =>
+  import("@/components/learn/lesson-assistant").then((m) => m.LessonAssistant),
+);
 
 const longDate = new Intl.DateTimeFormat("fr-FR", {
   weekday: "long",
@@ -315,6 +326,22 @@ export default function LessonPage() {
             exercise={lesson.exercise}
             mode={tracksProgress ? "student" : isOwner ? "preview" : "visitor"}
           />
+        ) : null}
+
+        {tracksProgress && total > 0 && done === total ? (
+          <Link
+            href={routes.course(courseId)}
+            className="mt-6 flex items-center gap-3 rounded-card border border-success/30 bg-success-soft px-4 py-3 text-[14px] text-success hover:bg-success-soft/70"
+          >
+            <Award className="size-5 shrink-0" />
+            <span className="flex-1">
+              <span className="font-semibold">Formation terminée, bravo !</span>{" "}
+              {certificateEnabled(course)
+                ? "Ton certificat t'attend sur la page de la formation."
+                : "Retrouve ton parcours sur la page de la formation."}
+            </span>
+            <ArrowRight className="size-4 shrink-0" />
+          </Link>
         ) : null}
 
         {assistantSettings?.enabled && course.assistant && !lock && (tracksProgress || isOwner) ? (

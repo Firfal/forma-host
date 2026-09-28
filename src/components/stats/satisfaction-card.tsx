@@ -67,6 +67,7 @@ export function SatisfactionCard({
               </p>
             </div>
             <BarList
+              numbered={false}
               title="Répartition des notes"
               rows={summary.distribution.map((row) => ({
                 key: String(row.rating),

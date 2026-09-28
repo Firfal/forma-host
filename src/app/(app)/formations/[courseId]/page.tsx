@@ -1,6 +1,7 @@
 "use client";
 
 import { FileCheck2, MessagesSquare, PlayCircle } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -15,7 +16,6 @@ import { PageContainer } from "@/components/layout/page";
 import { CertificateButton } from "@/components/learn/certificate-button";
 import { CourseAnnouncements } from "@/components/learn/course-announcements";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
-import { CourseReviewCard } from "@/components/learn/course-review-card";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
 import { useStudentCourse } from "@/components/learn/student-course-context";
@@ -25,6 +25,11 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreator } from "@/lib/creator";
 import { callOpenConversation, errorMessage } from "@/lib/firebase/callables";
+
+// Avis de fin de formation : téléchargé seulement pour les élèves inscrits.
+const CourseReviewCard = dynamic(() =>
+  import("@/components/learn/course-review-card").then((m) => m.CourseReviewCard),
+);
 
 /** Ouvre (ou crée) la conversation avec l'école de la formation. */
 function WriteToSchoolButton({ schoolId }: { schoolId: string }) {
