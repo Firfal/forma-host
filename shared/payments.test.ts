@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  discountedAmount,
   formatPrice,
   installmentLabel,
   installmentPlan,
   isLiveKey,
   parsePriceInput,
   promoLabel,
+  promoRedemptions,
   sameStripeMode,
 } from "./payments";
 import { coursePriceSchema, promoCodeInput } from "./payments-input";
@@ -85,5 +87,24 @@ describe("paiement en plusieurs fois", () => {
     expect(
       coursePriceSchema.safeParse({ amount: 19700, currency: "eur", installments: [6] }).success,
     ).toBe(false);
+  });
+});
+
+describe("remises des codes promo", () => {
+  it("pourcentage arrondi au centime, montant fixe jamais négatif", () => {
+    expect(discountedAmount(19700, { kind: "percent", value: 20 })).toBe(15760);
+    expect(discountedAmount(9999, { kind: "percent", value: 15 })).toBe(8499);
+    expect(discountedAmount(19700, { kind: "amount", value: 5000 })).toBe(14700);
+    expect(discountedAmount(1000, { kind: "amount", value: 5000 })).toBe(0);
+  });
+
+  it("échéancier recalculé sur le prix remisé", () => {
+    const total = discountedAmount(19700, { kind: "percent", value: 20 });
+    expect(installmentPlan(total, 3)).toEqual({ count: 3, first: 5254, monthly: 5253 });
+  });
+
+  it("utilisations en une fois (Stripe) et en plusieurs fois (plateforme)", () => {
+    expect(promoRedemptions({ timesRedeemed: 2, installmentRedemptions: 3 })).toBe(5);
+    expect(promoRedemptions({ timesRedeemed: 2 })).toBe(2);
   });
 });

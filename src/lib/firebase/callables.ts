@@ -23,7 +23,13 @@ import type {
 import type { SchoolDomain, SchoolDomainInput } from "@shared/domains";
 import type { SchoolLegalInput } from "@shared/legal";
 import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
-import type { CreateCheckoutInput, PromoCodeIdInput, PromoCodeInput } from "@shared/payments-input";
+import type { CheckedPromo } from "@shared/payments";
+import type {
+  CheckPromoInput,
+  CreateCheckoutInput,
+  PromoCodeIdInput,
+  PromoCodeInput,
+} from "@shared/payments-input";
 import type {
   InviteSchoolAdminInput,
   RemoveSchoolAdminInput,
@@ -83,6 +89,7 @@ export const callCreateCheckoutSession = callable<CreateCheckoutInput, { url: st
   "createCheckoutSession",
 );
 export const callCreatePromoCode = callable<PromoCodeInput, { id: string }>("createPromoCode");
+export const callCheckPromoCode = callable<CheckPromoInput, CheckedPromo>("checkPromoCode");
 export const callSyncPromoCodes = callable<CourseIdInput, { ok: true }>("syncPromoCodes");
 export const callDeactivatePromoCode = callable<PromoCodeIdInput, { ok: true }>(
   "deactivatePromoCode",

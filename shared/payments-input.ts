@@ -22,8 +22,16 @@ export const createCheckoutInput = z.object({
   installments: z.number().int().min(2).max(4).nullish(),
   /** CGV acceptées et renonciation au droit de rétractation (accès immédiat). */
   acceptTerms: z.literal(true, { message: "Accepte les conditions pour continuer" }),
+  /** Code promo saisi dans la fenêtre de commande (vérifié par le serveur). */
+  promoCode: z.string().trim().toUpperCase().max(30).nullish(),
 });
 export type CreateCheckoutInput = z.infer<typeof createCheckoutInput>;
+
+export const checkPromoInput = z.object({
+  courseId: z.string().min(1).max(128),
+  code: z.string().trim().toUpperCase().min(1, "Saisis un code").max(30, "Code invalide"),
+});
+export type CheckPromoInput = z.infer<typeof checkPromoInput>;
 
 export const promoCodeInput = z
   .object({
@@ -39,6 +47,8 @@ export const promoCodeInput = z
     maxRedemptions: z.number().int().min(1).max(100_000).nullish(),
     /** Date d'expiration (ISO 8601). */
     expiresAt: z.iso.datetime({ offset: true }).nullish(),
+    /** Valable aussi en paiement en plusieurs fois (choix du formateur, oui par défaut). */
+    installments: z.boolean().nullish(),
   })
   .superRefine((value, ctx) => {
     if (value.kind === "percent" && value.value > 100) {

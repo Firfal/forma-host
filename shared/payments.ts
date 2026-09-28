@@ -94,11 +94,40 @@ export interface PromoCodeDoc<T = unknown> {
   stripeCouponId: string;
   /** Compte Stripe de l'école au moment de la création (absent sur les codes plus anciens). */
   stripeAccountId?: string;
+  /** Valable aussi en paiement en plusieurs fois (absent : oui). */
+  installments?: boolean;
+  /** Utilisations en plusieurs fois (comptées par la plateforme, pas par Stripe). */
+  installmentRedemptions?: number;
   createdAt: T;
 }
 
 export function promoLabel(promo: Pick<PromoCodeDoc, "kind" | "value">): string {
   return promo.kind === "percent" ? `-${promo.value} %` : `-${formatPrice(promo.value)}`;
+}
+
+export type PromoDiscount = Pick<PromoCodeDoc, "kind" | "value">;
+
+/** Prix après remise (centimes), jamais négatif. */
+export function discountedAmount(amount: number, promo: PromoDiscount): number {
+  const discounted =
+    promo.kind === "percent"
+      ? Math.round((amount * (100 - promo.value)) / 100)
+      : amount - promo.value;
+  return Math.max(0, discounted);
+}
+
+/** Utilisations d'un code, tous modes de paiement confondus. */
+export function promoRedemptions(
+  promo: Pick<PromoCodeDoc, "timesRedeemed" | "installmentRedemptions">,
+): number {
+  return promo.timesRedeemed + (promo.installmentRedemptions ?? 0);
+}
+
+/** Code promo vérifié avant le paiement (fenêtre de commande). */
+export interface CheckedPromo extends PromoDiscount {
+  code: string;
+  /** Valable en paiement en plusieurs fois. */
+  installments: boolean;
 }
 
 /** Échéancier d'un achat en plusieurs fois (abonnement Stripe arrêté après la dernière). */

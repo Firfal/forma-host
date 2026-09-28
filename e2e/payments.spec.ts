@@ -52,6 +52,15 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
   );
   await expect(buyer.getByText("ou en 3 fois sans frais").first()).toBeVisible();
   await order.getByRole("radio", { name: /En 3 fois sans frais/ }).check();
+  // Code promo saisi à la commande : échéancier recalculé sur le prix remisé (157,60 €).
+  await order.getByRole("button", { name: "J'ai un code promo" }).click();
+  await order.getByLabel("Code promo").fill("inconnu");
+  await order.getByRole("button", { name: "Appliquer" }).click();
+  await expect(order.getByText("Code promo invalide ou expiré.")).toBeVisible();
+  await order.getByLabel("Code promo").fill("bienvenue");
+  await order.getByRole("button", { name: "Appliquer" }).click();
+  await expect(order.getByText(/Code\s+BIENVENUE/)).toBeVisible();
+  await expect(order.getByText(/52,54\s€ aujourd'hui, puis 2 × 52,53\s€ par mois/)).toBeVisible();
   await order.getByRole("checkbox").check();
   await pay.click();
   await expect(buyer.getByText("Merci pour ton achat !")).toBeVisible();
@@ -76,6 +85,8 @@ test("vente directe : Stripe relié, prix, code promo, achat puis accès", async
   await expect(page.getByText("Test", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Facture" })).toBeVisible();
   await expect(page.getByText("3× · 1/3")).toBeVisible();
+  // Code utilisé en plusieurs fois : compté par la plateforme.
+  await expect(page.getByText(/^1 utilisation/)).toBeVisible();
   await page.fill("#course-price", "");
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByText("Vente directe désactivée")).toBeVisible();

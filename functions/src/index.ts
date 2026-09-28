@@ -40,7 +40,12 @@ import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
 import { schoolLegalInput } from "@shared/legal";
 import { mailSettingsInput } from "@shared/mail-settings";
-import { createCheckoutInput, promoCodeIdInput, promoCodeInput } from "@shared/payments-input";
+import {
+  checkPromoInput,
+  createCheckoutInput,
+  promoCodeIdInput,
+  promoCodeInput,
+} from "@shared/payments-input";
 import { inviteSchoolAdminInput, removeSchoolAdminInput, schoolIdInput } from "@shared/school";
 import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";
@@ -84,6 +89,7 @@ import {
   stripeKey,
 } from "./params";
 import {
+  checkPromoCode as checkPromoCodeImpl,
   completeCheckout,
   connectStripe as connectStripeImpl,
   createCheckout,
@@ -1038,11 +1044,11 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
       client,
       termsAcceptedAt,
       installments: input.installments ?? null,
+      promoCode: input.promoCode ?? null,
     });
     if (fakePayments && course) {
       // Émulateurs : paiement simulé, validé tout de suite (le webhook ne passe pas).
       const stripe = (await db().doc(`creators/${course.creatorId}/private/stripe`).get()).data();
-      const price = (course as { price?: { amount: number } }).price;
       await completeCheckout(
         {
           sessionId: session.id,
@@ -1050,10 +1056,11 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
           courseId: input.courseId,
           email: email ?? "acheteur@exemple.fr",
           name: null,
-          amount: price?.amount ?? 0,
+          amount: session.total,
           currency: "eur",
           paymentIntentId: input.installments ? null : `pi_${session.id}`,
-          promoCode: null,
+          promoCode: session.promo?.code ?? null,
+          promoId: session.promo?.id ?? null,
           livemode: false,
           termsAcceptedAt,
           installments: input.installments
@@ -1066,9 +1073,20 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
             : null,
         },
         appUrlFor,
+        client,
       );
     }
     return { url: session.url };
+  } catch (error) {
+    paymentError(error);
+  }
+});
+
+/** Vérifie un code promo dans la fenêtre de commande (visiteur ou élève connecté). */
+export const checkPromoCode = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const input = parseInput(checkPromoInput, request.data);
+  try {
+    return await checkPromoCodeImpl(input.courseId, input.code, paymentsClient());
   } catch (error) {
     paymentError(error);
   }
@@ -1164,7 +1182,8 @@ export const stripeWebhook = onRequest(
                 typeof session.payment_intent === "string"
                   ? session.payment_intent
                   : (session.payment_intent?.id ?? null),
-              promoCode: null,
+              promoCode: session.metadata?.promoCode || null,
+              promoId: session.metadata?.promoId || null,
               livemode: event.livemode,
               termsAcceptedAt: session.metadata?.termsAcceptedAt ?? null,
               billingAddress: formatPostalAddress(session.customer_details?.address),
@@ -1179,6 +1198,7 @@ export const stripeWebhook = onRequest(
                   : null,
             },
             appUrlFor,
+            stripeClient(key),
           );
           break;
         }

@@ -1,10 +1,13 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import Stripe from "stripe";
 import {
+  discountedAmount,
   installmentPlan,
   isLiveKey,
   MIN_INSTALLMENTS_PRICE_CENTS,
+  MIN_PRICE_CENTS,
   sameStripeMode,
+  type CheckedPromo,
   type CoursePrice,
   type OrderDoc,
   type OrderInstallments,
@@ -44,6 +47,10 @@ export interface CheckoutRequest {
   termsAcceptedAt: string;
   /** Paiement en plusieurs fois : abonnement mensuel arrêté après la dernière échéance. */
   installments: { count: number; first: number; monthly: number } | null;
+  /** Montant total dû (prix, ou prix remisé par le code promo). */
+  total: number;
+  /** Code promo saisi dans la fenêtre de commande. */
+  promo: { id: string; code: string; promotionCodeId: string } | null;
 }
 
 /** Rappel affiché sous le bouton de paiement Stripe. */
@@ -115,8 +122,10 @@ export function stripeClient(secretKey: string): PaymentsClient {
         courseId: request.courseId,
         schoolId: request.schoolId,
         termsAcceptedAt: request.termsAcceptedAt,
-        totalAmount: String(request.price.amount),
+        totalAmount: String(request.total),
         installments: request.installments ? String(request.installments.count) : "",
+        promoCode: request.promo?.code ?? "",
+        promoId: request.promo?.id ?? "",
       };
       const common = {
         ...(request.email ? { customer_email: request.email } : {}),
@@ -173,7 +182,11 @@ export function stripeClient(secretKey: string): PaymentsClient {
                 },
               },
             ],
-            allow_promotion_codes: true,
+            // Code saisi dans la fenêtre de commande : appliqué (et compté) par Stripe ; sinon
+            // l'acheteur peut encore en saisir un sur la page de paiement.
+            ...(request.promo
+              ? { discounts: [{ promotion_code: request.promo.promotionCodeId }] }
+              : { allow_promotion_codes: true }),
           };
       const session = await stripe.checkout.sessions.create(params, {
         stripeAccount: request.accountId,
@@ -323,6 +336,58 @@ async function ensureProduct(
   return productId;
 }
 
+/**
+ * Code promo actif de la formation sur le compte Stripe actuel : non expiré, sous son nombre
+ * maximal d'utilisations (en une fois et en plusieurs fois).
+ */
+async function findActivePromo(courseId: string, code: string, accountId: string) {
+  const snap = await db()
+    .collection(`courses/${courseId}/promoCodes`)
+    .where("code", "==", code.trim().toUpperCase())
+    .where("active", "==", true)
+    .limit(1)
+    .get();
+  const doc = snap.docs[0];
+  const promo = doc?.data() as PromoCodeDoc<Timestamp> | undefined;
+  const invalid = new PaymentError("Code promo invalide ou expiré.");
+  if (!doc || !promo) throw invalid;
+  if (promo.stripeAccountId && promo.stripeAccountId !== accountId) throw invalid;
+  if (promo.expiresAt && promo.expiresAt.toMillis() <= Date.now()) throw invalid;
+  const used = promo.timesRedeemed + (promo.installmentRedemptions ?? 0);
+  if (promo.maxRedemptions && used >= promo.maxRedemptions) throw invalid;
+  return { id: doc.id, promo };
+}
+
+async function activeCourseAccount(courseId: string, client: PaymentsClient) {
+  const course = (await db().doc(`courses/${courseId}`).get()).data() as CourseDoc | undefined;
+  if (!course || course.status !== "published") throw new PaymentError("Formation introuvable.");
+  if (!course.price) throw new PaymentError("Cette formation n'est pas en vente.");
+  const stripe = await schoolStripe(course.creatorId, client.livemode);
+  if (!stripe?.chargesEnabled) {
+    throw new PaymentError("Le paiement en ligne n'est pas encore activé pour cette formation.");
+  }
+  return { course, price: course.price, stripe };
+}
+
+/** Vérifie un code promo saisi dans la fenêtre de commande (prix remisé affiché avant paiement). */
+export async function checkPromoCode(
+  courseId: string,
+  code: string,
+  client: PaymentsClient,
+): Promise<CheckedPromo> {
+  const { price, stripe } = await activeCourseAccount(courseId, client);
+  const { promo } = await findActivePromo(courseId, code, stripe.accountId);
+  if (discountedAmount(price.amount, promo) < MIN_PRICE_CENTS) {
+    throw new PaymentError("Ce code ne peut pas s'appliquer à ce prix.");
+  }
+  return {
+    code: promo.code,
+    kind: promo.kind,
+    value: promo.value,
+    installments: promo.installments !== false,
+  };
+}
+
 /** Session de paiement pour une formation publiée, avec prix et compte Stripe actif. */
 export async function createCheckout(params: {
   courseId: string;
@@ -332,7 +397,14 @@ export async function createCheckout(params: {
   termsAcceptedAt?: string;
   /** Nombre d'échéances (paiement en plusieurs fois) ; absent : paiement unique. */
   installments?: number | null;
-}): Promise<{ id: string; url: string }> {
+  /** Code promo saisi dans la fenêtre de commande. */
+  promoCode?: string | null;
+}): Promise<{
+  id: string;
+  url: string;
+  total: number;
+  promo: { id: string; code: string } | null;
+}> {
   const course = (await db().doc(`courses/${params.courseId}`).get()).data() as
     CourseDoc | undefined;
   if (!course || course.status !== "published") throw new PaymentError("Formation introuvable.");
@@ -349,9 +421,27 @@ export async function createCheckout(params: {
   if (!stripe?.chargesEnabled) {
     throw new PaymentError("Le paiement en ligne n'est pas encore activé pour cette formation.");
   }
+  // Code promo : en une fois, appliqué par Stripe ; en plusieurs fois, l'échéancier est
+  // calculé sur le prix remisé (si le formateur a ouvert ce code au paiement échelonné).
+  let promo: { id: string; code: string; promotionCodeId: string } | null = null;
+  let total = course.price.amount;
+  if (params.promoCode) {
+    const found = await findActivePromo(params.courseId, params.promoCode, stripe.accountId);
+    if (count && found.promo.installments === false) {
+      throw new PaymentError("Ce code promo n'est valable qu'en paiement en une fois.");
+    }
+    total = discountedAmount(course.price.amount, found.promo);
+    if (total < MIN_PRICE_CENTS)
+      throw new PaymentError("Ce code ne peut pas s'appliquer à ce prix.");
+    promo = {
+      id: found.id,
+      code: found.promo.code,
+      promotionCodeId: found.promo.stripePromotionCodeId,
+    };
+  }
   const creator = (await db().doc(`creators/${course.creatorId}`).get()).data() as CreatorDoc;
   const productId = await ensureProduct(params.courseId, course, stripe.accountId, params.client);
-  return params.client.createCheckout({
+  const session = await params.client.createCheckout({
     accountId: stripe.accountId,
     productId,
     price: course.price,
@@ -361,8 +451,11 @@ export async function createCheckout(params: {
     successUrl: `${params.appUrl}/merci?session={CHECKOUT_SESSION_ID}&formation=${params.courseId}`,
     cancelUrl: `${params.appUrl}${routes.salesPage(creator.slug, course.slug)}`,
     termsAcceptedAt: params.termsAcceptedAt ?? new Date().toISOString(),
-    installments: count ? installmentPlan(course.price.amount, count) : null,
+    installments: count ? installmentPlan(total, count) : null,
+    total,
+    promo,
   });
+  return { ...session, total, promo: promo ? { id: promo.id, code: promo.code } : null };
 }
 
 export interface CompletedCheckout {
@@ -375,6 +468,8 @@ export interface CompletedCheckout {
   currency: string;
   paymentIntentId: string | null;
   promoCode: string | null;
+  /** Code promo saisi dans la fenêtre de commande (compté ici en paiement échelonné). */
+  promoId?: string | null;
   livemode: boolean;
   termsAcceptedAt?: string | null;
   billingAddress?: string | null;
@@ -387,10 +482,39 @@ export interface CompletedCheckout {
   } | null;
 }
 
+/**
+ * Utilisation d'un code promo en paiement échelonné (Stripe ne la voit pas) : comptée, et le
+ * code est désactivé chez Stripe aussi quand il atteint son maximum d'utilisations.
+ */
+async function countInstallmentRedemption(
+  courseId: string,
+  promoId: string,
+  accountId: string,
+  client: PaymentsClient | undefined,
+): Promise<void> {
+  const ref = db().doc(`courses/${courseId}/promoCodes/${promoId}`);
+  const exhausted = await db().runTransaction(async (tx) => {
+    const promo = (await tx.get(ref)).data() as PromoCodeDoc | undefined;
+    if (!promo) return null;
+    const installmentRedemptions = (promo.installmentRedemptions ?? 0) + 1;
+    const full = Boolean(
+      promo.maxRedemptions && promo.timesRedeemed + installmentRedemptions >= promo.maxRedemptions,
+    );
+    tx.update(ref, { installmentRedemptions, ...(full ? { active: false } : {}) });
+    return full ? promo : null;
+  });
+  if (exhausted && client) {
+    await client
+      .deactivatePromo(accountId, exhausted.stripePromotionCodeId)
+      .catch((error) => console.error(`Code promo ${promoId}`, error));
+  }
+}
+
 /** Paiement réussi : commande enregistrée et accès donné (idempotent, les webhooks sont rejoués). */
 export async function completeCheckout(
   checkout: CompletedCheckout,
   appUrlFor: (schoolId: string) => Promise<string>,
+  client?: PaymentsClient,
 ): Promise<void> {
   const account = (await db().doc(`stripeAccounts/${checkout.accountId}`).get()).data() as
     { schoolId: string } | undefined;
@@ -434,6 +558,14 @@ export async function completeCheckout(
       : FieldValue.serverTimestamp(),
   };
   await orderRef.set(order, { merge: true });
+  if (!existing && plan && checkout.promoId) {
+    await countInstallmentRedemption(
+      checkout.courseId,
+      checkout.promoId,
+      checkout.accountId,
+      client,
+    ).catch((error) => console.error(`Code promo de la commande ${checkout.sessionId}`, error));
+  }
   // La facture ne doit jamais bloquer l'accès : une erreur est journalisée, pas propagée.
   await issueInvoice(checkout.sessionId).catch((error) =>
     console.error(`Facture de la commande ${checkout.sessionId}`, error),
@@ -628,6 +760,8 @@ export async function createPromoCode(
       expiresAt: input.expiresAt ? Timestamp.fromMillis(Date.parse(input.expiresAt)) : null,
       active: true,
       timesRedeemed: 0,
+      installments: input.installments ?? true,
+      installmentRedemptions: 0,
       stripePromotionCodeId: created.promotionCodeId,
       stripeCouponId: created.couponId,
       stripeAccountId: stripe.accountId,

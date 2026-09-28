@@ -12,6 +12,7 @@ import {
   MIN_INSTALLMENTS_PRICE_CENTS,
   parsePriceInput,
   promoLabel,
+  promoRedemptions,
   sameStripeMode,
   type OrderDoc,
   type PromoCodeDoc,
@@ -129,7 +130,7 @@ function PriceCard({ course, stripeActive }: { course: CourseWithId; stripeActiv
             </legend>
             <p className="text-[13px] text-muted">
               {installmentsAllowed
-                ? "Mensualités prélevées automatiquement ; accès dès le premier paiement. Les codes promo s'appliquent au paiement en une fois."
+                ? "Mensualités prélevées automatiquement ; accès dès le premier paiement. Un code promo réduit l'ensemble des échéances (sauf s'il est réservé au paiement en une fois)."
                 : "Disponible à partir de 50 €."}
             </p>
             <div className="space-y-1.5">
@@ -176,6 +177,7 @@ function PromoCodesCard({ course }: { course: CourseWithId }) {
   const [value, setValue] = useState("");
   const [maxRedemptions, setMaxRedemptions] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [forInstallments, setForInstallments] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
   async function create(event: FormEvent) {
@@ -188,6 +190,7 @@ function PromoCodesCard({ course }: { course: CourseWithId }) {
       value: numeric,
       maxRedemptions: maxRedemptions ? Number(maxRedemptions) : null,
       expiresAt: expiresAt ? new Date(`${expiresAt}T23:59:59`).toISOString() : null,
+      installments: forInstallments,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Code promo invalide");
@@ -201,6 +204,7 @@ function PromoCodesCard({ course }: { course: CourseWithId }) {
       setValue("");
       setMaxRedemptions("");
       setExpiresAt("");
+      setForInstallments(true);
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -244,7 +248,8 @@ function PromoCodesCard({ course }: { course: CourseWithId }) {
       </CardHeader>
       <CardBody className="space-y-4">
         <p className="text-[13px] text-muted">
-          Tes élèves saisissent le code sur la page de paiement Stripe.
+          Tes élèves saisissent le code au moment de commander : le prix remisé (et
+          l&apos;échéancier) s&apos;affiche avant le paiement.
         </p>
         {promos.length ? (
           <ul className="divide-y divide-line-soft rounded-md border border-line text-sm">
@@ -253,10 +258,11 @@ function PromoCodesCard({ course }: { course: CourseWithId }) {
                 <Tag className="size-4 text-muted" />
                 <span className="font-mono font-semibold">{promo.code}</span>
                 <Badge tone="brand">{promoLabel(promo)}</Badge>
+                {promo.installments === false ? <Badge>En une fois seulement</Badge> : null}
                 <span className="text-[13px] text-muted">
-                  {promo.timesRedeemed}
+                  {promoRedemptions(promo)}
                   {promo.maxRedemptions ? ` / ${promo.maxRedemptions}` : ""} utilisation
-                  {promo.timesRedeemed > 1 ? "s" : ""}
+                  {promoRedemptions(promo) > 1 ? "s" : ""}
                   {promo.expiresAt ? ` · jusqu'au ${formatDate(promo.expiresAt)}` : ""}
                 </span>
                 <span className="ml-auto">
@@ -323,6 +329,15 @@ function PromoCodesCard({ course }: { course: CourseWithId }) {
               onChange={(e) => setExpiresAt(e.target.value)}
             />
           </Field>
+          <label className="flex items-center gap-2 text-[14px] sm:col-span-2">
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--color-ink)]"
+              checked={forInstallments}
+              onChange={(e) => setForInstallments(e.target.checked)}
+            />
+            Valable aussi en paiement en plusieurs fois
+          </label>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={busy !== null || !code.trim() || !value.trim()}>
               {busy === "create" ? "Création…" : "Créer le code"}
