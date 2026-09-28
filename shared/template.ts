@@ -1,5 +1,3 @@
-import { brandPalette } from "./color";
-
 /** Rendu des modèles d'email ({{variable}}). Toutes les valeurs sont échappées. */
 
 export function escapeHtml(value: string): string {
@@ -46,10 +44,7 @@ export function emailLayout({
   brandColor,
   footer,
 }: EmailLayoutInput): string {
-  // Couleur de l'école, assombrie si besoin pour que le bouton reste lisible.
-  const button = /^#[0-9a-f]{6}$/i.test(brandColor)
-    ? brandPalette(brandColor)
-    : { brand: "#06040e", ink: "#ffffff" };
+  const color = /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#06040e";
   return `<!doctype html>
 <html lang="fr">
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Inter,Arial,sans-serif;color:#06040e">
@@ -59,7 +54,7 @@ export function emailLayout({
         <tr><td style="padding:24px 32px 0;font-size:16px;font-weight:600">${escapeHtml(brandName)}</td></tr>
         <tr><td style="padding:24px 32px 8px;font-size:15px;line-height:1.6">${bodyHtml}</td></tr>
         <tr><td style="padding:0 32px 32px">
-          <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:${button.brand};color:${button.ink};text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:6px">${escapeHtml(ctaLabel)}</a>
+          <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background:${color};color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 20px;border-radius:6px">${escapeHtml(ctaLabel)}</a>
         </td></tr>
       </table>
       <p style="font-size:12px;color:#717073;margin:16px 0 0">${escapeHtml(footer ?? "")}</p>

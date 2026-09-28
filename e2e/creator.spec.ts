@@ -121,6 +121,9 @@ test("le profil de l'école se modifie dans Paramètres", async ({ page }) => {
   await page.locator("#school-slug").blur();
   await expect(page.locator("#school-slug")).toHaveValue("motion-academy");
   await page.fill("#school-color", "#12a150");
+  // Couleur claire : simple conseil, la couleur choisie est gardée telle quelle.
+  await expect(page.getByText(/Texte blanc peu lisible/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Utiliser #0e8140" })).toBeVisible();
   await page.getByRole("button", { name: "Enregistrer" }).first().click();
   await expect(page.getByText("École enregistrée")).toBeVisible();
   await expect(page.getByRole("complementary").getByText("Motion Academy")).toBeVisible();

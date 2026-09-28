@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { brandContrastAdvice } from "@shared/color";
 import { routes, storagePaths } from "@shared/paths";
 import { schoolProfileInput } from "@shared/school";
 import { slugify } from "@shared/slug";
@@ -101,6 +102,7 @@ export function SchoolSettingsCard() {
 
   const slugChanged = creator && form.slug !== creator.slug;
 
+  const contrast = brandContrastAdvice(form.brandColor);
   return (
     <Card>
       <CardHeader>
@@ -182,6 +184,25 @@ export function SchoolSettingsCard() {
                   maxLength={7}
                 />
               </div>
+              {contrast ? (
+                <p className="mt-1.5 text-[12px] text-warning">
+                  Texte blanc peu lisible sur cette couleur (contraste{" "}
+                  {contrast.ratio.toFixed(1).replace(".", ",")}:1, 4,5:1 conseillé).
+                  {contrast.suggestion ? (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        className="font-medium underline"
+                        onClick={() => update("brandColor", contrast.suggestion!)}
+                      >
+                        Utiliser {contrast.suggestion}
+                      </button>
+                      , une teinte proche plus lisible.
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
             </Field>
             <Field
               label="Email de support"
