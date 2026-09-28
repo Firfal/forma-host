@@ -250,6 +250,18 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time;
       }
 
+      // Directs (Zoom, Meet…) : programmés par l'équipe, vus par les inscrits.
+      match /lives/{liveId} {
+        allow read: if isCourseAdmin(courseId) || isEnrolled(courseId);
+        allow create: if isCourseAdmin(courseId)
+          && isValidLive(courseId, request.resource.data)
+          && request.resource.data.createdAt == request.time;
+        allow update: if isCourseAdmin(courseId)
+          && isValidLive(courseId, request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isCourseAdmin(courseId);
+      }
+
       // Annonces aux élèves, publiées par la callable publishAnnouncement.
       match /announcements/{announcementId} {
         allow read: if isCourseAdmin(courseId) || isEnrolled(courseId);
@@ -318,6 +330,25 @@ service cloud.firestore {
         || (exercise is map
           && exercise.keys().hasOnly(['instructions'])
           && isShortString(exercise.instructions, 0, 3000));
+    }
+
+    function isHttpUrl(value) {
+      return isShortString(value, 8, 2000) && value.matches('^https?://.+');
+    }
+
+    function isValidLive(courseId, data) {
+      return data.keys().hasOnly([
+          'creatorId', 'courseId', 'title', 'description', 'startsAt', 'durationMin', 'joinUrl',
+          'replayUrl', 'createdAt', 'updatedAt'])
+        && data.creatorId == course(courseId).creatorId
+        && data.courseId == courseId
+        && isShortString(data.title, 1, 120)
+        && isShortString(data.description, 0, 2000)
+        && data.startsAt is timestamp
+        && data.durationMin is int && data.durationMin >= 15 && data.durationMin <= 480
+        && isHttpUrl(data.joinUrl)
+        && (data.replayUrl == null || isHttpUrl(data.replayUrl))
+        && data.updatedAt == request.time;
     }
 
     // Quiz de fin de leçon (sans les bonnes réponses, rangées dans quizKeys).

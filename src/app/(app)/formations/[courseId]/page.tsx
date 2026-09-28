@@ -15,6 +15,7 @@ import { RichText } from "@/components/editor/rich-text";
 import { PageContainer } from "@/components/layout/page";
 import { CertificateButton } from "@/components/learn/certificate-button";
 import { CourseAnnouncements } from "@/components/learn/course-announcements";
+import { CourseLives } from "@/components/learn/course-lives";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
@@ -87,6 +88,7 @@ export default function StudentCoursePage() {
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
         <div className="order-2 space-y-6 lg:order-1">
           <CourseAnnouncements courseId={course.id} />
+          <CourseLives courseId={course.id} courseTitle={course.title} />
           {course.description ? (
             <Card className="p-4">
               <RichText doc={course.description} />

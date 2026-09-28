@@ -60,6 +60,7 @@ export const routes = {
   adminCourseSalesPage: (courseId: string) => `/admin/formations/${courseId}/page-de-vente`,
   adminCourseSales: (courseId: string) => `/admin/formations/${courseId}/vente`,
   adminCourseAnnouncements: (courseId: string) => `/admin/formations/${courseId}/annonces`,
+  adminCourseLives: (courseId: string) => `/admin/formations/${courseId}/directs`,
   thanks: "/merci",
   invoice: (orderId: string) => `/factures/${orderId}`,
   certificate: (id: string) => `/certificats/${id}`,

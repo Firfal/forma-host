@@ -1077,3 +1077,42 @@ describe("communauté d'école", () => {
     await assertSucceeds(deleteDoc(doc(creatorDb(), "communities/theo/posts/p1")));
   });
 });
+
+describe("directs", () => {
+  const live = (overrides: Record<string, unknown> = {}) => ({
+    creatorId: THEO,
+    courseId: "c1",
+    title: "Questions-réponses",
+    description: "",
+    startsAt: Timestamp.fromDate(new Date("2026-10-01T17:00:00Z")),
+    durationMin: 60,
+    joinUrl: "https://meet.google.com/abc",
+    replayUrl: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  it("programmés par l'équipe, vus par les inscrits", async () => {
+    await assertSucceeds(setDoc(doc(creatorDb(), "courses/c1/lives/d1"), live()));
+    await assertSucceeds(setDoc(doc(coAdminDb(), "courses/c1/lives/d2"), live()));
+    await assertFails(setDoc(doc(db(ANNE), "courses/c1/lives/d3"), live()));
+    await assertFails(
+      setDoc(doc(creatorDb(), "courses/c1/lives/d4"), live({ joinUrl: "javascript:alert(1)" })),
+    );
+    await assertFails(setDoc(doc(creatorDb(), "courses/c1/lives/d5"), live({ durationMin: 5 })));
+    await assertSucceeds(getDoc(doc(db(ANNE), "courses/c1/lives/d1")));
+    await assertFails(getDoc(doc(db(STRANGER), "courses/c1/lives/d1")));
+    await assertFails(getDoc(doc(db(REVOKED), "courses/c1/lives/d1")));
+    await assertSucceeds(
+      updateDoc(doc(creatorDb(), "courses/c1/lives/d1"), {
+        replayUrl: "https://vimeo.com/123",
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(db(ANNE), "courses/c1/lives/d1"), { title: "x", updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(deleteDoc(doc(creatorDb(), "courses/c1/lives/d1")));
+  });
+});

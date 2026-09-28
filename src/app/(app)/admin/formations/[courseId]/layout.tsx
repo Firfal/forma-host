@@ -16,6 +16,7 @@ const tabs = [
   { segment: null, label: "Élèves", href: routes.adminCourse },
   { segment: "contenu", label: "Contenu", href: routes.adminCourseContent },
   { segment: "annonces", label: "Annonces", href: routes.adminCourseAnnouncements },
+  { segment: "directs", label: "Directs", href: routes.adminCourseLives },
   { segment: "details", label: "Détails", href: routes.adminCourseDetails },
   { segment: "page-de-vente", label: "Page de vente", href: routes.adminCourseSalesPage },
   { segment: "vente", label: "Vente", href: routes.adminCourseSales },

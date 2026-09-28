@@ -187,7 +187,8 @@ export type NotificationType =
   | "new_submission"
   | "submission_feedback"
   | "community_post"
-  | "community_reply";
+  | "community_reply"
+  | "live_scheduled";
 
 export interface NotificationDoc<T = TimestampLike> {
   type: NotificationType;

@@ -10,6 +10,7 @@ import {
   Globe,
   GraduationCap,
   Megaphone,
+  Radio,
   MessageSquare,
   MessagesSquare,
   UsersRound,
@@ -46,6 +47,7 @@ const icons: Record<NotificationType, typeof Bell> = {
   submission_feedback: ClipboardCheck,
   community_post: UsersRound,
   community_reply: UsersRound,
+  live_scheduled: Radio,
 };
 
 export function NotificationsBell({ className }: { className?: string }) {

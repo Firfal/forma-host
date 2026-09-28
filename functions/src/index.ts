@@ -1,5 +1,5 @@
 import "./setup";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type Timestamp } from "firebase-admin/firestore";
 import {
   onDocumentCreated,
   onDocumentDeleted,
@@ -34,6 +34,7 @@ import {
   type CommunityReplyDoc,
 } from "@shared/community";
 import type { FeedbackDoc, SubmissionDoc } from "@shared/exercises";
+import type { LiveDoc } from "@shared/lives";
 import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
 import { schoolLegalInput } from "@shared/legal";
@@ -132,6 +133,7 @@ import {
   setCommunityEnabled,
 } from "./community";
 import { handleNewFeedback, handleNewSubmission, handleSubmissionReviewed } from "./exercises";
+import { handleNewLive } from "./lives";
 import {
   AssistantError,
   anthropicAssistant,
@@ -660,6 +662,20 @@ export const onCommunityReplyDeleted = onDocumentDeleted(
       await handleReplyDeleted(event.params.schoolId, event.params.postId);
     } catch (error) {
       logger.error("onCommunityReplyDeleted", error);
+    }
+  },
+);
+
+/** Direct programmé : les élèves inscrits sont prévenus (in-app). */
+export const onLiveCreated = onDocumentCreated(
+  "courses/{courseId}/lives/{liveId}",
+  async (event) => {
+    const live = event.data?.data() as LiveDoc<Timestamp> | undefined;
+    if (!live) return;
+    try {
+      await handleNewLive(event.params.courseId, event.params.liveId, live);
+    } catch (error) {
+      logger.error("onLiveCreated", error);
     }
   },
 );

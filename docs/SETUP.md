@@ -156,6 +156,25 @@ Le déploiement crée une sauvegarde quotidienne de Firestore, conservée 14 jou
   ```
   On y récupère ensuite les documents voulus.
 
+## 9. Options à activer
+
+Tout est livré désactivé : rien ne change pour les élèves tant qu'une option n'est pas activée.
+
+- **Assistant IA** (réponses aux questions des élèves à partir du contenu des formations) :
+  1. Crée une clé sur [console.anthropic.com](https://console.anthropic.com) > *API Keys* (la
+     consommation est facturée sur ce compte ; 30 questions par élève et par jour au maximum).
+  2. Dans l'app, *Plateforme > Vue d'ensemble > Assistant IA* : colle la clé (jamais dans un
+     chat ni un email). Elle est vérifiée puis enregistrée chiffrée.
+  3. Sur chaque formation concernée : *Détails > Assistant IA > Activé*.
+- **Communauté d'école** : *Admin > Communauté > Ouvrir la communauté*. Les élèves inscrits
+  la voient dans leur barre latérale ; tu peux la fermer à tout moment (les messages restent).
+- **Qualiopi / financements** : renseigne le numéro de déclaration d'activité dans *Paramètres >
+  Informations légales*. Attestation d'assiduité : menu « … » d'un élève dans la formation
+  (l'élève la retrouve aussi sur la page de sa formation). Avis de fin de formation :
+  *Statistiques > Satisfaction des élèves*.
+- **Quiz, exercices à rendre, ouverture progressive** : dans chaque leçon ou dans *Détails* de la
+  formation.
+
 ## Déployer à la main (alternative)
 
 ```bash
