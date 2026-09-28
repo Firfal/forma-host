@@ -1,6 +1,6 @@
 "use client";
 
-import { MessagesSquare, PlayCircle } from "lucide-react";
+import { FileCheck2, MessagesSquare, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -8,13 +8,14 @@ import { toast } from "sonner";
 import { certificateEnabled, isCourseCompleted } from "@shared/certificates";
 import { lockLabel } from "@shared/drip";
 import { completedCount, resumeLesson, visibleLessons } from "@shared/outline";
-import { routes } from "@shared/paths";
+import { enrollmentId, routes } from "@shared/paths";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
 import { RichText } from "@/components/editor/rich-text";
 import { PageContainer } from "@/components/layout/page";
 import { CertificateButton } from "@/components/learn/certificate-button";
 import { CourseAnnouncements } from "@/components/learn/course-announcements";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
+import { CourseReviewCard } from "@/components/learn/course-review-card";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
 import { useStudentCourse } from "@/components/learn/student-course-context";
@@ -94,6 +95,14 @@ export default function StudentCoursePage() {
             locks={locks}
             variant="cards"
           />
+          {enrollment?.status === "active" && !isOwner ? (
+            <CourseReviewCard
+              courseId={course.id}
+              creatorId={course.creatorId}
+              done={done}
+              total={total}
+            />
+          ) : null}
         </div>
         <Card className="order-1 overflow-hidden lg:sticky lg:top-6 lg:order-2">
           <CourseThumbnail src={course.thumbnailUrl} title={course.title} />
@@ -130,6 +139,14 @@ export default function StudentCoursePage() {
             ) : null}
             {!isOwner && enrollment?.status === "active" ? (
               <WriteToSchoolButton schoolId={course.creatorId} />
+            ) : null}
+            {enrollment && done > 0 ? (
+              <Link
+                href={routes.attendance(enrollmentId(course.id, enrollment.uid))}
+                className="flex items-center justify-center gap-1.5 text-[13px] text-muted hover:text-ink"
+              >
+                <FileCheck2 className="size-4" /> Attestation d&apos;assiduité
+              </Link>
             ) : null}
           </div>
         </Card>

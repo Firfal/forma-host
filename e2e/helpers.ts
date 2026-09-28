@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 export const THEO = { email: "theo@ecolemotion.com", password: "motion123" };
 export const ANNE = { email: "anne@exemple.fr", password: "eleve123" };
@@ -10,7 +10,28 @@ export async function stubVimeo(page: Page) {
   );
 }
 
+/**
+ * Pages ouvertes par `browser.newPage()` : Playwright ne les ferme pas à la fin du scénario.
+ * Leurs écouteurs temps réel s'accumuleraient au fil de la suite : on ferme celles des
+ * scénarios précédents à la première connexion du suivant.
+ */
+const openPages = new Map<Page, string>();
+
+async function closePagesOfPreviousTests() {
+  const current = test.info().testId;
+  for (const [page, testId] of openPages) {
+    if (testId === current) continue;
+    openPages.delete(page);
+    await page
+      .context()
+      .close()
+      .catch(() => undefined);
+  }
+}
+
 export async function login(page: Page, user: { email: string; password: string }) {
+  await closePagesOfPreviousTests();
+  openPages.set(page, test.info().testId);
   await stubVimeo(page);
   await page.goto("/connexion");
   await page.fill("#email", user.email);

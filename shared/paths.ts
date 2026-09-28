@@ -63,6 +63,7 @@ export const routes = {
   thanks: "/merci",
   invoice: (orderId: string) => `/factures/${orderId}`,
   certificate: (id: string) => `/certificats/${id}`,
+  attendance: (enrollmentId: string) => `/attestations/${enrollmentId}`,
   adminLesson: (courseId: string, lessonId: string) =>
     `/admin/formations/${courseId}/lecons/${lessonId}`,
   adminMembers: "/admin/membres",
@@ -76,6 +77,7 @@ export const routes = {
   messages: "/messages",
   conversation: (conversationId: string) => `/messages/${conversationId}`,
   becomeCreator: "/devenir-formateur",
+  platformOverview: "/plateforme",
   platformRequests: "/plateforme/demandes",
   salesPage: (creatorSlug: string, courseSlug: string) => `/${creatorSlug}/${courseSlug}`,
   creatorPage: (creatorSlug: string) => `/${creatorSlug}`,

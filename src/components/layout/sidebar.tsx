@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   GraduationCap,
   House,
+  LayoutDashboard,
   LayoutGrid,
   LogOut,
   Menu,
@@ -84,6 +85,7 @@ const becomeCreatorNav: NavItem = {
 };
 
 const platformNav: NavItem[] = [
+  { href: routes.platformOverview, label: "Vue d'ensemble", icon: LayoutDashboard, exact: true },
   { href: routes.platformRequests, label: "Demandes formateurs", icon: ShieldCheck },
 ];
 

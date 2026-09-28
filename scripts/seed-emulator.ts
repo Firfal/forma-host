@@ -7,6 +7,7 @@
  * Comptes : theo@ecolemotion.com / motion123 (formateur) — anne@exemple.fr / eleve123 (élève)
  */
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { activityDay } from "../shared/attendance";
 import { DEFAULT_WELCOME_EMAIL } from "../shared/constants";
 import type { OutlineItem, RichText } from "../shared/types";
 import { ensureSchoolOwner } from "./school-owner";
@@ -199,6 +200,21 @@ async function main() {
         lastLessonId: completed ? lessonIds[Math.min(completed, lessonIds.length - 1)] : null,
         lastActivityAt: completed ? daysAgo(Math.max(0, joinedDaysAgo - 1)) : null,
       },
+    });
+  }
+
+  // Assiduité d'Anne (attestation de démo) : trois jours de connexion, 2 h au total.
+  for (const [back, minutes, lessonIds] of [
+    [6, 40, ["l1", "l2"]],
+    [4, 25, ["l2", "l3"]],
+    [1, 55, ["l3", "l4"]],
+  ] as const) {
+    const day = activityDay(daysAgo(back).toDate());
+    await db.doc(`enrollments/${courseId}_${uids.Anne}/activity/${day}`).set({
+      day,
+      seconds: minutes * 60,
+      lessonIds: [...lessonIds],
+      updatedAt: daysAgo(back),
     });
   }
 

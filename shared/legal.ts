@@ -45,6 +45,8 @@ export const schoolLegalInput = z
     vatMode: z.enum(["franchise", "standard", "exempt"]),
     /** Numéro de TVA intracommunautaire (requis avec la TVA à 20 %). */
     vatNumber: optionalText(20),
+    /** Numéro de déclaration d'activité (organisme de formation), facultatif. */
+    trainingNumber: optionalText(20).optional(),
     publisherName: z.string().trim().min(1, "Directeur de la publication requis").max(120),
     contactEmail: emailSchema,
     phone: optionalText(30),
@@ -113,6 +115,11 @@ function sellerLines(info: SchoolLegalInfo): string[] {
     `Adresse : ${info.address}.`,
     vatMention(info),
     `Contact : ${info.contactEmail}${info.phone ? `, ${info.phone}` : ""}.`,
+    ...(info.trainingNumber
+      ? [
+          `Déclaration d'activité enregistrée sous le numéro ${info.trainingNumber} auprès du préfet de région. Cet enregistrement ne vaut pas agrément de l'État.`,
+        ]
+      : []),
   ];
 }
 

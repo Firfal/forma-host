@@ -80,6 +80,8 @@ export interface CourseDoc<T = TimestampLike> {
   certificate?: boolean;
   /** Ouverture progressive des leçons (absent ou null : tout est ouvert). */
   drip?: DripSettings | null;
+  /** Assistant IA sous les leçons (si la plateforme l'a activé). */
+  assistant?: boolean;
   createdAt: T;
   updatedAt: T;
 }

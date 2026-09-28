@@ -58,9 +58,7 @@ test("exercice : l'élève rend sa vidéo, le formateur la commente au bon momen
     await anne.reload();
     await expect(exercise.getByText("Corrigé", { exact: true })).toBeVisible();
     await expect(exercise.getByText("Adoucis l'arrivée du logo.")).toBeVisible();
-    await expect(
-      exercise.getByRole("button", { name: "Revoir le passage à 0:00" }),
-    ).toBeVisible();
+    await expect(exercise.getByRole("button", { name: "Revoir le passage à 0:00" })).toBeVisible();
     await expect(exercise.getByText("Formateur", { exact: true })).toBeVisible();
   } finally {
     await setExercise(theo, false);

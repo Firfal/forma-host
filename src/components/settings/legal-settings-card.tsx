@@ -35,6 +35,7 @@ interface LegalForm {
   publisherName: string;
   contactEmail: string;
   phone: string;
+  trainingNumber: string;
   mediatorName: string;
   mediatorUrl: string;
   refundDays: number;
@@ -83,6 +84,7 @@ export function LegalSettingsCard() {
       publisherName: legal?.publisherName ?? user?.displayName ?? "",
       contactEmail: legal?.contactEmail ?? creator.supportEmail ?? user?.email ?? "",
       phone: legal?.phone ?? "",
+      trainingNumber: legal?.trainingNumber ?? "",
       mediatorName: legal?.mediatorName ?? "",
       mediatorUrl: legal?.mediatorUrl ?? "",
       refundDays: legal?.refundDays ?? 0,
@@ -291,6 +293,20 @@ export function LegalSettingsCard() {
                   value={form.phone}
                   onChange={(e) => update("phone", e.target.value)}
                   maxLength={30}
+                />
+              </Field>
+              <Field
+                label="Déclaration d'activité (facultatif)"
+                htmlFor="legal-training-number"
+                error={errors.trainingNumber}
+                hint="Numéro d'organisme de formation (NDA) : affiché sur les attestations et les mentions légales."
+              >
+                <Input
+                  id="legal-training-number"
+                  value={form.trainingNumber}
+                  onChange={(e) => update("trainingNumber", e.target.value)}
+                  maxLength={20}
+                  placeholder="11 75 12345 75"
                 />
               </Field>
             </div>

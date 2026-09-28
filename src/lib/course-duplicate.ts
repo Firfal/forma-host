@@ -54,6 +54,7 @@ export async function duplicateCourse(course: CourseWithId): Promise<string> {
     price: null,
     ...(course.certificate === false ? { certificate: false } : {}),
     ...(course.drip ? { drip: course.drip } : {}),
+    ...(course.assistant ? { assistant: true } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

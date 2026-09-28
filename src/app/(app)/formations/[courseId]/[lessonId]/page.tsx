@@ -19,11 +19,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AUTO_COMPLETE_RATIO } from "@shared/constants";
 import { adjacentLessons, completedCount, visibleLessons } from "@shared/outline";
-import { routes } from "@shared/paths";
+import { enrollmentId, routes } from "@shared/paths";
+import type { AssistantSettingsDoc } from "@shared/assistant";
 import type { LessonDoc } from "@shared/types";
 import { LessonComments } from "@/components/comments/lesson-comments";
 import { RichText } from "@/components/editor/rich-text";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
+import { LessonAssistant } from "@/components/learn/lesson-assistant";
 import { LessonExercise } from "@/components/learn/lesson-exercise";
 import { LessonQuiz } from "@/components/learn/lesson-quiz";
 import { NoAccess } from "@/components/learn/no-access";
@@ -32,6 +34,7 @@ import { useStudentCourse } from "@/components/learn/student-course-context";
 import { VimeoPlayer, type VimeoProgress } from "@/components/video/vimeo-player";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useActivityTracker } from "@/lib/attendance";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { useCreator } from "@/lib/creator";
@@ -70,6 +73,13 @@ export default function LessonPage() {
     [canView, lock, courseId, lessonId],
   );
   const { data: lesson, loading: lessonLoading } = useDocData<LessonDoc>(lessonRef);
+  const assistantRef = useMemo(() => doc(db, "platform", "assistant"), []);
+  const { data: assistantSettings } = useDocData<AssistantSettingsDoc>(assistantRef);
+  // Assiduité : temps passé sur les leçons ouvertes (élève inscrit seulement).
+  const markActive = useActivityTracker(
+    isEnrolled && user && canView && !lock ? enrollmentId(courseId, user.uid) : null,
+    lessonId,
+  );
 
   const completed = useMemo(() => enrollment?.progress.completedLessonIds ?? [], [enrollment]);
   const completedSet = useMemo(() => new Set(completed), [completed]);
@@ -122,6 +132,7 @@ export default function LessonPage() {
   }
 
   function onProgress(progress: VimeoProgress) {
+    markActive();
     if (progress.seconds - lastSaved.current > 5) {
       lastSaved.current = progress.seconds;
       writeVideoPosition(courseId, lessonId, progress.seconds);
@@ -304,6 +315,10 @@ export default function LessonPage() {
             exercise={lesson.exercise}
             mode={tracksProgress ? "student" : isOwner ? "preview" : "visitor"}
           />
+        ) : null}
+
+        {assistantSettings?.enabled && course.assistant && !lock && (tracksProgress || isOwner) ? (
+          <LessonAssistant key={`assistant-${lessonId}`} courseId={courseId} lessonId={lessonId} />
         ) : null}
 
         <div className="mt-6 flex items-center justify-end gap-2 border-b border-line-soft pb-6">

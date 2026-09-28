@@ -163,9 +163,10 @@ service cloud.firestore {
       return data.keys().hasOnly([
           'creatorId', 'title', 'slug', 'description', 'summary', 'thumbnailUrl', 'status',
           'visibility', 'commentsMode', 'items', 'outlineVersion', 'salesPage', 'price',
-          'certificate', 'drip', 'createdAt', 'updatedAt'])
+          'certificate', 'drip', 'assistant', 'createdAt', 'updatedAt'])
         && isValidPrice(data.get('price', null))
         && data.get('certificate', true) is bool
+        && data.get('assistant', false) is bool
         && isValidDrip(data.get('drip', null))
         && isShortString(data.title, 1, 200)
         && data.slug is string && data.slug.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
@@ -369,6 +370,67 @@ service cloud.firestore {
         && changedOnly(['progress'])
         && isValidProgress(request.resource.data.progress);
       allow create, delete: if false;
+
+      // Temps passé jour par jour (assiduité) : écrit par l'élève, une minute au plus par minute.
+      match /activity/{day} {
+        function enrollment() {
+          return get(/databases/$(database)/documents/enrollments/$(enrollmentId)).data;
+        }
+        function isStudent() {
+          return signedIn()
+            && enrollment().uid == request.auth.uid
+            && enrollment().status == 'active';
+        }
+        allow read: if signedIn()
+          && (enrollment().uid == request.auth.uid || isSchoolAdmin(enrollment().creatorId));
+        allow create: if isStudent() && isValidActivity(day)
+          && request.resource.data.seconds <= 90;
+        allow update: if isStudent() && isValidActivity(day)
+          && request.resource.data.seconds > resource.data.seconds
+          && request.resource.data.seconds <= resource.data.seconds + 90
+          && request.time > resource.data.updatedAt + duration.value(50, 's');
+        allow delete: if false;
+      }
+    }
+
+    function isValidActivity(day) {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['day', 'seconds', 'lessonIds', 'updatedAt'])
+        && data.day == day
+        && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.seconds is int && data.seconds >= 0
+        && data.lessonIds is list && data.lessonIds.size() <= 200
+        && data.updatedAt == request.time;
+    }
+
+    // Avis de fin de formation : l'élève inscrit écrit le sien, l'équipe de l'école les lit.
+    match /reviews/{reviewId} {
+      allow get: if signedIn()
+        && (reviewId.matches('^[A-Za-z0-9-]+_' + request.auth.uid + '$')
+            || isSchoolAdmin(resource.data.creatorId));
+      allow list: if signedIn() && isSchoolAdmin(resource.data.creatorId);
+      allow create: if isValidReview(reviewId)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isValidReview(reviewId)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+    }
+
+    function isValidReview(reviewId) {
+      let data = request.resource.data;
+      return signedIn()
+        && data.keys().hasOnly(['courseId', 'uid', 'creatorId', 'studentName', 'rating',
+            'recommend', 'comment', 'createdAt', 'updatedAt'])
+        && data.uid == request.auth.uid
+        && isShortString(data.courseId, 1, 128)
+        && reviewId == data.courseId + '_' + request.auth.uid
+        && isEnrolled(data.courseId)
+        && data.creatorId == course(data.courseId).creatorId
+        && isShortString(data.studentName, 1, 80)
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.recommend is bool
+        && isShortString(data.comment, 0, 2000)
+        && data.updatedAt == request.time;
     }
 
     function isValidProgress(progress) {

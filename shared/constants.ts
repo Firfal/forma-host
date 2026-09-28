@@ -21,6 +21,7 @@ export const RESERVED_SLUGS = new Set([
   "admin",
   "api",
   "bienvenue",
+  "attestations",
   "c",
   "certificats",
   "compte",

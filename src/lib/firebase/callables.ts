@@ -11,6 +11,8 @@ import type {
 } from "@shared/schemas";
 import type { PublishAnnouncementInput } from "@shared/announcements";
 import type { IssueCertificateInput } from "@shared/certificates";
+import type { AskAssistantInput, AssistantAnswer, AssistantKeyInput } from "@shared/assistant";
+import type { PlatformOverview } from "@shared/platform";
 import type { QuizGrade, SubmitQuizInput } from "@shared/quiz";
 import type { OpenConversationInput, UpdateConversationInput } from "@shared/chat";
 import type {
@@ -90,6 +92,16 @@ export const callIssueCertificate = callable<IssueCertificateInput, { id: string
   "issueCertificate",
 );
 export const callSubmitQuiz = callable<SubmitQuizInput, QuizGrade>("submitQuiz");
+export const callAskAssistant = callable<AskAssistantInput, AssistantAnswer>("askAssistant");
+export const callSaveAssistantKey = callable<AssistantKeyInput, { keyLast4: string }>(
+  "saveAssistantKey",
+);
+export const callDeleteAssistantKey = callable<Record<string, never>, { ok: true }>(
+  "deleteAssistantKey",
+);
+export const callPlatformOverview = callable<Record<string, never>, PlatformOverview>(
+  "platformOverview",
+);
 export const callPublishAnnouncement = callable<
   PublishAnnouncementInput,
   { id: string; recipients: number }

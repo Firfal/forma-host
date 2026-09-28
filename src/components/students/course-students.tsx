@@ -1,7 +1,16 @@
 "use client";
 
 import { collection, getCountFromServer, orderBy, query, where } from "firebase/firestore";
-import { Download, MailPlus, MoreHorizontal, Search, UserCheck, UserX, Users } from "lucide-react";
+import {
+  Download,
+  FileCheck2,
+  MailPlus,
+  MoreHorizontal,
+  Search,
+  UserCheck,
+  UserX,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -117,6 +126,11 @@ function StudentActions({ course, enrollment }: { course: CourseWithId; enrollme
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
+        <DropdownMenuItem asChild>
+          <Link href={routes.attendance(enrollment.id)}>
+            <FileCheck2 /> Attestation d&apos;assiduité
+          </Link>
+        </DropdownMenuItem>
         {enrollment.status === "active" ? (
           <>
             <DropdownMenuItem

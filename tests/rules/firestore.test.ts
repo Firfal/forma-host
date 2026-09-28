@@ -917,3 +917,90 @@ describe("exercices rendus", () => {
     await assertFails(save({ instructions: "ok", deadline: 3 }));
   });
 });
+
+describe("assiduité et avis", () => {
+  const activity = (overrides: Record<string, unknown> = {}) => ({
+    day: "2026-09-27",
+    seconds: 60,
+    lessonIds: ["l1"],
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  it("l'élève compte son temps : une minute au plus, pas plus d'une fois par minute", async () => {
+    const ref = doc(db(ANNE), "enrollments/c1_anne/activity/2026-09-27");
+    await assertFails(setDoc(ref, activity({ seconds: 3600 })));
+    await assertFails(setDoc(ref, activity({ day: "2026-09-28" })));
+    await assertSucceeds(setDoc(ref, activity()));
+    // Trop tôt après la précédente écriture.
+    await assertFails(setDoc(ref, activity({ seconds: 120 })));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "enrollments/c1_anne/activity/2026-09-27"), {
+        ...activity(),
+        updatedAt: Timestamp.fromMillis(Date.now() - 120_000),
+      });
+    });
+    await assertFails(setDoc(ref, activity({ seconds: 600 })));
+    await assertSucceeds(setDoc(ref, activity({ seconds: 120 })));
+    await assertFails(
+      setDoc(doc(db(REVOKED), "enrollments/c1_revoque/activity/2026-09-27"), activity()),
+    );
+    await assertFails(
+      setDoc(doc(db(STRANGER), "enrollments/c1_anne/activity/2026-09-26"), activity()),
+    );
+  });
+
+  it("relevé lisible par l'élève et l'équipe de l'école", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "enrollments/c1_anne/activity/2026-09-27"), {
+        ...activity(),
+        updatedAt: Timestamp.now(),
+      });
+    });
+    await assertSucceeds(getDocs(collection(db(ANNE), "enrollments/c1_anne/activity")));
+    await assertSucceeds(getDocs(collection(coAdminDb(), "enrollments/c1_anne/activity")));
+    await assertFails(getDocs(collection(db(STRANGER), "enrollments/c1_anne/activity")));
+  });
+
+  const review = (uid: string, overrides: Record<string, unknown> = {}) => ({
+    courseId: "c1",
+    uid,
+    creatorId: THEO,
+    studentName: "Anne",
+    rating: 5,
+    recommend: true,
+    comment: "Top",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  it("avis : l'élève inscrit écrit le sien, l'équipe les lit", async () => {
+    await assertSucceeds(getDoc(doc(db(ANNE), "reviews/c1_anne")));
+    await assertSucceeds(setDoc(doc(db(ANNE), "reviews/c1_anne"), review(ANNE)));
+    await assertFails(setDoc(doc(db(ANNE), "reviews/c1_autre"), review(ANNE)));
+    await assertFails(setDoc(doc(db(REVOKED), "reviews/c1_revoque"), review(REVOKED)));
+    await assertFails(setDoc(doc(db(ANNE), "reviews/c1_anne"), review(ANNE, { rating: 6 })));
+    await assertFails(
+      setDoc(doc(db(ANNE), "reviews/c1_anne"), review(ANNE, { creatorId: OTHER_CREATOR })),
+    );
+    await assertSucceeds(
+      getDocs(query(collection(creatorDb(), "reviews"), where("creatorId", "==", THEO))),
+    );
+    await assertFails(getDoc(doc(db(STRANGER), "reviews/c1_anne")));
+    await assertFails(
+      getDocs(query(collection(db(ANNE), "reviews"), where("creatorId", "==", THEO))),
+    );
+  });
+});
+
+describe("assistant IA", () => {
+  it("le formateur l'active sur sa formation (booléen), les secrets restent au serveur", async () => {
+    const ref = doc(creatorDb(), "courses/c1");
+    await assertSucceeds(updateDoc(ref, { assistant: true, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { assistant: "oui", updatedAt: serverTimestamp() }));
+    await assertSucceeds(getDoc(doc(db(null), "platform/assistant")));
+    await assertFails(getDoc(doc(creatorDb(), "platformSecrets/assistant")));
+    await assertFails(getDoc(doc(db(ANNE), "assistantUsage/anne_2026-09-27")));
+  });
+});

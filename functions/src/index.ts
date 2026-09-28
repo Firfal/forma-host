@@ -24,6 +24,7 @@ import {
 } from "@shared/creator-requests";
 import { publishAnnouncementInput } from "@shared/announcements";
 import { issueCertificateInput } from "@shared/certificates";
+import { askAssistantInput, assistantKeyInput } from "@shared/assistant";
 import { submitQuizInput } from "@shared/quiz";
 import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
 import type { FeedbackDoc, SubmissionDoc } from "@shared/exercises";
@@ -111,6 +112,15 @@ import { publishAnnouncement as publishAnnouncementImpl } from "./announcements"
 import { CertificateError, issueCertificate as issueCertificateImpl } from "./certificates";
 import { issueMissingInvoices as issueMissingInvoicesImpl } from "./invoices";
 import { handleNewFeedback, handleNewSubmission, handleSubmissionReviewed } from "./exercises";
+import {
+  AssistantError,
+  anthropicAssistant,
+  askAssistant as askAssistantImpl,
+  deleteAssistantKey as deleteAssistantKeyImpl,
+  fakeAssistant,
+  saveAssistantKey as saveAssistantKeyImpl,
+} from "./assistant";
+import { platformOverview as platformOverviewImpl } from "./platform";
 import { QuizError, submitQuiz as submitQuizImpl } from "./quiz";
 import { resolveVimeo } from "./vimeo";
 import {
@@ -606,6 +616,61 @@ export const onSubmissionFeedbackCreated = onDocumentCreated(
     }
   },
 );
+
+// Claude simulé dans les émulateurs (ASSISTANT_FAKE=true) : réponses de démonstration.
+const assistantClient =
+  process.env.FUNCTIONS_EMULATOR === "true" && process.env.ASSISTANT_FAKE === "true"
+    ? fakeAssistant
+    : anthropicAssistant;
+
+function assistantHttpError(error: unknown): never {
+  if (error instanceof AssistantError) throw new HttpsError("failed-precondition", error.message);
+  throw error;
+}
+
+/** Clé API Anthropic de la plateforme (vérifiée, chiffrée) : active l'assistant IA. */
+export const saveAssistantKey = onCall({ secrets: [SETTINGS_ENCRYPTION_KEY] }, async (request) => {
+  requirePlatformAdmin(request);
+  const input = parseInput(assistantKeyInput, request.data);
+  try {
+    return await saveAssistantKeyImpl(input.apiKey, { key: settingsKey, client: assistantClient });
+  } catch (error) {
+    assistantHttpError(error);
+  }
+});
+
+export const deleteAssistantKey = onCall(async (request) => {
+  requirePlatformAdmin(request);
+  await deleteAssistantKeyImpl();
+  return { ok: true };
+});
+
+/** Question d'un élève à l'assistant de la formation (limite quotidienne). */
+export const askAssistant = onCall(
+  { secrets: [SETTINGS_ENCRYPTION_KEY], timeoutSeconds: 180 },
+  async (request) => {
+    const caller = requireAuth(request);
+    const input = parseInput(askAssistantInput, request.data);
+    try {
+      return await askAssistantImpl(
+        {
+          input,
+          uid: caller.uid,
+          schools: (request.auth?.token.schools as string[] | undefined) ?? [],
+        },
+        { key: settingsKey, client: assistantClient },
+      );
+    } catch (error) {
+      assistantHttpError(error);
+    }
+  },
+);
+
+/** Vue d'ensemble de la plateforme (écoles, inscriptions, ventes) : administrateurs seulement. */
+export const platformOverview = onCall({ timeoutSeconds: 120 }, async (request) => {
+  requirePlatformAdmin(request);
+  return platformOverviewImpl();
+});
 
 /** Nouvelle demande d'espace formateur : les administrateurs de la plateforme sont prévenus. */
 export const onCreatorRequestCreated = onDocumentCreated("creatorRequests/{uid}", async (event) => {

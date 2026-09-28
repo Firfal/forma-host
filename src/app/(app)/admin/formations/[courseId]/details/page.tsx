@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { doc } from "firebase/firestore";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
+import type { AssistantSettingsDoc } from "@shared/assistant";
 import { richTextToPlain } from "@shared/richtext";
 import { isReservedSlug, isValidSlug, slugify } from "@shared/slug";
 import { storagePaths } from "@shared/paths";
@@ -18,6 +20,8 @@ import { isCourseSlugTaken, updateCourse } from "@/lib/courses";
 import { useCreator } from "@/lib/creator";
 import { cn } from "@/lib/cn";
 import { errorMessage } from "@/lib/firebase/callables";
+import { db } from "@/lib/firebase/client";
+import { useDocData } from "@/lib/hooks";
 
 function Choice<T extends string>({
   name,
@@ -81,6 +85,9 @@ export default function CourseDetailsPage() {
   const [certificate, setCertificate] = useState<"on" | "off">(
     course.certificate === false ? "off" : "on",
   );
+  const [assistant, setAssistant] = useState<"on" | "off">(course.assistant ? "on" : "off");
+  const assistantRef = useMemo(() => doc(db, "platform", "assistant"), []);
+  const { data: assistantSettings } = useDocData<AssistantSettingsDoc>(assistantRef);
   const [dripMode, setDripMode] = useState<"none" | "sequential" | "schedule">(
     course.drip?.mode ?? "none",
   );
@@ -118,6 +125,9 @@ export default function CourseDetailsPage() {
         visibility,
         commentsMode,
         certificate: certificate === "on",
+        ...(assistantSettings?.enabled || course.assistant
+          ? { assistant: assistant === "on" }
+          : {}),
         drip:
           dripMode === "none"
             ? null
@@ -305,6 +315,28 @@ export default function CourseDetailsPage() {
             ]}
           />
         </Field>
+        {assistantSettings?.enabled ? (
+          <Field label="Assistant IA">
+            <Choice
+              name="assistant"
+              value={assistant}
+              onChange={setAssistant}
+              options={[
+                {
+                  value: "on",
+                  label: "Activé",
+                  description:
+                    "Sous chaque leçon, les élèves posent leurs questions à un assistant qui répond à partir du contenu de la formation.",
+                },
+                {
+                  value: "off",
+                  label: "Désactivé",
+                  description: "Pas d'assistant sur cette formation.",
+                },
+              ]}
+            />
+          </Field>
+        ) : null}
       </Section>
 
       <div className="sticky bottom-0 -mx-1 flex justify-end border-t border-line-soft bg-white/90 px-1 py-3 backdrop-blur">

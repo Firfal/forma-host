@@ -15,6 +15,7 @@ import {
 import type { CourseDoc, EnrollmentDoc, TimestampLike } from "@shared/types";
 import { BarList } from "@/components/charts/bar-list";
 import { ColumnChart } from "@/components/charts/column-chart";
+import { SatisfactionCard } from "@/components/stats/satisfaction-card";
 import { PageContainer } from "@/components/layout/page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +73,10 @@ export default function StatisticsPage() {
   const { data: enrollmentDocs, loading } = useQueryData<EnrollmentDoc>(enrollmentsQuery);
   const { data: courses } = useQueryData<CourseDoc>(coursesQuery);
 
+  const courseTitles = useMemo(
+    () => new Map(courses.map((course) => [course.id, course.title])),
+    [courses],
+  );
   const sortedCourses = useMemo(
     () => [...courses].sort((a, b) => a.title.localeCompare(b.title, "fr")),
     [courses],
@@ -324,6 +329,10 @@ export default function StatisticsPage() {
                 />
               </CardBody>
             </Card>
+          ) : null}
+
+          {schoolId ? (
+            <SatisfactionCard schoolId={schoolId} courseId={courseId} courseTitles={courseTitles} />
           ) : null}
         </div>
       )}
