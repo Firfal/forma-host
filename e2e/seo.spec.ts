@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("référencement : robots.txt, plan du site et adresse canonique", async ({ request, page }) => {
+test("référencement : robots.txt, plan du site, adresse canonique et données structurées", async ({
+  request,
+  page,
+}) => {
   const robots = await (await request.get("/robots.txt")).text();
   expect(robots).toContain("Disallow: /admin");
   expect(robots).toContain("Disallow: /formations");
@@ -14,4 +17,9 @@ test("référencement : robots.txt, plan du site et adresse canonique", async ({
     "href",
     /\/ecole-motion\/maitriser-after-effects$/,
   );
+  const jsonLd = JSON.parse(
+    (await page.locator('script[type="application/ld+json"]').textContent()) ?? "{}",
+  );
+  expect(jsonLd["@type"]).toBe("Course");
+  expect(jsonLd.provider.name).toBe("Ecole Motion");
 });

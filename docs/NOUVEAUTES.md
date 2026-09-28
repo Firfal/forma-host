@@ -34,21 +34,23 @@ défaut : rien ne change pour les élèves tant que l'école ne l'active pas.
 - **Qualiopi / financements** : temps passé jour par jour, attestation d'assiduité imprimable (menu
   « … » d'un élève), avis de fin de formation, numéro de déclaration d'activité.
 - **Certificats de réussite** vérifiables en ligne.
-- **Accueil formateur** : bloc « À faire » (exercices à corriger, messages non lus, informations
-  légales manquantes).
+- **Accueil formateur** : « Premiers pas » pour ouvrir son école (étapes cochées au fur et à
+  mesure, masquables) et bloc « À faire » (exercices à corriger, messages non lus).
 
 ## Gérer
 
 - **Duplication** d'une formation (menu de la formation).
 - **Import d'élèves** depuis Podia, Teachable, Thinkific, Kajabi, Systeme.io… (CSV).
 - **Intégrations** : webhooks signés vers Zapier, Make ou n8n (*Paramètres > Intégrations*).
+- **Paramètres par sections** : raccourcis en haut de page (École, Paiements, Emails…).
 - **Vue d'ensemble de la plateforme** (administrateurs de la plateforme).
 - **Sauvegardes quotidiennes** de la base, conservées 14 jours.
 
 ## Sous le capot
 
-- Pages élèves plus légères (environ un quart de JavaScript en moins).
+- Pages plus légères : environ un quart de JavaScript en moins sur les pages élèves, et 40 ko de
+  moins sur toutes les pages (outils de téléversement et de validation chargés à la demande).
 - Référencement : robots.txt, plan du site par domaine, adresse canonique sur le domaine de
-  l'école.
+  l'école, données structurées (formation, école, prix) lisibles par Google.
 - Aucun email n'est envoyé par ces nouveautés, sauf les annonces si le formateur coche l'envoi par
   email.

@@ -4,6 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { publicSchoolUrl } from "@shared/host-routing";
 import { visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
+import { jsonLdScript, schoolJsonLd } from "@shared/structured-data";
 import { CourseThumbnail } from "@/components/course/course-thumbnail";
 import { LogoMark } from "@/components/logo";
 import { SchoolFooter } from "@/components/sales/school-footer";
@@ -47,8 +48,18 @@ export default async function CreatorPage({
     getSchoolLegal(creator.id),
   ]);
 
+  const structuredData = schoolJsonLd({
+    name: creator.name,
+    url: publicSchoolUrl(creator, brand.appUrl),
+    logoUrl: creator.logoUrl,
+  });
+
   return (
     <div className="flex min-h-dvh flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData) }}
+      />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-12">
         <header className="mb-10 flex items-center gap-3">
           {creator.logoUrl ? (

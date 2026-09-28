@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { publicSchoolUrl } from "@shared/host-routing";
 import { routes } from "@shared/paths";
 import { resolveSalesPage } from "@shared/sales-page";
+import { courseJsonLd, jsonLdScript } from "@shared/structured-data";
 import { SalesPageView } from "@/components/sales/sales-page-view";
 import { brand } from "@/lib/brand";
 import {
@@ -62,15 +63,31 @@ export default async function SalesPageRoute({ params }: { params: Promise<Param
     data.course.price ? isCheckoutAvailable(data.creator.id) : false,
     getSchoolLegal(data.creator.id),
   ]);
+  const page = resolveSalesPage(data.course, data.creator.name);
+  const checkout = checkoutAvailable && data.course.price ? { price: data.course.price } : null;
+  const structuredData = courseJsonLd({
+    name: data.course.title,
+    description: page.subheadline || data.course.summary,
+    url: publicSchoolUrl(data.creator, brand.appUrl, data.course.slug),
+    imageUrl: data.course.thumbnailUrl,
+    school: { name: data.creator.name, url: publicSchoolUrl(data.creator, brand.appUrl) },
+    price: checkout?.price ?? null,
+  });
   return (
-    <SalesPageView
-      course={data.course}
-      creator={data.creator}
-      page={resolveSalesPage(data.course, data.creator.name)}
-      ctaUrl={ctaUrl}
-      preview={preview}
-      checkout={checkoutAvailable && data.course.price ? { price: data.course.price } : null}
-      legal={legal ? { accessMonths: legal.accessMonths } : null}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(structuredData) }}
+      />
+      <SalesPageView
+        course={data.course}
+        creator={data.creator}
+        page={page}
+        ctaUrl={ctaUrl}
+        preview={preview}
+        checkout={checkout}
+        legal={legal ? { accessMonths: legal.accessMonths } : null}
+      />
+    </>
   );
 }
