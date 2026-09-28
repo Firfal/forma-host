@@ -1,5 +1,6 @@
 import { ArrowRight, CheckCircle2, ChevronDown, Clock, PlayCircle, Unlock } from "lucide-react";
 import type { CSSProperties } from "react";
+import { schoolHref } from "@shared/host-routing";
 import { brandCssVars } from "@shared/color";
 import { formatDuration, groupByChapter, visibleLessons } from "@shared/outline";
 import { formatPrice, type CoursePrice } from "@shared/payments";
@@ -88,7 +89,7 @@ export function SalesPageView({
     courseId: course.id,
     courseTitle: course.title,
     brandColor: creator.brandColor,
-    termsUrl: legal ? routes.legalPage(creator.slug, "cgv") : null,
+    termsUrl: legal ? schoolHref(creator, "legal/cgv") : null,
   };
 
   return (

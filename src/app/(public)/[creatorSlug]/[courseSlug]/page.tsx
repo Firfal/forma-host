@@ -18,6 +18,11 @@ import {
 
 export const revalidate = 60;
 
+// Page mise en cache (60 s) dès sa première visite, au lieu d'être recalculée à chaque visite.
+export async function generateStaticParams() {
+  return [];
+}
+
 interface Params {
   creatorSlug: string;
   courseSlug: string;

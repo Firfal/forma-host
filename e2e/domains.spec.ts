@@ -61,6 +61,10 @@ test("domaine d'école : parcours guidé, puis école servie sur son domaine", a
   ).newPage();
   await visitor.goto("/");
   await expect(visitor.getByRole("heading", { name: "Ecole Motion" })).toBeVisible();
+  // Liens directs vers l'adresse finale du domaine (pas de redirection /ecole-motion/… → /…).
+  await expect(
+    visitor.locator('a[href="https://actif.ecolemotion.com/maitriser-after-effects"]'),
+  ).toBeVisible();
   await visitor.goto("/maitriser-after-effects");
   await expect(visitor.getByRole("heading", { name: "Le programme" })).toBeVisible();
   await visitor.goto("/connexion");

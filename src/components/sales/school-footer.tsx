@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { LEGAL_PAGE_IDS, LEGAL_PAGES } from "@shared/legal";
-import { routes } from "@shared/paths";
+import { schoolHref } from "@shared/host-routing";
 
 /** Pied de page public d'une école : contact et pages légales (si publiées). */
 export function SchoolFooter({
   school,
   hasLegal,
 }: {
-  school: { name: string; slug: string; supportEmail: string | null };
+  school: {
+    name: string;
+    slug: string;
+    supportEmail: string | null;
+    customDomain?: { host: string; status: string } | null;
+  };
   hasLegal: boolean;
 }) {
   return (
@@ -27,7 +32,7 @@ export function SchoolFooter({
           className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1"
         >
           {LEGAL_PAGE_IDS.map((page) => (
-            <Link key={page} href={routes.legalPage(school.slug, page)} className="hover:text-ink">
+            <Link key={page} href={schoolHref(school, `legal/${page}`)} className="hover:text-ink">
               {LEGAL_PAGES[page]}
             </Link>
           ))}

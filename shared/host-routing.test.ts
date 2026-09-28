@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPlatformHost, publicSchoolUrl, routeForSchoolHost } from "./host-routing";
+import { isPlatformHost, publicSchoolUrl, routeForSchoolHost, schoolHref } from "./host-routing";
 
 describe("routage par domaine d'école", () => {
   it("reconnaît les hôtes de la plateforme", () => {
@@ -77,5 +77,32 @@ describe("adresse canonique", () => {
         "after",
       ),
     ).toBe("https://forma.app/ecole-motion/after");
+  });
+});
+
+describe("liens des pages publiques d'une école", () => {
+  const school = { slug: "ecole-motion" };
+  const withDomain = {
+    slug: "ecole-motion",
+    customDomain: { host: "app.ecolemotion.com", status: "active" },
+  };
+
+  it("sans domaine : /ecole/… sur l'adresse courante", () => {
+    expect(schoolHref(school)).toBe("/ecole-motion");
+    expect(schoolHref(school, "after-effects")).toBe("/ecole-motion/after-effects");
+    expect(schoolHref(school, "legal/cgv")).toBe("/ecole-motion/legal/cgv");
+  });
+
+  it("domaine actif : adresse finale sur le domaine, sans redirection", () => {
+    expect(schoolHref(withDomain)).toBe("https://app.ecolemotion.com/");
+    expect(schoolHref(withDomain, "after-effects")).toBe(
+      "https://app.ecolemotion.com/after-effects",
+    );
+    expect(schoolHref(withDomain, "legal/cgv")).toBe("https://app.ecolemotion.com/legal/cgv");
+    const pending = {
+      ...withDomain,
+      customDomain: { host: "app.ecolemotion.com", status: "pending" },
+    };
+    expect(schoolHref(pending, "after-effects")).toBe("/ecole-motion/after-effects");
   });
 });

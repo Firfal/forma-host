@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
+import { schoolHref } from "@shared/host-routing";
 import { isLegalPageId, LEGAL_PAGES, legalPage } from "@shared/legal";
 import { routes } from "@shared/paths";
 import { LogoMark } from "@/components/logo";
@@ -10,6 +11,11 @@ import { formatDate } from "@/lib/format";
 import { getCreatorBySlug, getRenamedCreatorSlug, getSchoolLegal } from "@/lib/public-data";
 
 export const revalidate = 60;
+
+// Page mise en cache (60 s) dès sa première visite, au lieu d'être recalculée à chaque visite.
+export async function generateStaticParams() {
+  return [];
+}
 
 interface Params {
   creatorSlug: string;
@@ -41,7 +47,7 @@ export default async function LegalPageRoute({ params }: { params: Promise<Param
   return (
     <div className="min-h-dvh bg-white">
       <header className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-5">
-        <Link href={routes.creatorPage(creator.slug)} className="flex items-center gap-2">
+        <Link href={schoolHref(creator)} className="flex items-center gap-2">
           {creator.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={creator.logoUrl} alt="" className="size-7 rounded-md object-cover" />

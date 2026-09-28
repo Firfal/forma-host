@@ -35,6 +35,19 @@ export function routeForSchoolHost(pathname: string, slug: string): HostRoute {
   return { type: "next" };
 }
 
+type SchoolAddress = { slug: string; customDomain?: { host: string; status: string } | null };
+
+/**
+ * Lien vers une page publique de l'école (« » : accueil, « formation », « legal/cgv ») : sur son
+ * domaine s'il est actif, directement à l'adresse finale (sans passer par la redirection
+ * /ecole/… → /… du domaine) ; sinon /ecole/… sur l'adresse courante.
+ */
+export function schoolHref(school: SchoolAddress, subpath = ""): string {
+  const domain = school.customDomain?.status === "active" ? school.customDomain.host : null;
+  if (domain) return `https://${domain}/${subpath}`;
+  return `/${school.slug}${subpath ? `/${subpath}` : ""}`;
+}
+
 /**
  * Adresse publique canonique d'une école ou d'une page de vente : son domaine s'il est actif
  * (https://app.ecolemotion.com/formation), sinon l'adresse de la plateforme (/ecole/formation).

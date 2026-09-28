@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { publicSchoolUrl } from "@shared/host-routing";
+import { publicSchoolUrl, schoolHref } from "@shared/host-routing";
 import { visibleLessons } from "@shared/outline";
 import { routes } from "@shared/paths";
 import { jsonLdScript, schoolJsonLd } from "@shared/structured-data";
@@ -17,6 +17,11 @@ import {
 } from "@/lib/public-data";
 
 export const revalidate = 60;
+
+// Page mise en cache (60 s) dès sa première visite, au lieu d'être recalculée à chaque visite.
+export async function generateStaticParams() {
+  return [];
+}
 
 export async function generateMetadata({
   params,
@@ -80,7 +85,7 @@ export default async function CreatorPage({
             {courses.map((course) => (
               <Link
                 key={course.id}
-                href={routes.salesPage(creator.slug, course.slug)}
+                href={schoolHref(creator, course.slug)}
                 className="overflow-hidden rounded-xl border border-line transition hover:shadow-lg hover:shadow-black/5"
               >
                 <CourseThumbnail src={course.thumbnailUrl} title={course.title} />
