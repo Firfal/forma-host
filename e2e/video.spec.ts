@@ -24,7 +24,8 @@ test("vidéo Vimeo collée dans une leçon existante : visible sur la page de la
   const editorUrl = page.url();
   await page.locator(".ProseMirror").click();
   await page.keyboard.type("test");
-  await page.getByRole("button", { name: "Enregistrer" }).click();
+  // Raccourci clavier d'enregistrement.
+  await page.keyboard.press("ControlOrMeta+S");
   await expect(page.getByText("Leçon enregistrée")).toBeVisible();
 
   // Puis le lien est collé (presse-papiers) et la leçon enregistrée.

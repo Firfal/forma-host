@@ -135,6 +135,18 @@ export default function LessonEditorPage() {
       .catch((error) => toast.error(errorMessage(error)));
   }, [course.id, lessonId, item, draft]);
 
+  // Ctrl+S (⌘S sur Mac) : enregistre la leçon au lieu d'enregistrer la page web.
+  const saveShortcut = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "s" || !(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      saveShortcut.current?.();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -225,6 +237,9 @@ export default function LessonEditorPage() {
       setUploading(false);
     }
   }
+
+  const canSave = Boolean(draft) && !saving && (dirty || Boolean(videoUrl.trim()));
+  saveShortcut.current = canSave ? () => void save() : null;
 
   async function save() {
     if (!draft) return;
@@ -319,7 +334,7 @@ export default function LessonEditorPage() {
           <Button asChild variant="ghost">
             <Link href={routes.adminCourseContent(course.id)}>Fermer</Link>
           </Button>
-          <Button onClick={save} disabled={!draft || saving || (!dirty && !videoUrl.trim())}>
+          <Button onClick={save} disabled={!canSave} title="Enregistrer (Ctrl+S)">
             {saving ? "Enregistrement…" : "Enregistrer"}
           </Button>
         </div>
