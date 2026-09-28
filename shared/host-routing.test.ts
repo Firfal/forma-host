@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { domainRewritePath, isPlatformHost, publicSchoolUrl, schoolHref } from "./host-routing";
+import { isPlatformHost, publicSchoolUrl, routeForSchoolHost, schoolHref } from "./host-routing";
 
 describe("routage par domaine d'école", () => {
   it("reconnaît les hôtes de la plateforme", () => {
@@ -11,13 +11,15 @@ describe("routage par domaine d'école", () => {
     expect(isPlatformHost("formation.ecolemotion.com", app)).toBe(false);
   });
 
-  it("sert l'accueil, les pages de vente et les pages légales, laisse les routes de l'app", () => {
-    const domain = "app.ecolemotion.com";
-    expect(domainRewritePath("/", domain)).toBe("/domaines/app.ecolemotion.com");
-    expect(domainRewritePath("/after-effects", domain)).toBe(
-      "/domaines/app.ecolemotion.com/after-effects",
-    );
-    expect(domainRewritePath("/legal/cgv", domain)).toBe("/domaines/app.ecolemotion.com/legal/cgv");
+  it("réécrit l'accueil et les pages de vente, laisse les routes de l'app", () => {
+    expect(routeForSchoolHost("/", "ecole-motion")).toEqual({
+      type: "rewrite",
+      pathname: "/ecole-motion",
+    });
+    expect(routeForSchoolHost("/after-effects", "ecole-motion")).toEqual({
+      type: "rewrite",
+      pathname: "/ecole-motion/after-effects",
+    });
     for (const path of [
       "/connexion",
       "/formations/c1/l1",
@@ -25,11 +27,31 @@ describe("routage par domaine d'école", () => {
       "/bienvenue/abc",
       "/_next/x",
       "/icon.svg",
-      "/ecole-motion/after-effects",
-      "/domaines",
     ]) {
-      expect(domainRewritePath(path, domain), path).toBeNull();
+      expect(routeForSchoolHost(path, "ecole-motion"), path).toEqual({ type: "next" });
     }
+  });
+
+  it("sert les pages légales de l'école sous /legal", () => {
+    expect(routeForSchoolHost("/legal/cgv", "ecole-motion")).toEqual({
+      type: "rewrite",
+      pathname: "/ecole-motion/legal/cgv",
+    });
+    expect(routeForSchoolHost("/ecole-motion/legal/cgv", "ecole-motion")).toEqual({
+      type: "redirect",
+      pathname: "/legal/cgv",
+    });
+  });
+
+  it("redirige les liens au format de la plateforme vers l'adresse courte", () => {
+    expect(routeForSchoolHost("/ecole-motion/after-effects", "ecole-motion")).toEqual({
+      type: "redirect",
+      pathname: "/after-effects",
+    });
+    expect(routeForSchoolHost("/ecole-motion", "ecole-motion")).toEqual({
+      type: "redirect",
+      pathname: "/",
+    });
   });
 });
 

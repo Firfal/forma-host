@@ -4,7 +4,8 @@ import { publicSchoolUrl } from "@shared/host-routing";
 import type { CreatorDoc } from "@shared/types";
 import { brand } from "@/lib/brand";
 import { adminDb } from "@/lib/firebase/admin";
-import { getCreatorByDomain, getPublishedCourses, type PublicCreator } from "@/lib/public-data";
+import { getCreatorBySlug, getPublishedCourses, type PublicCreator } from "@/lib/public-data";
+import { schoolSlugForHost } from "@/lib/school-domains";
 
 async function schoolEntries(school: PublicCreator): Promise<MetadataRoute.Sitemap> {
   const courses = await getPublishedCourses(school.id);
@@ -30,8 +31,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .trim()
     .split(":")[0]
     .toLowerCase();
-  const domainSchool = host ? await getCreatorByDomain(host).catch(() => null) : null;
-  if (domainSchool) return schoolEntries(domainSchool);
+  const slug = host ? await schoolSlugForHost(host) : null;
+  if (slug) {
+    const school = await getCreatorBySlug(slug);
+    return school ? schoolEntries(school) : [];
+  }
   const creators = await adminDb.collection("creators").get();
   const schools = creators.docs
     .map((doc) => ({ id: doc.id, ...(doc.data() as CreatorDoc) }) as PublicCreator)

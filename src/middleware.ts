@@ -1,36 +1,54 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { domainRewritePath, isPlatformHost } from "@shared/host-routing";
+import { isPlatformHost, routeForSchoolHost } from "@shared/host-routing";
 
 /**
- * Domaines personnalisés des écoles (formation.ecolemotion.com) : la réécriture vers les pages
- * /domaines/{domaine}/… est faite par next.config (en-tête Host), ce qui garde ces pages en cache
- * (une réécriture faite ici désactive le cache des pages dans Next.js 15.5). Ce middleware n'est
- * qu'un secours, sans lecture de base : domaine transmis seulement par un proxy (x-forwarded-host).
+ * Domaines personnalisés des écoles : formation.ecolemotion.com affiche directement la page de
+ * l'école et ses pages de vente. Sur l'adresse de la plateforme, rien n'est modifié.
  */
 
-const appHostname = (() => {
+const appHost = (() => {
   try {
-    return new URL(process.env.NEXT_PUBLIC_APP_URL ?? "").hostname;
+    return new URL(process.env.NEXT_PUBLIC_APP_URL ?? "").host;
   } catch {
     return "";
   }
 })();
 
-const hostnameOf = (value: string | null) =>
-  (value ?? "").split(",")[0].trim().split(":")[0].toLowerCase();
+export async function middleware(request: NextRequest) {
+  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "")
+    .split(",")[0]
+    .trim()
+    .split(":")[0]
+    .toLowerCase();
+  if (!host || isPlatformHost(host, appHost)) return NextResponse.next();
 
-export function middleware(request: NextRequest) {
-  const host = hostnameOf(request.headers.get("host"));
-  if (host && !isPlatformHost(host, appHostname)) return NextResponse.next();
-  const forwarded = hostnameOf(request.headers.get("x-forwarded-host"));
-  if (!forwarded || isPlatformHost(forwarded, appHostname)) return NextResponse.next();
-  const pathname = domainRewritePath(request.nextUrl.pathname, forwarded);
-  if (!pathname) return NextResponse.next();
-  const url = request.nextUrl.clone();
-  url.pathname = pathname;
-  return NextResponse.rewrite(url);
+  let slug: string | null = null;
+  try {
+    // Chargé à la demande : l'adresse de la plateforme n'utilise jamais l'Admin SDK ici.
+    const { schoolSlugForHost } = await import("@/lib/school-domains");
+    slug = await schoolSlugForHost(host);
+  } catch (error) {
+    console.error("middleware", error);
+  }
+  if (!slug) return NextResponse.next();
+
+  const route = routeForSchoolHost(request.nextUrl.pathname, slug);
+  if (route.type === "rewrite") {
+    const url = request.nextUrl.clone();
+    url.pathname = route.pathname;
+    return NextResponse.rewrite(url);
+  }
+  if (route.type === "redirect") {
+    const proto = request.headers.get("x-forwarded-proto")?.split(",")[0] ?? "https";
+    return NextResponse.redirect(
+      new URL(`${route.pathname}${request.nextUrl.search}`, `${proto}://${host}`),
+      301,
+    );
+  }
+  return NextResponse.next();
 }
 
 export const config = {
+  runtime: "nodejs",
   matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };
