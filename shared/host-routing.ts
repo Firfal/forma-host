@@ -11,28 +11,29 @@ export function isPlatformHost(host: string, appHost: string): boolean {
   );
 }
 
-export type HostRoute =
-  { type: "next" } | { type: "rewrite"; pathname: string } | { type: "redirect"; pathname: string };
+/** Préfixe interne des pages servies sur le domaine d'une école (/domaines/{domaine}/…). */
+export const DOMAIN_PAGES_PREFIX = "/domaines";
 
 /**
- * Sur le domaine d'une école : « / » affiche la page de l'école et « /formation » sa page de vente.
- * Les liens au format de la plateforme (/ecole-motion/formation) redirigent vers l'adresse courte ;
- * les routes de l'application (/connexion, /formations…) restent inchangées.
+ * Sur le domaine d'une école : « / » affiche la page de l'école, « /formation » sa page de vente
+ * et « /legal/cgv » ses pages légales (chemins internes /domaines/{domaine}/…). null : route de
+ * l'application (/connexion, /formations…), servie telle quelle.
  */
-export function routeForSchoolHost(pathname: string, slug: string): HostRoute {
+export function domainRewritePath(pathname: string, domain: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
-  if (segments.length === 0) return { type: "rewrite", pathname: `/${slug}` };
+  const base = `${DOMAIN_PAGES_PREFIX}/${domain}`;
+  if (segments.length === 0) return base;
   const [first] = segments;
-  // Pages légales de l'école : /legal/cgv sur son domaine, /{ecole}/legal/cgv sur la plateforme.
-  if (first === "legal") return { type: "rewrite", pathname: `/${slug}${pathname}` };
-  if (RESERVED_SLUGS.has(first) || first.startsWith("_") || first.includes(".")) {
-    return { type: "next" };
+  if (first === "legal" && segments.length === 2) return `${base}/legal/${segments[1]}`;
+  if (
+    segments.length > 1 ||
+    RESERVED_SLUGS.has(first) ||
+    first.startsWith("_") ||
+    first.includes(".")
+  ) {
+    return null;
   }
-  if (first === slug) {
-    return { type: "redirect", pathname: `/${segments.slice(1).join("/")}` };
-  }
-  if (segments.length === 1) return { type: "rewrite", pathname: `/${slug}/${first}` };
-  return { type: "next" };
+  return `${base}/${first}`;
 }
 
 type SchoolAddress = { slug: string; customDomain?: { host: string; status: string } | null };

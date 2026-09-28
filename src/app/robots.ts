@@ -19,6 +19,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
         "/bienvenue",
         "/communaute",
         "/compte",
+        "/domaines",
         "/factures",
         "/formations",
         "/merci",

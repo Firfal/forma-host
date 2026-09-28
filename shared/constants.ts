@@ -28,6 +28,7 @@ export const RESERVED_SLUGS = new Set([
   "compte",
   "connexion",
   "devenir-formateur",
+  "domaines",
   "factures",
   "formations",
   "inscription",

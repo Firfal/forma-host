@@ -16,6 +16,17 @@ export const getCreatorBySlug = cache(async (slug: string): Promise<PublicCreato
   return doc ? ({ id: doc.id, ...(doc.data() as CreatorDoc) } as PublicCreator) : null;
 });
 
+/** École servie sur ce domaine personnalisé (null : domaine inconnu ou pas encore actif). */
+export const getCreatorByDomain = cache(async (host: string): Promise<PublicCreator | null> => {
+  const domain = (await adminDb.doc(`domains/${host.toLowerCase()}`).get()).data() as
+    { schoolId: string; status: string } | undefined;
+  if (domain?.status !== "active") return null;
+  const creator = await adminDb.doc(`creators/${domain.schoolId}`).get();
+  return creator.exists
+    ? ({ id: creator.id, ...(creator.data() as CreatorDoc) } as PublicCreator)
+    : null;
+});
+
 /** Nouvelle adresse d'une école renommée (redirection des anciens liens). */
 export const getRenamedCreatorSlug = cache(async (slug: string): Promise<string | null> => {
   const snap = await adminDb
