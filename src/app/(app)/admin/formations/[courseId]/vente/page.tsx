@@ -1,7 +1,7 @@
 "use client";
 
 import { collection, limit, orderBy, query, where } from "firebase/firestore";
-import { FileText, RefreshCw, Tag } from "lucide-react";
+import { RefreshCw, Tag } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import { promoCodeInput } from "@shared/payments-input";
 import { routes } from "@shared/paths";
 import type { TimestampLike } from "@shared/types";
 import { useLoadedCourse } from "@/components/course/admin-course-context";
+import { OrderInvoiceLinks } from "@/components/account/order-invoice-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
@@ -368,8 +369,10 @@ function OrdersCard({ course, livemode }: { course: CourseWithId; livemode: bool
   );
   const revenue = paid.reduce((sum, order) => sum + order.amount, 0);
   const { data: legal } = useSchoolLegal(course.creatorId);
+  // Factures établies par Stripe ou par l'outil de l'école : rien à émettre ici.
   const missingInvoices = orders.filter(
-    (order) => order.status === "paid" && !order.invoice,
+    (order) =>
+      order.status === "paid" && !order.invoice && (order.invoicing ?? "platform") === "platform",
   ).length;
   const [issuing, setIssuing] = useState(false);
 
@@ -429,15 +432,7 @@ function OrdersCard({ course, livemode }: { course: CourseWithId; livemode: bool
                 ) : null}
                 {order.livemode ? null : <Badge tone="info">Test</Badge>}
                 {order.status === "refunded" ? <Badge tone="danger">Remboursée</Badge> : null}
-                {order.invoice ? (
-                  <Link
-                    href={routes.invoice(order.id)}
-                    className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-ink"
-                    title={`Facture ${order.invoice.number}`}
-                  >
-                    <FileText className="size-3.5" /> Facture
-                  </Link>
-                ) : null}
+                <OrderInvoiceLinks order={order} />
               </li>
             ))}
           </ul>

@@ -245,6 +245,62 @@ describe("factures", () => {
   const invoiceOf = async (orderId: string) =>
     (await db().doc(`orders/${orderId}`).get()).data()?.invoice;
 
+  it("facturation par Stripe (réglage) : facture Stripe demandée et liée, aucune facture Forma Host", async () => {
+    const checkouts: CheckoutRequest[] = [];
+    const spy: PaymentsClient = {
+      ...client,
+      async createCheckout(request) {
+        checkouts.push(request);
+        return client.createCheckout(request);
+      },
+    };
+    const accountId = await connectedAccount();
+    await db().doc("creators/theo/legal/info").set(legal);
+    await db().doc("creators/theo/private/sales").set({ unpaidPolicy: "end", invoicing: "stripe" });
+    const session = await createCheckout({
+      courseId: "c1",
+      email: null,
+      appUrl: APP_URL,
+      client: spy,
+    });
+    expect(checkouts.at(-1)?.stripeInvoice).toBe(true);
+    const checkout = {
+      sessionId: session.id,
+      accountId,
+      courseId: "c1",
+      email: "eleve@test.fr",
+      name: "Élève",
+      amount: 19700,
+      currency: "eur",
+      paymentIntentId: "pi_stripe",
+      promoCode: null,
+      livemode: false,
+      stripeInvoiceId: "in_s1",
+    };
+    await completeCheckout(checkout, appUrlFor, spy);
+    await completeCheckout(checkout, appUrlFor, spy);
+    const order = (await db().doc(`orders/${session.id}`).get()).data();
+    expect(order?.invoicing).toBe("stripe");
+    expect(order?.invoice).toBeUndefined();
+    // Rejoué : une seule fois.
+    expect(order?.stripeInvoices).toEqual([expect.objectContaining({ id: "in_s1" })]);
+    expect(await issueMissingInvoices("theo")).toBe(0);
+  });
+
+  it("facturation par l'outil du formateur (réglage) : aucune facture établie ici", async () => {
+    const accountId = await connectedAccount();
+    await db().doc("creators/theo/legal/info").set(legal);
+    await db()
+      .doc("creators/theo/private/sales")
+      .set({ unpaidPolicy: "end", invoicing: "external" });
+    const orderId = await buy(accountId, "outil");
+    const order = (await db().doc(`orders/${orderId}`).get()).data();
+    expect(order).toMatchObject({ invoicing: "external" });
+    expect(order?.invoice).toBeUndefined();
+    expect(order?.stripeInvoices).toBeUndefined();
+    expect(await issueMissingInvoices("theo")).toBe(0);
+  });
+
   it("émise au paiement, numérotée sans trou, rejouable, avec avoir au remboursement", async () => {
     const accountId = await connectedAccount();
     await db().doc("creators/theo/legal/info").set(legal);
@@ -427,6 +483,120 @@ describe("paiement en plusieurs fois", () => {
     await recordInstallmentsEnded("sub_1");
     expect((await order())?.installments.status).toBe("canceled");
     expect((await enrollment())?.status).toBe("revoked");
+  });
+
+  it("impayé, suspension immédiate (réglage) : accès retiré puis rétabli au paiement", async () => {
+    const { spy } = spyClient();
+    const accountId = await connectedAccount();
+    await db()
+      .doc("creators/theo/private/sales")
+      .set({ unpaidPolicy: "immediate", invoicing: "platform" });
+    const { order, enrollment } = await buyInThree(accountId);
+    await recordInstallmentFailed("sub_1");
+    expect((await order())?.installments).toMatchObject({ status: "past_due", suspended: true });
+    expect((await enrollment())?.status).toBe("revoked");
+    await recordInstallmentPaid({
+      accountId,
+      subscriptionId: "sub_1",
+      invoiceId: "in_2",
+      client: spy,
+    });
+    expect((await order())?.installments).toMatchObject({ status: "active", suspended: false });
+    expect((await enrollment())?.status).toBe("active");
+    const notification = (await db().doc("users/theo/notifications/payment_cs_3x").get()).data();
+    expect(notification).toMatchObject({ title: "Échéance réglée" });
+  });
+
+  it("impayé, accès jamais retiré (réglage) : conservé même si Stripe arrête", async () => {
+    const accountId = await connectedAccount();
+    await db()
+      .doc("creators/theo/private/sales")
+      .set({ unpaidPolicy: "never", invoicing: "platform" });
+    const { order, enrollment } = await buyInThree(accountId);
+    await recordInstallmentFailed("sub_1");
+    expect((await enrollment())?.status).toBe("active");
+    await recordInstallmentsEnded("sub_1");
+    expect((await order())?.installments.status).toBe("canceled");
+    expect((await enrollment())?.status).toBe("active");
+  });
+
+  it("code promo en plusieurs fois : échéancier remisé, utilisation comptée, code épuisé désactivé", async () => {
+    const { spy, checkouts } = spyClient();
+    const accountId = await connectedAccount();
+    await db()
+      .doc("courses/c1")
+      .update({ price: { amount: 19700, currency: "eur", installments: [3] } });
+    const promoId = await createPromoCode(
+      { courseId: "c1", code: "BIENVENUE", kind: "percent", value: 20, maxRedemptions: 1 },
+      spy,
+    );
+    await createPromoCode(
+      { courseId: "c1", code: "UNEFOIS", kind: "amount", value: 2000, installments: false },
+      spy,
+    );
+    const session = await createCheckout({
+      courseId: "c1",
+      email: null,
+      appUrl: APP_URL,
+      client: spy,
+      installments: 3,
+      promoCode: "bienvenue",
+    });
+    expect(session.total).toBe(15760);
+    expect(checkouts.at(-1)).toMatchObject({
+      total: 15760,
+      installments: { count: 3, first: 5254, monthly: 5253 },
+      promo: { code: "BIENVENUE" },
+    });
+    await expect(
+      createCheckout({
+        courseId: "c1",
+        email: null,
+        appUrl: APP_URL,
+        client: spy,
+        installments: 3,
+        promoCode: "UNEFOIS",
+      }),
+    ).rejects.toThrow("qu'en paiement en une fois");
+
+    const checkout = {
+      sessionId: "cs_promo",
+      accountId,
+      courseId: "c1",
+      email: "lea@test.fr",
+      name: "Léa",
+      amount: 15760,
+      currency: "eur",
+      paymentIntentId: null,
+      promoCode: "BIENVENUE",
+      promoId,
+      livemode: false,
+      installments: {
+        count: 3,
+        subscriptionId: "sub_p",
+        customerId: "cus_p",
+        firstInvoiceId: "in_p1",
+      },
+    };
+    await completeCheckout(checkout, appUrlFor, spy);
+    await completeCheckout(checkout, appUrlFor, spy);
+    const promo = (await db().doc(`courses/c1/promoCodes/${promoId}`).get()).data();
+    expect(promo).toMatchObject({ installmentRedemptions: 1, active: false });
+    expect((await db().doc("orders/cs_promo").get()).data()).toMatchObject({
+      amount: 15760,
+      promoCode: "BIENVENUE",
+      installments: { first: 5254, monthly: 5253 },
+    });
+    await expect(
+      createCheckout({
+        courseId: "c1",
+        email: null,
+        appUrl: APP_URL,
+        client: spy,
+        installments: 3,
+        promoCode: "BIENVENUE",
+      }),
+    ).rejects.toThrow("invalide ou expiré");
   });
 
   it("remboursement retrouvé par le client Stripe : accès retiré, abonnement arrêté", async () => {

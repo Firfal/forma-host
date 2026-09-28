@@ -7,6 +7,7 @@ import { DomainSettingsCard } from "@/components/settings/domain-settings-card";
 import { LegalSettingsCard } from "@/components/settings/legal-settings-card";
 import { MailSettingsCard } from "@/components/settings/mail-settings-card";
 import { PaymentsSettingsCard } from "@/components/settings/payments-settings-card";
+import { SalesSettingsCard } from "@/components/settings/sales-settings-card";
 import { SchoolSettingsCard } from "@/components/settings/school-settings-card";
 import { TeamSettingsCard } from "@/components/settings/team-settings-card";
 import { VimeoSettingsCard } from "@/components/settings/vimeo-settings-card";
@@ -86,9 +87,12 @@ export default function SettingsPage() {
             </Section>
             <Section id="payments">
               {/* useSearchParams (retour de Stripe) : rendu côté client uniquement. */}
-              <Suspense fallback={null}>
-                <PaymentsSettingsCard />
-              </Suspense>
+              <div className="space-y-4">
+                <Suspense fallback={null}>
+                  <PaymentsSettingsCard />
+                </Suspense>
+                <SalesSettingsCard />
+              </div>
             </Section>
             <Section id="mail">
               <MailSettingsCard />

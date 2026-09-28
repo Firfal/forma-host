@@ -13,6 +13,7 @@ import {
   type OrderInstallments,
   type PromoCodeDoc,
   type SchoolStripeDoc,
+  type StripeInvoiceLink,
 } from "@shared/payments";
 import type { PromoCodeInput } from "@shared/payments-input";
 import { routes } from "@shared/paths";
@@ -21,6 +22,7 @@ import type { CourseDoc, CreatorDoc } from "@shared/types";
 import { grantAccessToStudents } from "./access";
 import { db } from "./db";
 import { issueCreditNote, issueInvoice } from "./invoices";
+import { readSalesSettings } from "./sales-settings";
 
 /**
  * Paiements Stripe Connect : chaque école relie son propre compte Stripe (compte « Standard »,
@@ -51,6 +53,8 @@ export interface CheckoutRequest {
   total: number;
   /** Code promo saisi dans la fenêtre de commande. */
   promo: { id: string; code: string; promotionCodeId: string } | null;
+  /** Mode de facturation « Stripe » : facture Stripe créée pour un paiement unique. */
+  stripeInvoice: boolean;
 }
 
 /** Rappel affiché sous le bouton de paiement Stripe. */
@@ -73,6 +77,8 @@ export interface PaymentsClient {
   deactivatePromo(accountId: string, promotionCodeId: string): Promise<void>;
   /** Arrête l'abonnement d'un paiement en plusieurs fois (sans prorata ni nouvelle facture). */
   cancelSubscription(accountId: string, subscriptionId: string): Promise<void>;
+  /** Facture Stripe (numéro, lien de consultation) ; null si introuvable. */
+  getInvoice(accountId: string, invoiceId: string): Promise<StripeInvoiceLink | null>;
 }
 
 /** Client Stripe réel (clé secrète de la plateforme, requêtes sur le compte de l'école). */
@@ -187,6 +193,10 @@ export function stripeClient(secretKey: string): PaymentsClient {
             ...(request.promo
               ? { discounts: [{ promotion_code: request.promo.promotionCodeId }] }
               : { allow_promotion_codes: true }),
+            // Facturation par Stripe : facture du paiement (les échéances ont déjà la leur).
+            ...(request.stripeInvoice
+              ? { invoice_creation: { enabled: true, invoice_data: { metadata } } }
+              : {}),
           };
       const session = await stripe.checkout.sessions.create(params, {
         stripeAccount: request.accountId,
@@ -234,6 +244,19 @@ export function stripeClient(secretKey: string): PaymentsClient {
     },
     async cancelSubscription(accountId, subscriptionId) {
       await stripe.subscriptions.cancel(subscriptionId, {}, { stripeAccount: accountId });
+    },
+    async getInvoice(accountId, invoiceId) {
+      const invoice = await stripe.invoices.retrieve(invoiceId, undefined, {
+        stripeAccount: accountId,
+      });
+      return invoice.id
+        ? {
+            id: invoice.id,
+            number: invoice.number ?? null,
+            url: invoice.hosted_invoice_url ?? null,
+            amount: invoice.amount_paid,
+          }
+        : null;
     },
   };
 }
@@ -454,6 +477,7 @@ export async function createCheckout(params: {
     installments: count ? installmentPlan(total, count) : null,
     total,
     promo,
+    stripeInvoice: (await readSalesSettings(course.creatorId)).invoicing === "stripe",
   });
   return { ...session, total, promo: promo ? { id: promo.id, code: promo.code } : null };
 }
@@ -470,6 +494,8 @@ export interface CompletedCheckout {
   promoCode: string | null;
   /** Code promo saisi dans la fenêtre de commande (compté ici en paiement échelonné). */
   promoId?: string | null;
+  /** Facture Stripe du paiement (mode de facturation « Stripe », ou 1re échéance). */
+  stripeInvoiceId?: string | null;
   livemode: boolean;
   termsAcceptedAt?: string | null;
   billingAddress?: string | null;
@@ -527,6 +553,8 @@ export async function completeCheckout(
 
   const orderRef = db().doc(`orders/${checkout.sessionId}`);
   const existing = (await orderRef.get()).data() as OrderDoc | undefined;
+  // Mode de facturation figé à l'achat (un changement de réglage ne touche pas aux ventes passées).
+  const invoicing = existing?.invoicing ?? (await readSalesSettings(account.schoolId)).invoicing;
   const plan = checkout.installments;
   const installments: OrderInstallments | null = plan
     ? {
@@ -551,6 +579,7 @@ export async function completeCheckout(
     livemode: checkout.livemode,
     termsAcceptedAt: checkout.termsAcceptedAt ?? null,
     billingAddress: checkout.billingAddress ?? null,
+    invoicing,
     // Webhook rejoué : la date d'achat et l'échéancier déjà suivi sont conservés.
     installments: existing?.installments ?? installments,
     createdAt: existing?.createdAt
@@ -567,9 +596,15 @@ export async function completeCheckout(
     ).catch((error) => console.error(`Code promo de la commande ${checkout.sessionId}`, error));
   }
   // La facture ne doit jamais bloquer l'accès : une erreur est journalisée, pas propagée.
-  await issueInvoice(checkout.sessionId).catch((error) =>
-    console.error(`Facture de la commande ${checkout.sessionId}`, error),
-  );
+  if (invoicing === "platform") {
+    await issueInvoice(checkout.sessionId).catch((error) =>
+      console.error(`Facture de la commande ${checkout.sessionId}`, error),
+    );
+  } else if (invoicing === "stripe" && checkout.stripeInvoiceId && client) {
+    await addStripeInvoice(orderRef.id, checkout.accountId, checkout.stripeInvoiceId, client).catch(
+      (error) => console.error(`Facture Stripe de la commande ${checkout.sessionId}`, error),
+    );
+  }
 
   const result = await grantAccessToStudents({
     courseId: checkout.courseId,
@@ -583,15 +618,35 @@ export async function completeCheckout(
   if (result.errors.length) throw new Error(result.errors[0].message);
 }
 
-async function revokeOrderAccess(order: OrderDoc): Promise<void> {
+/** Lien vers la facture Stripe, ajouté à la commande (une seule fois par facture). */
+async function addStripeInvoice(
+  orderId: string,
+  accountId: string,
+  invoiceId: string,
+  client: PaymentsClient,
+  known?: StripeInvoiceLink,
+): Promise<void> {
+  const invoice = known ?? (await client.getInvoice(accountId, invoiceId));
+  if (!invoice) return;
+  const ref = db().doc(`orders/${orderId}`);
+  await db().runTransaction(async (tx) => {
+    const order = (await tx.get(ref)).data() as OrderDoc | undefined;
+    if (!order || order.stripeInvoices?.some((existing) => existing.id === invoice.id)) return;
+    tx.update(ref, { stripeInvoices: [...(order.stripeInvoices ?? []), invoice] });
+  });
+}
+
+async function setOrderAccess(order: OrderDoc, status: "active" | "revoked"): Promise<void> {
   const enrollments = await db()
     .collection("enrollments")
     .where("courseId", "==", order.courseId)
     .where("email", "==", order.email)
     .limit(1)
     .get();
-  await enrollments.docs[0]?.ref.update({ status: "revoked" });
+  await enrollments.docs[0]?.ref.update({ status });
 }
+
+const revokeOrderAccess = (order: OrderDoc) => setOrderAccess(order, "revoked");
 
 async function orderBySubscription(subscriptionId: string) {
   const snap = await db()
@@ -628,27 +683,57 @@ async function notifySchool(
 /**
  * Échéance réglée (webhook invoice.paid) : comptée une seule fois ; après la dernière,
  * l'abonnement est arrêté. La première échéance est comptée à la création de la commande.
+ * Accès suspendu pour impayé : rétabli. Facturation « Stripe » : lien vers la facture ajouté.
  */
 export async function recordInstallmentPaid(params: {
   accountId: string;
   subscriptionId: string;
   invoiceId: string;
   client: PaymentsClient;
+  /** Facture Stripe déjà connue par le webhook (évite un appel à Stripe). */
+  invoice?: StripeInvoiceLink;
 }): Promise<OrderInstallments | null> {
   const doc = await orderBySubscription(params.subscriptionId);
   if (!doc) return null;
-  const installments = await db().runTransaction(async (tx) => {
+  const result = await db().runTransaction(async (tx) => {
     const order = (await tx.get(doc.ref)).data() as OrderDoc;
     const current = order.installments;
-    if (!current || current.paidInvoiceIds.includes(params.invoiceId)) return current ?? null;
+    if (!current || current.paidInvoiceIds.includes(params.invoiceId)) {
+      return { installments: current ?? null, order, restored: false };
+    }
     const paidInvoiceIds = [...current.paidInvoiceIds, params.invoiceId];
     const status = paidInvoiceIds.length >= current.count ? "completed" : "active";
     tx.update(doc.ref, {
       "installments.paidInvoiceIds": paidInvoiceIds,
       "installments.status": status,
+      "installments.suspended": false,
     });
-    return { ...current, paidInvoiceIds, status } as OrderInstallments;
+    return {
+      installments: { ...current, paidInvoiceIds, status, suspended: false } as OrderInstallments,
+      order,
+      restored: Boolean(current.suspended),
+    };
   });
+  const { installments, order, restored } = result;
+  if (restored && order.status === "paid") {
+    await setOrderAccess(order, "active");
+    await notifySchool(
+      order.schoolId,
+      `payment_${doc.id}`,
+      "Échéance réglée",
+      `${order.name || order.email} · ${order.courseTitle ?? "formation"} : paiement reçu, accès rétabli.`,
+      routes.adminCourseSales(order.courseId),
+    );
+  }
+  if (order.invoicing === "stripe") {
+    await addStripeInvoice(
+      doc.id,
+      params.accountId,
+      params.invoiceId,
+      params.client,
+      params.invoice,
+    ).catch((error) => console.error(`Facture Stripe ${params.invoiceId}`, error));
+  }
   if (installments?.status === "completed") {
     await params.client
       .cancelSubscription(params.accountId, params.subscriptionId)
@@ -657,24 +742,36 @@ export async function recordInstallmentPaid(params: {
   return installments;
 }
 
-/** Échéance refusée (webhook invoice.payment_failed) : l'école est prévenue, Stripe relance. */
+/**
+ * Échéance refusée (webhook invoice.payment_failed) : l'école est prévenue, Stripe relance.
+ * Selon le réglage de l'école, l'accès est suspendu tout de suite (rétabli au paiement).
+ */
 export async function recordInstallmentFailed(subscriptionId: string): Promise<void> {
   const doc = await orderBySubscription(subscriptionId);
   const order = doc?.data() as OrderDoc | undefined;
   if (!doc || !order?.installments || order.installments.status === "completed") return;
-  await doc.ref.update({ "installments.status": "past_due" });
+  const { unpaidPolicy } = await readSalesSettings(order.schoolId);
+  const suspend = unpaidPolicy === "immediate" && order.status === "paid";
+  await doc.ref.update({
+    "installments.status": "past_due",
+    ...(suspend ? { "installments.suspended": true } : {}),
+  });
+  if (suspend) await revokeOrderAccess(order);
   await notifySchool(
     order.schoolId,
     `payment_${doc.id}`,
     "Échéance impayée",
-    `${order.name || order.email} · ${order.courseTitle ?? "formation"} : Stripe va relancer le paiement.`,
+    `${order.name || order.email} · ${order.courseTitle ?? "formation"} : Stripe va relancer le paiement${
+      suspend ? " ; accès suspendu jusqu'au paiement." : "."
+    }`,
     routes.adminCourseSales(order.courseId),
   );
 }
 
 /**
  * Abonnement arrêté (webhook customer.subscription.deleted) avant la dernière échéance, par
- * exemple après plusieurs refus de paiement : l'accès est retiré et l'école prévenue.
+ * exemple après plusieurs refus de paiement : l'accès est retiré (sauf si l'école a choisi de
+ * ne jamais le retirer) et l'école prévenue.
  */
 export async function recordInstallmentsEnded(subscriptionId: string): Promise<void> {
   const doc = await orderBySubscription(subscriptionId);
@@ -684,13 +781,17 @@ export async function recordInstallmentsEnded(subscriptionId: string): Promise<v
   if (installments.paidInvoiceIds.length >= installments.count || order.status === "refunded") {
     return;
   }
+  const { unpaidPolicy } = await readSalesSettings(order.schoolId);
+  const keep = unpaidPolicy === "never";
   await doc.ref.update({ "installments.status": "canceled" });
-  await revokeOrderAccess(order);
+  if (!keep) await revokeOrderAccess(order);
   await notifySchool(
     order.schoolId,
     `payment_${doc.id}`,
     "Paiement en plusieurs fois interrompu",
-    `${order.name || order.email} · ${order.courseTitle ?? "formation"} : ${installments.paidInvoiceIds.length}/${installments.count} échéances payées, accès retiré.`,
+    `${order.name || order.email} · ${order.courseTitle ?? "formation"} : ${installments.paidInvoiceIds.length}/${installments.count} échéances payées, ${
+      keep ? "accès conservé (ton réglage)" : "accès retiré"
+    }.`,
     routes.adminCourseSales(order.courseId),
   );
 }
@@ -848,5 +949,8 @@ export function fakePaymentsClient(livemode = false): PaymentsClient {
     },
     async deactivatePromo() {},
     async cancelSubscription() {},
+    async getInvoice(_accountId, invoiceId) {
+      return { id: invoiceId, number: `DEMO-${invoiceId.slice(-4)}`, url: null, amount: 0 };
+    },
   };
 }

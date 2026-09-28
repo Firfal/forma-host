@@ -141,6 +141,16 @@ export interface OrderInstallments {
   customerId: string | null;
   /** active : en cours ; completed : tout payé ; past_due : échéance impayée ; canceled : arrêté. */
   status: "active" | "completed" | "past_due" | "canceled";
+  /** Accès suspendu pour impayé (réglage de l'école), rétabli au paiement. */
+  suspended?: boolean;
+}
+
+/** Facture établie par Stripe (mode de facturation « Stripe ») : lien pour l'élève. */
+export interface StripeInvoiceLink {
+  id: string;
+  number: string | null;
+  url: string | null;
+  amount: number;
 }
 
 /** orders/{sessionId} : achat d'une formation (lu par l'équipe de l'école). */
@@ -164,6 +174,10 @@ export interface OrderDoc<T = unknown> {
   billingAddress?: string | null;
   /** Facture émise au paiement (absente : informations légales manquantes à ce moment). */
   invoice?: OrderInvoice<T> | null;
+  /** Qui établit les factures de cette vente (réglage de l'école au moment de l'achat). */
+  invoicing?: "platform" | "stripe" | "external";
+  /** Factures Stripe (une par paiement ou par échéance). */
+  stripeInvoices?: StripeInvoiceLink[];
   /** Paiement en plusieurs fois (absent : paiement unique). */
   installments?: OrderInstallments | null;
   createdAt: T;

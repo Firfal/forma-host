@@ -40,6 +40,7 @@ import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
 import { schoolLegalInput } from "@shared/legal";
 import { mailSettingsInput } from "@shared/mail-settings";
+import { salesSettingsInput } from "@shared/sales-settings";
 import {
   checkPromoInput,
   createCheckoutInput,
@@ -88,6 +89,7 @@ import {
   settingsKey,
   stripeKey,
 } from "./params";
+import { saveSalesSettings as saveSalesSettingsImpl } from "./sales-settings";
 import {
   checkPromoCode as checkPromoCodeImpl,
   completeCheckout,
@@ -478,6 +480,14 @@ export const saveSchoolLegal = onCall(async (request) => {
   await db()
     .doc(`creators/${schoolId}/legal/info`)
     .set({ ...info, updatedAt: FieldValue.serverTimestamp() });
+  return { ok: true };
+});
+
+/** Réglages de vente de l'école (impayés, facturation) : propriétaire de l'école. */
+export const saveSalesSettings = onCall(async (request) => {
+  const caller = await requireSchoolOwner(request);
+  const input = parseInput(salesSettingsInput, request.data);
+  await saveSalesSettingsImpl(caller.uid, input);
   return { ok: true };
 });
 
@@ -1061,6 +1071,7 @@ export const createCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, as
           paymentIntentId: input.installments ? null : `pi_${session.id}`,
           promoCode: session.promo?.code ?? null,
           promoId: session.promo?.id ?? null,
+          stripeInvoiceId: input.installments ? `in_${session.id}_1` : `in_${session.id}`,
           livemode: false,
           termsAcceptedAt,
           installments: input.installments
@@ -1184,6 +1195,7 @@ export const stripeWebhook = onRequest(
                   : (session.payment_intent?.id ?? null),
               promoCode: session.metadata?.promoCode || null,
               promoId: session.metadata?.promoId || null,
+              stripeInvoiceId: idOf(session.invoice),
               livemode: event.livemode,
               termsAcceptedAt: session.metadata?.termsAcceptedAt ?? null,
               billingAddress: formatPostalAddress(session.customer_details?.address),
@@ -1214,6 +1226,12 @@ export const stripeWebhook = onRequest(
               subscriptionId,
               invoiceId: invoice.id,
               client: stripeClient(key),
+              invoice: {
+                id: invoice.id,
+                number: invoice.number ?? null,
+                url: invoice.hosted_invoice_url ?? null,
+                amount: invoice.amount_paid,
+              },
             });
           } else {
             await recordInstallmentFailed(subscriptionId);

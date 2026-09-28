@@ -1,12 +1,10 @@
 "use client";
 
 import { collection, query, where } from "firebase/firestore";
-import { FileText } from "lucide-react";
-import Link from "next/link";
 import { useMemo } from "react";
 import { formatPrice, type OrderDoc } from "@shared/payments";
-import { routes } from "@shared/paths";
 import type { TimestampLike } from "@shared/types";
+import { OrderInvoiceLinks } from "@/components/account/order-invoice-links";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
@@ -55,14 +53,7 @@ export function PurchasesCard() {
                 </Badge>
               ) : null}
               {order.status === "refunded" ? <Badge tone="danger">Remboursé</Badge> : null}
-              {order.invoice ? (
-                <Link
-                  href={routes.invoice(order.id)}
-                  className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-ink"
-                >
-                  <FileText className="size-3.5" /> Facture
-                </Link>
-              ) : null}
+              <OrderInvoiceLinks order={order} />
             </li>
           ))}
         </ul>

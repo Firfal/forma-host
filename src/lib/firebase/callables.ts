@@ -24,6 +24,7 @@ import type { SchoolDomain, SchoolDomainInput } from "@shared/domains";
 import type { SchoolLegalInput } from "@shared/legal";
 import type { MailSettingsInput, SaveMailSettingsResult } from "@shared/mail-settings";
 import type { CheckedPromo } from "@shared/payments";
+import type { SalesSettingsInput } from "@shared/sales-settings";
 import type {
   CheckPromoInput,
   CreateCheckoutInput,
@@ -122,6 +123,9 @@ export const callPublishAnnouncement = callable<
 >("publishAnnouncement");
 export const callIssueMissingInvoices = callable<{ schoolId?: string | null }, { issued: number }>(
   "issueMissingInvoices",
+);
+export const callSaveSalesSettings = callable<SalesSettingsInput, { ok: true }>(
+  "saveSalesSettings",
 );
 
 export const callOpenConversation = callable<OpenConversationInput, { conversationId: string }>(

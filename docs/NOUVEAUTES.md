@@ -10,8 +10,13 @@ défaut : rien ne change pour les élèves tant que l'école ne l'active pas.
 - **Récapitulatif d'achat** : CGV acceptées et renonciation au droit de rétractation cochées avant le
   paiement.
 - **Factures numérotées** automatiques (et avoirs en cas de remboursement), dans *Mon compte > Mes
-  achats* pour l'élève et dans *Vente* pour l'école.
+  achats* pour l'élève et dans *Vente* pour l'école (si l'école garde la facturation Forma Host).
 - **Paiement en 2, 3 ou 4 fois** sans frais (*Vente* de la formation).
+- **Codes promo** saisis dans la fenêtre de commande (prix remisé affiché avant de payer),
+  valables aussi en plusieurs fois sauf si le formateur les réserve au paiement en une fois.
+- **Factures et impayés** (*Paramètres > Paiements*) : factures établies par Forma Host, par
+  Stripe ou par l'outil du formateur (Pennylane, Tiime, Quaderno…) ; en cas d'échéance impayée,
+  accès retiré à l'arrêt des relances Stripe, suspendu tout de suite, ou jamais retiré.
 
 ## Enseigner
 

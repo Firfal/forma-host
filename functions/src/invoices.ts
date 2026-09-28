@@ -83,8 +83,12 @@ export async function issueMissingInvoices(schoolId: string): Promise<number> {
     .get();
   let issued = 0;
   // Dans l'ordre des ventes, pour une numérotation chronologique.
+  // Ventes dont la facture revient à Stripe ou à l'outil du formateur : ignorées.
   const pending = orders.docs
-    .filter((doc) => !(doc.data() as OrderDoc).invoice)
+    .filter((doc) => {
+      const order = doc.data() as OrderDoc;
+      return !order.invoice && (order.invoicing ?? "platform") === "platform";
+    })
     .sort(
       (a, b) =>
         ((a.data().createdAt as Timestamp | undefined)?.toMillis() ?? 0) -
