@@ -3,6 +3,7 @@
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { toast } from "sonner";
+import { brandCssVars } from "@shared/color";
 import { formatPrice, installmentLabel, type CoursePrice } from "@shared/payments";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/cn";
@@ -61,7 +62,7 @@ export function BuyButton({
       </DialogTrigger>
       <DialogContent
         title="Ta commande"
-        style={{ "--brand": brandColor } as CSSProperties}
+        style={brandCssVars(brandColor) as CSSProperties}
         className="max-w-md"
       >
         <div className="space-y-4">
@@ -140,7 +141,7 @@ export function BuyButton({
             type="button"
             onClick={pay}
             disabled={!accepted || busy}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--brand)] px-4 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[var(--brand)] px-4 text-sm font-semibold text-[var(--brand-ink)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? (
               <>

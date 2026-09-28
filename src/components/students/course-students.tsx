@@ -358,7 +358,9 @@ export function CourseStudents({ course }: { course: CourseWithId }) {
                   <th className="hidden px-3 py-2.5 font-medium xl:table-cell">
                     Dernière activité
                   </th>
-                  <th className="w-10" />
+                  <th className="w-10">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>

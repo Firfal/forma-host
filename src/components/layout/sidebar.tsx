@@ -316,7 +316,7 @@ export function Sidebar() {
       {open ? (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-ink/30" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-surface shadow-xl">
+          <aside aria-label="Menu" className="absolute inset-y-0 left-0 w-64 bg-surface shadow-xl">
             <button
               type="button"
               className="absolute right-2 top-3 rounded p-1.5 hover:bg-black/5"
@@ -331,7 +331,10 @@ export function Sidebar() {
       ) : null}
 
       {/* Desktop */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-line/60 bg-surface md:block">
+      <aside
+        aria-label="Menu"
+        className="sticky top-0 hidden h-dvh w-60 shrink-0 border-r border-line/60 bg-surface md:block"
+      >
         <SidebarContent onNavigate={() => undefined} />
       </aside>
     </>

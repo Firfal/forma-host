@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useSelectedLayoutSegment } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { routes } from "@shared/paths";
 import { AdminCourseProvider, useAdminCourse } from "@/components/course/admin-course-context";
 import { CourseActions } from "@/components/course/course-actions";
@@ -21,6 +21,41 @@ const tabs = [
   { segment: "page-de-vente", label: "Page de vente", href: routes.adminCourseSalesPage },
   { segment: "vente", label: "Vente", href: routes.adminCourseSales },
 ] as const;
+
+/** Onglets de la formation ; sur mobile, ils défilent et l'onglet ouvert reste visible. */
+function CourseTabs({ courseId, segment }: { courseId: string; segment: string | null }) {
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollTo({ left: active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2 });
+  }, [segment]);
+  return (
+    <nav
+      ref={navRef}
+      className="relative -mx-4 mt-4 flex gap-4 overflow-x-auto border-b border-line-soft px-4 md:mx-0 md:px-0"
+      aria-label="Sections de la formation"
+    >
+      {tabs.map((tab) => {
+        const active = segment === tab.segment;
+        return (
+          <Link
+            key={tab.label}
+            href={tab.href(courseId)}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "-mb-px whitespace-nowrap border-b-2 border-transparent pb-2 text-sm font-medium text-muted hover:text-ink",
+              active && "border-ink text-ink",
+            )}
+          >
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 function CourseShell({ courseId, children }: { courseId: string; children: ReactNode }) {
   const { course, loading, error } = useAdminCourse();
@@ -65,27 +100,7 @@ function CourseShell({ courseId, children }: { courseId: string; children: React
           </div>
           <CourseActions course={course} />
         </div>
-        <nav
-          className="mt-4 flex gap-4 overflow-x-auto border-b border-line-soft"
-          aria-label="Sections de la formation"
-        >
-          {tabs.map((tab) => {
-            const active = segment === tab.segment;
-            return (
-              <Link
-                key={tab.label}
-                href={tab.href(courseId)}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "-mb-px whitespace-nowrap border-b-2 border-transparent pb-2 text-sm font-medium text-muted hover:text-ink",
-                  active && "border-ink text-ink",
-                )}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <CourseTabs courseId={courseId} segment={segment} />
       </header>
       {children}
     </PageContainer>

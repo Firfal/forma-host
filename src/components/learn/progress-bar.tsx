@@ -1,10 +1,19 @@
 import { cn } from "@/lib/cn";
 
-export function ProgressBar({ percent, className }: { percent: number; className?: string }) {
+export function ProgressBar({
+  percent,
+  className,
+  label = "Progression",
+}: {
+  percent: number;
+  className?: string;
+  label?: string;
+}) {
   return (
     <div
       className={cn("h-1.5 w-full overflow-hidden rounded-full bg-line-soft", className)}
       role="progressbar"
+      aria-label={label}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={percent}

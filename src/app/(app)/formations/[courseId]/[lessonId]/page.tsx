@@ -197,7 +197,10 @@ export default function LessonPage() {
 
   return (
     <div className="lg:grid lg:grid-cols-[300px_1fr]">
-      <aside className="hidden border-r border-line-soft px-4 py-6 lg:block">
+      <aside
+        aria-label="Plan de la formation"
+        className="hidden border-r border-line-soft px-4 py-6 lg:block"
+      >
         <div className="sticky top-6 max-h-[calc(100dvh-3rem)] overflow-y-auto pr-1">{outline}</div>
       </aside>
 
@@ -352,29 +355,15 @@ export default function LessonPage() {
           <LessonAssistant key={`assistant-${lessonId}`} courseId={courseId} lessonId={lessonId} />
         ) : null}
 
-        <div className="mt-6 flex items-center justify-end gap-2 border-b border-line-soft pb-6">
-          <Button
-            asChild
-            variant="subtle"
-            size="icon"
-            aria-label="Leçon précédente"
-            className={cn(!prev && "invisible")}
-          >
-            <Link href={prev ? routes.lesson(courseId, prev.id) : "#"}>
-              <ArrowLeft />
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="subtle"
-            size="icon"
-            aria-label="Leçon suivante"
-            className={cn(!next && "invisible")}
-          >
-            <Link href={next ? routes.lesson(courseId, next.id) : "#"}>
-              <ArrowRight />
-            </Link>
-          </Button>
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-line-soft pb-6">
+          {prev ? (
+            <Button asChild variant="subtle" aria-label="Leçon précédente">
+              <Link href={routes.lesson(courseId, prev.id)}>
+                <ArrowLeft /> <span className="hidden sm:inline">Précédente</span>
+              </Link>
+            </Button>
+          ) : null}
+          <span className="flex-1" />
           {tracksProgress && !lock && quizRequired && !isDone ? (
             <Button asChild>
               <a href="#quiz">
@@ -385,6 +374,18 @@ export default function LessonPage() {
             <Button variant={isDone ? "secondary" : "primary"} onClick={toggleDone}>
               {isDone ? <Check className="text-success" /> : <Square />}
               {isDone ? "Terminée" : "Terminer"}
+            </Button>
+          ) : null}
+          {next ? (
+            <Button
+              asChild
+              // Leçon terminée (ou visiteur) : passer à la suivante devient l'action principale.
+              variant={isDone || !tracksProgress || lock ? "primary" : "secondary"}
+              aria-label="Leçon suivante"
+            >
+              <Link href={routes.lesson(courseId, next.id)}>
+                Suivante <ArrowRight />
+              </Link>
             </Button>
           ) : null}
         </div>

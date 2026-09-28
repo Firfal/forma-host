@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Award } from "lucide-react";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
+import { brandCssVars } from "@shared/color";
 import { certificateDuration, type CertificateDoc } from "@shared/certificates";
 import type { CreatorDoc, TimestampLike } from "@shared/types";
 import { LogoMark } from "@/components/logo";
@@ -44,14 +45,12 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
   const data = await load(id);
   if (!data) notFound();
   const { certificate, creator } = data;
-  const brandColor =
-    creator && /^#[0-9a-f]{6}$/i.test(creator.brandColor) ? creator.brandColor : "#5a0eb5";
   const duration = certificateDuration(certificate.durationSec);
   const verifyUrl = `${brand.appUrl.replace(/^https?:\/\//, "")}/certificats/${id}`;
 
   return (
     <div
-      style={{ "--brand": brandColor } as CSSProperties}
+      style={brandCssVars(creator?.brandColor) as CSSProperties}
       className="print-certificate min-h-dvh bg-surface px-4 py-8 print:bg-white print:p-0"
     >
       <div className="mx-auto mb-4 flex max-w-4xl items-center justify-between gap-3 print:hidden">
@@ -72,7 +71,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ id
             )}
             <span className="text-lg font-semibold">{certificate.schoolName}</span>
           </div>
-          <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.25em] text-[var(--brand)] md:mt-10 md:text-[13px]">
+          <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.25em] text-[var(--brand-text)] md:mt-10 md:text-[13px]">
             Certificat de réussite
           </p>
           <p className="mt-3 text-[13px] text-muted md:mt-5">décerné à</p>

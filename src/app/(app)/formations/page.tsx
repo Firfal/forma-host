@@ -57,9 +57,12 @@ function ResumeCard({
   const percent = current.total ? Math.round((current.done / current.total) * 100) : 0;
   return (
     <Card className="mb-6 flex flex-col overflow-hidden sm:flex-row">
+      {/* Miniature sur grand écran seulement (la carte de la formation la montre déjà). */}
       <Link
         href={routes.lesson(current.course.id, current.next.id)}
-        className="sm:w-64 sm:shrink-0"
+        className="hidden sm:block sm:w-64 sm:shrink-0"
+        tabIndex={-1}
+        aria-hidden
       >
         <CourseThumbnail src={current.course.thumbnailUrl} title={current.course.title} />
       </Link>
