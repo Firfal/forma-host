@@ -94,6 +94,12 @@ service cloud.firestore {
       }
 
       // Appareils qui reçoivent les notifications push (un token FCM par navigateur).
+      // Notes personnelles de l'élève sur une leçon ({formation}_{leçon}) : à lui seul.
+      match /notes/{noteId} {
+        allow read, delete: if isUser(userId);
+        allow create, update: if isUser(userId) && isValidNote(noteId);
+      }
+
       match /pushTokens/{tokenId} {
         allow read, delete: if isUser(userId);
         allow create: if isUser(userId)
@@ -103,6 +109,17 @@ service cloud.firestore {
           && isValidPushToken()
           && request.resource.data.createdAt == resource.data.createdAt;
       }
+    }
+
+    function isValidNote(noteId) {
+      let note = request.resource.data;
+      return onlyKeys(['courseId', 'lessonId', 'lessonTitle', 'text', 'updatedAt'])
+        && isShortString(note.courseId, 1, 128)
+        && isShortString(note.lessonId, 1, 128)
+        && noteId == note.courseId + '_' + note.lessonId
+        && isShortString(note.lessonTitle, 0, 200)
+        && isShortString(note.text, 0, 20000)
+        && note.updatedAt == request.time;
     }
 
     function isValidPushToken() {

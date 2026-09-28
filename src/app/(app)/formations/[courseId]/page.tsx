@@ -16,6 +16,7 @@ import { PageContainer } from "@/components/layout/page";
 import { CertificateButton } from "@/components/learn/certificate-button";
 import { CourseAnnouncements } from "@/components/learn/course-announcements";
 import { CourseLives } from "@/components/learn/course-lives";
+import { CourseNotes } from "@/components/learn/course-notes";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
@@ -102,6 +103,9 @@ export default function StudentCoursePage() {
             locks={locks}
             variant="cards"
           />
+          {enrollment?.status === "active" ? (
+            <CourseNotes uid={enrollment.uid} courseId={course.id} items={course.items} />
+          ) : null}
           {enrollment?.status === "active" && !isOwner ? (
             <CourseReviewCard
               courseId={course.id}

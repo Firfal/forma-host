@@ -28,6 +28,7 @@ import type { LessonDoc } from "@shared/types";
 import { LessonComments } from "@/components/comments/lesson-comments";
 import { RichText } from "@/components/editor/rich-text";
 import { CourseOutlineNav } from "@/components/learn/course-outline-nav";
+import { LessonNotes } from "@/components/learn/lesson-notes";
 import { NoAccess } from "@/components/learn/no-access";
 import { ProgressBar, progressLabel } from "@/components/learn/progress-bar";
 import { useStudentCourse } from "@/components/learn/student-course-context";
@@ -352,6 +353,16 @@ export default function LessonPage() {
 
         {assistantSettings?.enabled && course.assistant && !lock && (tracksProgress || isOwner) ? (
           <LessonAssistant key={`assistant-${lessonId}`} courseId={courseId} lessonId={lessonId} />
+        ) : null}
+
+        {tracksProgress && user && !lock ? (
+          <LessonNotes
+            key={`notes-${lessonId}`}
+            uid={user.uid}
+            courseId={courseId}
+            lessonId={lessonId}
+            lessonTitle={item.title}
+          />
         ) : null}
 
         <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-line-soft pb-6">

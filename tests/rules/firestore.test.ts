@@ -1129,3 +1129,34 @@ describe("webhooks", () => {
     );
   });
 });
+
+describe("notes de leçon", () => {
+  const note = (overrides: Record<string, unknown> = {}) => ({
+    courseId: "c1",
+    lessonId: "l1",
+    lessonTitle: "Intro",
+    text: "Penser aux courbes",
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  it("écrites et lues par l'élève seul", async () => {
+    await assertSucceeds(setDoc(doc(db(ANNE), "users/anne/notes/c1_l1"), note()));
+    await assertSucceeds(getDoc(doc(db(ANNE), "users/anne/notes/c1_l1")));
+    await assertSucceeds(getDocs(collection(db(ANNE), "users/anne/notes")));
+    await assertFails(getDoc(doc(creatorDb(), "users/anne/notes/c1_l1")));
+    await assertFails(setDoc(doc(db(STRANGER), "users/anne/notes/c1_l1"), note()));
+    await assertSucceeds(deleteDoc(doc(db(ANNE), "users/anne/notes/c1_l1")));
+  });
+
+  it("forme vérifiée : identifiant, champs, taille", async () => {
+    await assertFails(setDoc(doc(db(ANNE), "users/anne/notes/c1_l2"), note()));
+    await assertFails(setDoc(doc(db(ANNE), "users/anne/notes/c1_l1"), note({ extra: 1 })));
+    await assertFails(
+      setDoc(doc(db(ANNE), "users/anne/notes/c1_l1"), note({ text: "x".repeat(20001) })),
+    );
+    await assertFails(
+      setDoc(doc(db(ANNE), "users/anne/notes/c1_l1"), note({ updatedAt: Timestamp.now() })),
+    );
+  });
+});

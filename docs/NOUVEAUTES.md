@@ -26,6 +26,8 @@ défaut : rien ne change pour les élèves tant que l'école ne l'active pas.
 - **Assistant IA** sous les leçons (après ajout d'une clé API dans *Plateforme > Vue d'ensemble*,
   puis activation par formation).
 - **Communauté d'école** : espace d'échange entre élèves et équipe (*Admin > Communauté*).
+- **Notes de l'élève** : sous chaque leçon, notes personnelles (visibles par l'élève seul),
+  enregistrées pendant la saisie et regroupées sur la page de la formation.
 
 ## Suivre
 
