@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { groupByChapter, visibleLessons } from "./outline";
 import type { OutlineItem } from "./types";
 
@@ -8,11 +7,7 @@ import type { OutlineItem } from "./types";
  * - schedule : un chapitre s'ouvre tous les `intervalDays` jours après l'inscription.
  * C'est un rythme pédagogique affiché à l'élève (l'équipe de l'école voit tout).
  */
-export const dripSchema = z.discriminatedUnion("mode", [
-  z.object({ mode: z.literal("sequential") }),
-  z.object({ mode: z.literal("schedule"), intervalDays: z.number().int().min(1).max(90) }),
-]);
-export type DripSettings = z.infer<typeof dripSchema>;
+export type DripSettings = { mode: "sequential" } | { mode: "schedule"; intervalDays: number };
 
 export type LessonLock =
   | { reason: "sequential"; previousLessonId: string; previousTitle: string }

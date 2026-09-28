@@ -2,6 +2,9 @@ import { z } from "zod";
 import { emailSchema } from "./schemas";
 import { isReservedSlug, isValidSlug } from "./slug";
 
+// Sans zod, pour le code chargé sur toutes les pages (session, barre latérale).
+export { schoolAdminSet, schoolsFromClaims } from "./school-claims";
+
 /** Profil public d'une école (Admin > Paramètres), enregistré par la callable updateSchoolProfile. */
 
 export const schoolSlugSchema = z
@@ -35,23 +38,6 @@ export function nextPreviousSlugs(
       ? (current.previousSlugs ?? [])
       : [...(current.previousSlugs ?? []), current.slug];
   return [...new Set(all)].filter((slug) => slug !== newSlug);
-}
-
-/** Écoles gérées d'après les custom claims (`schools`), plus la sienne pour un ancien jeton. */
-export function schoolsFromClaims(uid: string, claims: Record<string, unknown>): string[] {
-  const schools = Array.isArray(claims.schools)
-    ? claims.schools.filter((id): id is string => typeof id === "string")
-    : [];
-  if (claims.creator === true && schools.length === 0) return [uid];
-  return schools;
-}
-
-/** Administrateurs d'une école : propriétaire (schoolId) et co-administrateurs. */
-export function schoolAdminSet(
-  schoolId: string,
-  creator: { adminUids?: string[] } | null | undefined,
-): Set<string> {
-  return new Set([schoolId, ...(creator?.adminUids ?? [])]);
 }
 
 export const inviteSchoolAdminInput = z.object({ email: emailSchema });

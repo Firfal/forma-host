@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { visibleLessons } from "./outline";
 import type { OutlineItem } from "./types";
 
@@ -21,12 +20,19 @@ export interface CertificateDoc<T = unknown> {
   issuedAt: T;
 }
 
-export const issueCertificateInput = z.object({
-  courseId: z.string().min(1).max(128),
+export interface IssueCertificateInput {
+  courseId: string;
   /** Nom imprimé sur le certificat. */
-  name: z.string().trim().min(2, "Ton nom complet").max(80, "80 caractères maximum"),
-});
-export type IssueCertificateInput = z.infer<typeof issueCertificateInput>;
+  name: string;
+}
+
+/** Nom imprimé sur le certificat : message d'erreur, ou null s'il convient. */
+export function certificateNameError(name: string): string | null {
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return "Ton nom complet";
+  if (trimmed.length > 80) return "80 caractères maximum";
+  return null;
+}
 
 /** Certificat délivré par défaut, sauf si le formateur l'a désactivé. */
 export function certificateEnabled(course: { certificate?: boolean }): boolean {

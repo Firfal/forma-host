@@ -6,12 +6,11 @@ import { toast } from "sonner";
 import {
   LIVE_DURATIONS,
   formatLiveDate,
-  liveInput,
   liveStatus,
-  replayUrlSchema,
   splitLives,
   type LiveStatus,
 } from "@shared/lives";
+import { liveInput, replayUrlSchema } from "@shared/lives-input";
 import { useLoadedCourse } from "@/components/course/admin-course-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

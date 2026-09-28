@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { schoolAdminSet } from "@shared/school";
+import { schoolAdminSet } from "@shared/school-claims";
 import type { CreatorDoc } from "@shared/types";
 import { useAuth } from "./auth";
 import { useCreator } from "./creator";

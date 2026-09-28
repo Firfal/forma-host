@@ -9,13 +9,12 @@ import {
   where,
   type DocumentReference,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { useEffect, useMemo, useState } from "react";
 import type { SubmissionDoc, SubmissionFile, SubmissionStatus } from "@shared/exercises";
 import { storagePaths } from "@shared/paths";
-import { db, storage } from "./firebase/client";
+import { db, loadStorage } from "./firebase/client";
 import { useQueryData } from "./hooks";
-import { deleteFile, safeFileName } from "./storage";
+import { deleteFile, fileUrl, safeFileName } from "./storage";
 
 /** Envoie le fichier d'un exercice (progression de 0 à 1). */
 export async function uploadSubmissionFile(
@@ -25,7 +24,8 @@ export async function uploadSubmissionFile(
   onProgress: (ratio: number) => void,
 ): Promise<SubmissionFile> {
   const path = storagePaths.submission(courseId, uid, safeFileName(file.name));
-  const task = uploadBytesResumable(ref(storage, path), file, {
+  const { sdk, storage } = await loadStorage();
+  const task = sdk.uploadBytesResumable(sdk.ref(storage, path), file, {
     contentType: file.type || "application/octet-stream",
     contentDisposition: `inline; filename="${encodeURIComponent(file.name)}"`,
   });
@@ -93,7 +93,7 @@ export function useSubmissionFileUrl(path: string | null | undefined): string | 
   useEffect(() => {
     if (!path) return;
     let cancelled = false;
-    getDownloadURL(ref(storage, path))
+    fileUrl(path)
       .then((next) => !cancelled && setUrl({ path, url: next }))
       .catch(() => undefined);
     return () => {

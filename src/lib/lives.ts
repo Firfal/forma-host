@@ -10,7 +10,8 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { useMemo } from "react";
-import { buildIcs, type LiveDoc, type LiveInput } from "@shared/lives";
+import { buildIcs, type LiveDoc } from "@shared/lives";
+import type { LiveInput } from "@shared/lives-input";
 import type { TimestampLike } from "@shared/types";
 import { db } from "./firebase/client";
 import { toDate } from "./format";

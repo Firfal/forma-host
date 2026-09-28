@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { setCommunityInput, sortFeed } from "./community";
+import { sortFeed } from "./community";
+import { setCommunityInput } from "./community-input";
 
 describe("communauté", () => {
   it("fil : épinglés d'abord, puis du plus récent au plus ancien, sans doublon", () => {

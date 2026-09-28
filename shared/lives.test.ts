@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildIcs, formatLiveDate, liveInput, liveStatus, splitLives } from "./lives";
+import { buildIcs, formatLiveDate, liveStatus, splitLives } from "./lives";
+import { liveInput } from "./lives-input";
 
 const start = new Date("2026-10-01T17:00:00Z"); // 19:00 à Paris
 

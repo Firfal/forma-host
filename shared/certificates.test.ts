@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  certificateDuration,
-  certificateEnabled,
-  isCourseCompleted,
-  issueCertificateInput,
-} from "./certificates";
+import { certificateDuration, certificateEnabled, isCourseCompleted } from "./certificates";
+import { issueCertificateInput } from "./certificates-input";
 import type { OutlineItem } from "./types";
 
 const items = [

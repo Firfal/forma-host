@@ -4,12 +4,8 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  RATING_LABELS,
-  courseReviewInput,
-  shouldAskReview,
-  type CourseReviewDoc,
-} from "@shared/attendance";
+import { RATING_LABELS, shouldAskReview, type CourseReviewDoc } from "@shared/attendance";
+import { courseReviewInput } from "@shared/course-review-input";
 import type { ProfileDoc } from "@shared/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";

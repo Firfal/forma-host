@@ -1,5 +1,4 @@
-import { deleteObject, getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { storage } from "./firebase/client";
+import { loadStorage } from "./firebase/client";
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
@@ -31,12 +30,13 @@ export async function uploadPublicFile(
   pathFor: (fileName: string) => string,
   file: File,
 ): Promise<string> {
-  const objectRef = ref(storage, pathFor(safeFileName(file.name)));
-  await uploadBytes(objectRef, file, {
+  const { sdk, storage } = await loadStorage();
+  const objectRef = sdk.ref(storage, pathFor(safeFileName(file.name)));
+  await sdk.uploadBytes(objectRef, file, {
     contentType: file.type,
     cacheControl: "public, max-age=31536000",
   });
-  return getDownloadURL(objectRef);
+  return sdk.getDownloadURL(objectRef);
 }
 
 /** Téléverse un fichier protégé (pièce jointe) et retourne son chemin. */
@@ -45,7 +45,8 @@ export async function uploadProtectedFile(
   file: File,
 ): Promise<string> {
   const path = pathFor(safeFileName(file.name));
-  await uploadBytes(ref(storage, path), file, {
+  const { sdk, storage } = await loadStorage();
+  await sdk.uploadBytes(sdk.ref(storage, path), file, {
     contentType: file.type || "application/octet-stream",
     contentDisposition: `attachment; filename="${encodeURIComponent(file.name)}"`,
   });
@@ -54,7 +55,8 @@ export async function uploadProtectedFile(
 
 /** Télécharge un fichier protégé (les règles vérifient l'inscription) puis le propose au navigateur. */
 export async function downloadProtectedFile(path: string, fileName: string): Promise<void> {
-  const blob = await getBlob(ref(storage, path));
+  const { sdk, storage } = await loadStorage();
+  const blob = await sdk.getBlob(sdk.ref(storage, path));
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -63,8 +65,15 @@ export async function downloadProtectedFile(path: string, fileName: string): Pro
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+/** Adresse de lecture d'un fichier (les règles de Storage s'appliquent). */
+export async function fileUrl(path: string): Promise<string> {
+  const { sdk, storage } = await loadStorage();
+  return sdk.getDownloadURL(sdk.ref(storage, path));
+}
+
 export async function deleteFile(path: string): Promise<void> {
-  await deleteObject(ref(storage, path)).catch((error: { code?: string }) => {
+  const { sdk, storage } = await loadStorage();
+  await sdk.deleteObject(sdk.ref(storage, path)).catch((error: { code?: string }) => {
     if (error.code !== "storage/object-not-found") throw error;
   });
 }

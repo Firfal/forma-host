@@ -1,4 +1,3 @@
-import { httpsCallable } from "firebase/functions";
 import type {
   AcceptInviteInput,
   CourseIdInput,
@@ -32,11 +31,13 @@ import type {
 } from "@shared/school";
 import type { VimeoSettingsInput } from "@shared/vimeo-settings";
 import type { VimeoVideo } from "@shared/types";
-import { functions } from "./client";
+import { loadFunctions } from "./client";
 
 function callable<I, O>(name: string) {
-  const fn = httpsCallable<I, O>(functions, name);
-  return async (input: I): Promise<O> => (await fn(input)).data;
+  return async (input: I): Promise<O> => {
+    const { sdk, functions } = await loadFunctions();
+    return (await sdk.httpsCallable<I, O>(functions, name)(input)).data;
+  };
 }
 
 export const callGrantAccess = callable<GrantAccessInput, GrantAccessResult>("grantAccess");

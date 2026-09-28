@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * Suivi de l'assiduité (Qualiopi, financements OPCO) : temps passé sur les leçons, jour par jour,
  * et avis de fin de formation.
@@ -91,12 +89,11 @@ export interface CourseReviewDoc<T = unknown> {
   updatedAt: T;
 }
 
-export const courseReviewInput = z.object({
-  rating: z.number().int().min(1, "Choisis une note").max(5),
-  recommend: z.boolean(),
-  comment: z.string().trim().max(2000, "2000 caractères maximum"),
-});
-export type CourseReviewInput = z.infer<typeof courseReviewInput>;
+export interface CourseReviewInput {
+  rating: number;
+  recommend: boolean;
+  comment: string;
+}
 
 export const RATING_LABELS = ["", "Décevante", "Moyenne", "Bien", "Très bien", "Excellente"];
 

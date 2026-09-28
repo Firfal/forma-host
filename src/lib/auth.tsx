@@ -12,7 +12,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { schoolsFromClaims } from "@shared/school";
+import { schoolsFromClaims } from "@shared/school-claims";
 import type { UserDoc } from "@shared/types";
 import { auth, db } from "./firebase/client";
 import { forgetPushDevice } from "./push";

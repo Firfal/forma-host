@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { issueCertificateInput } from "@shared/certificates";
+import { certificateNameError } from "@shared/certificates";
 import { routes } from "@shared/paths";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -40,14 +40,14 @@ export function CertificateButton({
 
   async function issue(event: FormEvent) {
     event.preventDefault();
-    const parsed = issueCertificateInput.safeParse({ courseId, name });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Nom invalide");
+    const nameError = certificateNameError(name);
+    if (nameError) {
+      setError(nameError);
       return;
     }
     setBusy(true);
     try {
-      const { id } = await callIssueCertificate(parsed.data);
+      const { id } = await callIssueCertificate({ courseId, name: name.trim() });
       toast.success("Bravo, ton certificat est prêt !");
       router.push(routes.certificate(id));
     } catch (err) {

@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   activityDay,
   attendanceSummary,
-  courseReviewInput,
   formatDay,
   formatTimeSpent,
   reviewSummary,
   shouldAskReview,
 } from "./attendance";
+import { courseReviewInput } from "./course-review-input";
 
 describe("assiduité", () => {
   it("jour d'activité à l'heure de Paris", () => {

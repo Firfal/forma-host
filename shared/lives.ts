@@ -1,10 +1,9 @@
-import { z } from "zod";
-
 /**
  * Directs d'une formation (Zoom, Meet, Teams…) : date, lien de connexion, replay. Les élèves
  * inscrits les voient sur la page de la formation et les ajoutent à leur agenda (.ics).
  *
  * courses/{courseId}/lives/{liveId} : lu par l'équipe et les inscrits, écrit par l'équipe.
+ * Validation de saisie : lives-input.ts (zod, hors des pages élèves).
  */
 
 export interface LiveDoc<T = unknown> {
@@ -23,25 +22,6 @@ export interface LiveDoc<T = unknown> {
 /** Le lien s'active un peu avant l'heure, pour tester son micro. */
 export const JOIN_EARLY_MIN = 15;
 export const LIVE_DURATIONS = [30, 45, 60, 90, 120, 180] as const;
-
-const httpUrl = (message: string) =>
-  z
-    .string()
-    .trim()
-    .max(2000, "Lien trop long")
-    .url(message)
-    .refine((url) => /^https?:\/\//.test(url), message);
-
-export const liveInput = z.object({
-  title: z.string().trim().min(1, "Donne un titre au direct").max(120, "120 caractères maximum"),
-  description: z.string().trim().max(2000, "2000 caractères maximum"),
-  startsAt: z.date({ message: "Date et heure du direct" }),
-  durationMin: z.number().int().min(15).max(480),
-  joinUrl: httpUrl("Lien de connexion invalide (Zoom, Meet, Teams… commençant par https://)"),
-});
-export type LiveInput = z.infer<typeof liveInput>;
-
-export const replayUrlSchema = httpUrl("Lien du replay invalide (https://…)");
 
 export type LiveStatus = "upcoming" | "soon" | "live" | "ended";
 

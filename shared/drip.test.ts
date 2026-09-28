@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dripSchema, lessonLocks, lockLabel } from "./drip";
+import { lessonLocks, lockLabel } from "./drip";
+import { dripSchema } from "./drip-input";
 import type { OutlineItem } from "./types";
 
 const items = [

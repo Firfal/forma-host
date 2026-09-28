@@ -24,15 +24,13 @@ import {
   type CreatorRequestDoc,
 } from "@shared/creator-requests";
 import { publishAnnouncementInput } from "@shared/announcements";
-import { issueCertificateInput } from "@shared/certificates";
+import { issueCertificateInput } from "@shared/certificates-input";
 import { askAssistantInput, assistantKeyInput } from "@shared/assistant";
 import { submitQuizInput } from "@shared/quiz";
-import { openConversationInput, updateConversationInput, type MessageDoc } from "@shared/chat";
-import {
-  setCommunityInput,
-  type CommunityPostDoc,
-  type CommunityReplyDoc,
-} from "@shared/community";
+import type { MessageDoc } from "@shared/chat";
+import { openConversationInput, updateConversationInput } from "@shared/chat-input";
+import type { CommunityPostDoc, CommunityReplyDoc } from "@shared/community";
+import { setCommunityInput } from "@shared/community-input";
 import type { FeedbackDoc, SubmissionDoc } from "@shared/exercises";
 import type { LiveDoc } from "@shared/lives";
 import { webhookIdInput, webhookInput } from "@shared/webhooks";

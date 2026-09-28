@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { TimestampLike } from "./types";
 
 /**
@@ -11,23 +10,19 @@ const EXCERPT_MAX = 140;
 
 export const conversationId = (schoolId: string, studentUid: string) => `${schoolId}_${studentUid}`;
 
-const uid = z.string().min(1).max(128);
-
-/** Élève : `studentUid` omis. Équipe : l'élève à qui écrire. */
-export const openConversationInput = z.object({
-  schoolId: uid,
-  studentUid: uid.nullish(),
-});
-export type OpenConversationInput = z.infer<typeof openConversationInput>;
+/** Élève : `studentUid` omis. Équipe : l'élève à qui écrire (validation : chat-input.ts). */
+export interface OpenConversationInput {
+  schoolId: string;
+  studentUid?: string | null;
+}
 
 /** Réglages d'une conversation : archivage et blocage (équipe), sourdine (chaque participant). */
-export const updateConversationInput = z.object({
-  conversationId: z.string().min(3).max(300),
-  archived: z.boolean().nullish(),
-  blocked: z.boolean().nullish(),
-  muted: z.boolean().nullish(),
-});
-export type UpdateConversationInput = z.infer<typeof updateConversationInput>;
+export interface UpdateConversationInput {
+  conversationId: string;
+  archived?: boolean | null;
+  blocked?: boolean | null;
+  muted?: boolean | null;
+}
 
 export interface ConversationDoc<T = TimestampLike> {
   schoolId: string;

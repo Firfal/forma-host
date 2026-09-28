@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * Communauté d'école : un fil de discussion réservé à l'équipe et aux élèves inscrits à au moins
  * une formation de l'école. Désactivée par défaut, activée par l'équipe.
@@ -42,11 +40,11 @@ export interface CommunityReplyDoc<T = unknown> {
   createdAt: T;
 }
 
-export const setCommunityInput = z.object({
-  schoolId: z.string().min(1).max(128),
-  enabled: z.boolean(),
-});
-export type SetCommunityInput = z.infer<typeof setCommunityInput>;
+/** Ouverture ou fermeture de la communauté d'une école (validation : community-input.ts). */
+export interface SetCommunityInput {
+  schoolId: string;
+  enabled: boolean;
+}
 
 /** Fil : messages épinglés d'abord, puis du plus récent au plus ancien, sans doublon. */
 export function sortFeed<T extends { id: string; pinned: boolean; at: number }>(
