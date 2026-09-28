@@ -7,6 +7,8 @@ export const DEFAULT_BRAND_COLOR = "#5a0eb5";
 const WHITE = "#ffffff";
 const INK = "#111111";
 const AA = 4.5;
+/** Texte de couleur : un peu de marge, pour rester lisible sur un fond légèrement teinté. */
+const TEXT_ON_TINT = 5.2;
 
 const isHex = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
 
@@ -39,10 +41,10 @@ export function darken(hex: string, ratio: number): string {
 }
 
 /** Première teinte, de plus en plus sombre, lisible sur du blanc (null au-delà de `max`). */
-function readableShade(hex: string, max: number): string | null {
+function readableShade(hex: string, max: number, target = AA): string | null {
   for (let step = 0; step <= Math.round(max * 20); step += 1) {
     const shade = darken(hex, step / 20);
-    if (contrastRatio(shade, WHITE) >= AA) return shade;
+    if (contrastRatio(shade, WHITE) >= target) return shade;
   }
   return null;
 }
@@ -62,7 +64,7 @@ export interface BrandPalette {
  */
 export function brandPalette(color: string | null | undefined): BrandPalette {
   const base = color && isHex(color) ? color.toLowerCase() : DEFAULT_BRAND_COLOR;
-  const text = readableShade(base, 0.9) ?? INK;
+  const text = readableShade(base, 0.9, TEXT_ON_TINT) ?? INK;
   const shade = readableShade(base, 0.35);
   return shade ? { brand: shade, ink: WHITE, text } : { brand: base, ink: INK, text };
 }

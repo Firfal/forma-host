@@ -40,7 +40,7 @@ import { schoolDomainInput } from "@shared/domains";
 import { formatPostalAddress } from "@shared/invoices";
 import { schoolLegalInput } from "@shared/legal";
 import { mailSettingsInput } from "@shared/mail-settings";
-import { createCheckoutInput, promoCodeIdInput, promoCodeInput } from "@shared/payments";
+import { createCheckoutInput, promoCodeIdInput, promoCodeInput } from "@shared/payments-input";
 import { inviteSchoolAdminInput, removeSchoolAdminInput, schoolIdInput } from "@shared/school";
 import { schoolProfileInput } from "@shared/school";
 import { vimeoSettingsInput } from "@shared/vimeo-settings";

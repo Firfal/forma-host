@@ -36,7 +36,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActivityTracker } from "@/lib/attendance";
 import { useAuth } from "@/lib/auth";
-import { cn } from "@/lib/cn";
 import { useCreator } from "@/lib/creator";
 import { errorMessage } from "@/lib/firebase/callables";
 import { db } from "@/lib/firebase/client";

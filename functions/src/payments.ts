@@ -9,9 +9,9 @@ import {
   type OrderDoc,
   type OrderInstallments,
   type PromoCodeDoc,
-  type PromoCodeInput,
   type SchoolStripeDoc,
 } from "@shared/payments";
+import type { PromoCodeInput } from "@shared/payments-input";
 import { routes } from "@shared/paths";
 import { schoolAdminSet } from "@shared/school";
 import type { CourseDoc, CreatorDoc } from "@shared/types";

@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  coursePriceSchema,
   formatPrice,
   installmentLabel,
   installmentPlan,
   isLiveKey,
   parsePriceInput,
-  promoCodeInput,
   promoLabel,
   sameStripeMode,
 } from "./payments";
+import { coursePriceSchema, promoCodeInput } from "./payments-input";
 
 describe("prix", () => {
   it("formate en euros", () => {

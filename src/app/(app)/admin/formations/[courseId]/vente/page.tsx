@@ -11,12 +11,12 @@ import {
   installmentLabel,
   MIN_INSTALLMENTS_PRICE_CENTS,
   parsePriceInput,
-  promoCodeInput,
   promoLabel,
   sameStripeMode,
   type OrderDoc,
   type PromoCodeDoc,
 } from "@shared/payments";
+import { promoCodeInput } from "@shared/payments-input";
 import { routes } from "@shared/paths";
 import type { TimestampLike } from "@shared/types";
 import { useLoadedCourse } from "@/components/course/admin-course-context";

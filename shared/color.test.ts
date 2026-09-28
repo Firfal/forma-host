@@ -6,6 +6,11 @@ describe("couleur d'école lisible", () => {
     expect(brandPalette("#5a0eb5")).toEqual({ brand: "#5a0eb5", ink: "#ffffff", text: "#5a0eb5" });
   });
 
+  it("texte de couleur lisible aussi sur un fond teinté à 10 %", () => {
+    const { text } = brandPalette("#9d72f9");
+    expect(contrastRatio(text, "#f3effb")).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("violet clair : légèrement assombri jusqu'au contraste AA", () => {
     const palette = brandPalette("#9D72F9");
     expect(palette.ink).toBe("#ffffff");

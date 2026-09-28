@@ -29,7 +29,7 @@ function Stars({
   const shown = hover || value;
   if (!onChange) {
     return (
-      <span className="inline-flex" aria-label={`${value} sur 5`}>
+      <span className="inline-flex" role="img" aria-label={`${value} sur 5`}>
         {[1, 2, 3, 4, 5].map((rating) => (
           <Star
             key={rating}
