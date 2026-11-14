@@ -1,6 +1,6 @@
 name: Déploiement Firebase
 
-# Déploie le projet Firebase « forma-host » à chaque push sur la branche par défaut,
+# Déploie le projet Firebase « forma-host » à chaque push sur main (la production),
 # ou à la demande (onglet Actions > Déploiement Firebase > Run workflow).
 #
 # Accès au projet sans clé (Workload Identity Federation) : lancer une fois
@@ -13,6 +13,7 @@ name: Déploiement Firebase
 
 on:
   push:
+    branches: [main]
     paths-ignore:
       - "**.md"
       - "docs/**"

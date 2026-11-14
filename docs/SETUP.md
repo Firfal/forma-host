@@ -4,7 +4,7 @@ Pour le développement local, les émulateurs suffisent (voir le README).
 
 > **Région unique : `europe-west4` (Pays-Bas).** La région de Firestore et celle du bucket Storage ne peuvent **plus être changées** après leur création.
 
-Le déploiement est **automatique** : le workflow GitHub Actions `Déploiement Firebase` (`.github/workflows/deploy.yml`) prépare le projet et déploie tout à chaque push sur la branche par défaut. Il suffit de lui donner un accès au projet (étape 1), sans aucune clé à manipuler.
+Le déploiement est **automatique** : le workflow GitHub Actions `Déploiement Firebase` (`.github/workflows/deploy.yml`) prépare le projet et déploie tout à chaque push sur `main`. Les autres branches passent seulement les tests (CI) : on y prépare les changements, puis on les fusionne dans `main` pour les mettre en ligne. Il suffit de lui donner un accès au projet (étape 1), sans aucune clé à manipuler.
 
 Adresse de l'application : **https://forma-host--forma-host.europe-west4.hosted.app**
 
@@ -15,7 +15,7 @@ Adresse de l'application : **https://forma-host--forma-host.europe-west4.hosted.
    1. Ouvre [Cloud Shell](https://shell.cloud.google.com/?project=forma-host) (terminal dans le navigateur, rien à installer).
    2. Colle cette commande :
       ```bash
-      curl -fsSL https://raw.githubusercontent.com/Firfal/forma-host/claude/optimistic-knuth-lnjps2/scripts/setup-github-deploy.sh | bash
+      curl -fsSL https://raw.githubusercontent.com/Firfal/forma-host/main/scripts/setup-github-deploy.sh | bash
       ```
    3. Elle crée le compte de service `github-deploy` (rôle Propriétaire). Seul le workflow `deploy.yml` de ce dépôt peut l'utiliser.
    4. Reporte le **numéro de projet** affiché à la fin dans `PROJECT_NUMBER` de `.github/workflows/deploy.yml`.
